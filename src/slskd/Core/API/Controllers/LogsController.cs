@@ -52,15 +52,12 @@ namespace slskd.Core.API
     public class LogsController : ControllerBase
     {
         public LogsController(
-            FileService fileService,
-            OptionsAtStartup optionsAtStartup)
+            FileService fileService)
         {
             Files = fileService;
-            OptionsAtStartup = optionsAtStartup;
         }
 
         private FileService Files { get; }
-        private OptionsAtStartup OptionsAtStartup { get; }
         private ILogger Log { get; } = Serilog.Log.ForContext<ApplicationController>();
 
         /// <summary>
