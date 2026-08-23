@@ -365,6 +365,16 @@ namespace slskd.Files
             });
         }
 
+        /// <summary>
+        ///     Retrieves the contents of the specified <paramref name="filename"/> as a stream.
+        /// </summary>
+        /// <param name="filename">The file for which contents are to be retrieved.</param>
+        /// <returns>A Stream containing the contents of the file.</returns>
+        /// <exception cref="ArgumentNullException">Thrown if the specified filename is null or contains only whitespace.</exception>
+        /// <exception cref="ArgumentException">Thrown if the specified filename contains path traversal segments.</exception>
+        /// <exception cref="UnauthorizedException">Thrown if the specified file is not within an allowed directory.</exception>
+        /// <exception cref="NotFoundException">Thrown if the specified file does not exist.</exception>
+        /// <exception cref="IOException">Thrown if the file can't be opened for some reason.</exception>
         public virtual Stream GetFileContents(string filename)
         {
             ArgumentNullException.ThrowIfNullOrWhiteSpace(filename, nameof(filename));
