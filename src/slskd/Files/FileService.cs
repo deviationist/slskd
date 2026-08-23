@@ -365,6 +365,39 @@ namespace slskd.Files
             });
         }
 
+        public virtual Stream GetFileContents(string filename)
+        {
+            ArgumentNullException.ThrowIfNullOrWhiteSpace(filename, nameof(filename));
+
+            if (FileSafety.ContainsTraversalSegments(filename))
+            {
+                Log.Warning("Suspicious attempt to read a file with a filename containing unsafe path segments (one or more of path traversal characters '.' and '..'). Requested file: {File}", filename);
+                throw new ArgumentException("Filenames containing traversal segments are not allowed");
+            }
+
+            // important! we must fully expand the path with GetFullPath() to resolve a given relative directory, like '..'
+            if (!AllowedDirectories.Any(allowed => filename.StartsWith(allowed + Path.DirectorySeparatorChar)))
+            {
+                throw new UnauthorizedException($"Only application-controlled directories can be listed");
+            }
+
+            var info = ResolveFileInfo(filename);
+
+            if (!info.Exists)
+            {
+                throw new NotFoundException();
+            }
+
+            try
+            {
+                return new FileStream(filename, FileMode.Open, FileAccess.Read);
+            }
+            catch (Exception ex)
+            {
+                throw new IOException($"Failed to open file {Path.GetFileName(filename)} for reading: {ex.Message}", ex);
+            }
+        }
+
         /// <summary>
         ///     Creates a new file with the specified fully qualified <paramref name="filename"/> and the optional <paramref name="options"/>,
         ///     returning a <see cref="Stream"/> with which the contents of the file can be written.
