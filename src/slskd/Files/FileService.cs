@@ -61,6 +61,7 @@ namespace slskd.Files
         {
             Path.GetFullPath(OptionsMonitor.CurrentValue.Directories.Downloads),
             Path.GetFullPath(OptionsMonitor.CurrentValue.Directories.Incomplete),
+            Path.GetFullPath(Program.LogDirectory),
         };
 
         private ILogger Log { get; } = Serilog.Log.ForContext<FileService>();
