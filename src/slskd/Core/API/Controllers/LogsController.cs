@@ -32,9 +32,14 @@
 
 namespace slskd.Core.API
 {
+    using System;
+    using System.IO;
+    using System.Threading.Tasks;
     using Asp.Versioning;
     using Microsoft.AspNetCore.Authorization;
     using Microsoft.AspNetCore.Mvc;
+    using Serilog;
+    using slskd.Files;
 
     /// <summary>
     ///     Logs.
@@ -46,15 +51,67 @@ namespace slskd.Core.API
     [Consumes("application/json")]
     public class LogsController : ControllerBase
     {
+        public LogsController(
+            FileService fileService,
+            OptionsAtStartup optionsAtStartup)
+        {
+            Files = fileService;
+            OptionsAtStartup = optionsAtStartup;
+        }
+
+        private FileService Files { get; }
+        private OptionsAtStartup OptionsAtStartup { get; }
+        private ILogger Log { get; } = Serilog.Log.ForContext<ApplicationController>();
+
         /// <summary>
         ///     Gets the last few application logs.
         /// </summary>
         /// <returns></returns>
-        [HttpGet]
+        [HttpGet("buffer")]
         [Authorize(Policy = AuthPolicy.Any)]
         public IActionResult Logs()
         {
             return Ok(Program.LogBuffer);
+        }
+
+        [HttpGet]
+        [Authorize(Policy = AuthPolicy.Any)]
+        public async Task<IActionResult> List()
+        {
+            var directory = await Files.ListDirectoryContentsAsync(System.IO.Path.GetFullPath(Program.LogDirectory), enumerationOptions: new EnumerationOptions
+            {
+                AttributesToSkip = FileAttributes.System,
+                RecurseSubdirectories = false,
+            });
+
+            return Ok(directory.Files);
+        }
+
+        [HttpGet("{filename}")]
+        [Authorize(Policy = AuthPolicy.Any)]
+        public async Task<IActionResult> Get(string filename, [FromQuery] bool download = false)
+        {
+            filename = FileSafety.GetFileNameSafely(filename);
+
+            try
+            {
+                var stream = Files.GetFileContents(FileSafety.CombineSafely(Program.LogDirectory, filename));
+
+                if (download)
+                {
+                    return File(stream, "text/plain", filename);
+                }
+
+                return File(stream, "text/plain");
+            }
+            catch (UnauthorizedException)
+            {
+                return NotFound();
+            }
+            catch (NotFoundException)
+            {
+                return NotFound();
+            }
         }
     }
 }
