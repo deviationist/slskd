@@ -301,7 +301,7 @@ namespace slskd.Files
         /// <exception cref="ArgumentException">Thrown if the specified directory has a relative path.</exception>
         /// <exception cref="NotFoundException">Thrown if the specified directory does not exist.</exception>
         /// <exception cref="UnauthorizedException">Thrown if the specified root directory is restricted.</exception>
-        public virtual async Task<FilesystemDirectory> ListContentsAsync(string directory, EnumerationOptions enumerationOptions = null)
+        public virtual async Task<FilesystemDirectory> ListDirectoryContentsAsync(string directory, EnumerationOptions enumerationOptions)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(directory);
 
