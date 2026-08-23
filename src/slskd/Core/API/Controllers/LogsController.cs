@@ -67,15 +67,19 @@ namespace slskd.Core.API
         ///     Gets the last few application logs.
         /// </summary>
         /// <returns></returns>
-        [HttpGet("buffer")]
-        [Authorize(Policy = AuthPolicy.Any)]
+        [HttpGet("live")]
+        [Authorize(Policy = AuthPolicy.Any, Roles = AuthRole.AdministratorOnly)]
         public IActionResult Logs()
         {
             return Ok(Program.LogBuffer);
         }
 
-        [HttpGet]
-        [Authorize(Policy = AuthPolicy.Any)]
+        /// <summary>
+        ///     Lists the log files currently on disk.
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet("files")]
+        [Authorize(Policy = AuthPolicy.Any, Roles = AuthRole.AdministratorOnly)]
         public async Task<IActionResult> List()
         {
             var directory = await Files.ListDirectoryContentsAsync(System.IO.Path.GetFullPath(Program.LogDirectory), enumerationOptions: new EnumerationOptions
@@ -87,8 +91,14 @@ namespace slskd.Core.API
             return Ok(directory.Files);
         }
 
-        [HttpGet("{filename}")]
-        [Authorize(Policy = AuthPolicy.Any)]
+        /// <summary>
+        ///     Retrieves the requested log file from disk.
+        /// </summary>
+        /// <param name="filename"></param>
+        /// <param name="download"></param>
+        /// <returns></returns>
+        [HttpGet("files/{filename}")]
+        [Authorize(Policy = AuthPolicy.Any, Roles = AuthRole.AdministratorOnly)]
         public async Task<IActionResult> Get(string filename, [FromQuery] bool download = false)
         {
             filename = FileSafety.GetFileNameSafely(filename);
