@@ -1458,11 +1458,11 @@ namespace slskd
             /// <summary>
             ///     Gets a value indicating whether to write logs to disk.
             /// </summary>
-            [Argument(default, "disk-logger")]
-            [EnvironmentVariable("DISK_LOGGER")]
-            [Description("enable logging to disk")]
+            [Argument(default, "no-disk-logger")]
+            [EnvironmentVariable("NO_DISK_LOGGER")]
+            [Description("disable logging to disk")]
             [RequiresRestart]
-            public bool Disk { get; init; } = false;
+            public bool Disk { get; init; } = true;
 
             /// <summary>
             ///     Gets a value indicating whether to suppress colorization of console logs.
