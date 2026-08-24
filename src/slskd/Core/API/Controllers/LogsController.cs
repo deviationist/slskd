@@ -33,7 +33,10 @@
 namespace slskd.Core.API
 {
     using System;
+    using System.Collections.Generic;
     using System.IO;
+    using System.IO.Compression;
+    using System.Threading;
     using System.Threading.Tasks;
     using Asp.Versioning;
     using Microsoft.AspNetCore.Authorization;
@@ -77,13 +80,23 @@ namespace slskd.Core.API
         /// <returns></returns>
         [HttpGet("files")]
         [Authorize(Policy = AuthPolicy.Any, Roles = AuthRole.AdministratorOnly)]
-        public async Task<IActionResult> List()
+        public async Task<IActionResult> List(CancellationToken cancellationToken, [FromQuery] bool download = false)
         {
             var directory = await Files.ListDirectoryContentsAsync(System.IO.Path.GetFullPath(Program.LogDirectory), enumerationOptions: new EnumerationOptions
             {
                 AttributesToSkip = FileAttributes.System,
                 RecurseSubdirectories = false,
             });
+
+            if (download)
+            {
+                var stream = new MemoryStream();
+                await ZipFile.CreateFromDirectoryAsync(Program.LogDirectory, stream, cancellationToken: cancellationToken);
+
+                var now = DateTime.UtcNow;
+
+                return File(stream, "application/zip", $"logs-{now:yyyyMMdd}-{new DateTimeOffset(now).ToUnixTimeMilliseconds}.zip");
+            }
 
             return Ok(directory.Files);
         }
