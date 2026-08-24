@@ -35,7 +35,6 @@ namespace slskd.Core.API
     using System;
     using System.Collections.Generic;
     using System.IO;
-    using System.IO.Compression;
     using System.Threading;
     using System.Threading.Tasks;
     using Asp.Versioning;
@@ -87,16 +86,6 @@ namespace slskd.Core.API
                 AttributesToSkip = FileAttributes.System,
                 RecurseSubdirectories = false,
             });
-
-            if (download)
-            {
-                var stream = new MemoryStream();
-                await ZipFile.CreateFromDirectoryAsync(Program.LogDirectory, stream, cancellationToken: cancellationToken);
-
-                var now = DateTime.UtcNow;
-
-                return File(stream, "application/zip", $"logs-{now:yyyyMMdd}-{new DateTimeOffset(now).ToUnixTimeMilliseconds}.zip");
-            }
 
             return Ok(directory.Files);
         }
