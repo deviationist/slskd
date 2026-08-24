@@ -1500,8 +1500,8 @@ namespace slskd
             /// <summary>
             ///     Gets the time to retain logs, in days.
             /// </summary>
-            [Range(1, maximum: int.MaxValue)]
-            public int Logs { get; init; } = 180;
+            [Range(7, maximum: int.MaxValue)]
+            public int Logs { get; init; } = 30;
 
             /// <summary>
             ///     Transfer retention options.
