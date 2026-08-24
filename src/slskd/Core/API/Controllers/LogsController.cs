@@ -98,27 +98,111 @@ namespace slskd.Core.API
         [Authorize(Policy = AuthPolicy.Any, Roles = AuthRole.AdministratorOnly)]
         public async Task<IActionResult> Get(string filename, [FromQuery] bool download = false)
         {
-            filename = FileSafety.GetFileNameSafely(filename);
+            if (string.IsNullOrWhiteSpace(filename))
+            {
+                return BadRequest("Filename is required");
+            }
+
+            if (filename.ContainsAny('/', '\\'))
+            {
+                return BadRequest("Filename must not contain a path");
+            }
+
+            var sanitizedFilename = FileSafety.GetFileNameSafely(filename, sanitize: true);
+
+            if (!sanitizedFilename.Equals(filename, StringComparison.OrdinalIgnoreCase))
+            {
+                Log.Warning("Input filename {Filename} sanitized to {Sanitized}", filename, sanitizedFilename);
+                return BadRequest("Filename contains one or more invalid characters");
+            }
 
             try
             {
-                var stream = Files.GetFileContents(FileSafety.CombineSafely(Program.LogDirectory, filename));
+                var stream = Files.GetFileContents(FileSafety.CombineSafely(Program.LogDirectory, sanitizedFilename));
 
                 if (download)
                 {
                     return File(stream, "text/plain", filename);
                 }
 
-                return File(stream, "text/plain");
+                var logs = await ParseLogEntriesAsync(stream);
+
+                return Ok(logs);
             }
             catch (UnauthorizedException)
             {
-                return NotFound();
+                return Unauthorized();
             }
             catch (NotFoundException)
             {
                 return NotFound();
             }
+        }
+
+        private async Task<List<LogRecord>> ParseLogEntriesAsync(Stream stream)
+        {
+            Dictionary<string, string> levels = new()
+            {
+                ["VRB"] = nameof(Serilog.Events.LogEventLevel.Verbose),
+                ["DBG"] = nameof(Serilog.Events.LogEventLevel.Debug),
+                ["INF"] = nameof(Serilog.Events.LogEventLevel.Information),
+                ["WRN"] = nameof(Serilog.Events.LogEventLevel.Warning),
+                ["ERR"] = nameof(Serilog.Events.LogEventLevel.Error),
+                ["FTL"] = nameof(Serilog.Events.LogEventLevel.Fatal),
+            };
+
+            var list = new List<LogRecord>();
+
+            var reader = new StreamReader(stream);
+            string line;
+
+            while ((line = await reader.ReadLineAsync()) is not null)
+            {
+                if (line.Length == 0)
+                {
+                    continue;
+                }
+
+                try
+                {
+                    // if the line isn't a log, append it to the previous message
+                    if (!line.StartsWith('['))
+                    {
+                        var lastIndex = list.Count - 1;
+
+                        if (lastIndex >= 0)
+                        {
+                            var old = list[lastIndex];
+
+                            list[lastIndex] = new LogRecord
+                            {
+                                Timestamp = old.Timestamp,
+                                Level = old.Level,
+                                Message = old.Message + '\n' + line,
+                            };
+                        }
+
+                        continue;
+                    }
+
+                    var parts = line.TrimStart('[').Split(']', count: 2);
+                    var meta = parts[0].Split(' ');
+
+                    list.Add(new LogRecord
+                    {
+                        Timestamp = DateTime.Parse(meta[0]),
+                        Level = levels[meta[1]],
+                        Message = parts[1].TrimStart(),
+                    });
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "Error parsing log message: {Message}", ex.Message);
+                    continue;
+                }
+            }
+
+            return list;
         }
     }
 }
