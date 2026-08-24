@@ -400,7 +400,7 @@ namespace slskd.Files
 
             try
             {
-                return new FileStream(filename, FileMode.Open, FileAccess.Read);
+                return new FileStream(filename, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
             }
             catch (Exception ex)
             {
