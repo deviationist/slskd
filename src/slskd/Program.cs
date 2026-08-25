@@ -512,7 +512,7 @@ namespace slskd
 
             Log.Information("Storing application data in {DataDirectory}", DataDirectory);
 
-            if (OptionsAtStartup.Logger.Disk)
+            if (!OptionsAtStartup.Logger.NoDisk)
             {
                 Log.Information("Saving application logs to {LogDirectory}", LogDirectory);
             }
@@ -1242,7 +1242,7 @@ namespace slskd
                     outputTemplate: (OptionsAtStartup.Debug ? "[{SourceContext}] " : string.Empty) + "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
                 .WriteTo.Async(config =>
                     config.Conditional(
-                        e => OptionsAtStartup.Logger.Disk,
+                        e => !OptionsAtStartup.Logger.NoDisk,
                         config => config.File(
                             Path.Combine(LogDirectory, $"{AppName}-.log"),
                             outputTemplate: (OptionsAtStartup.Debug ? "[{SourceContext}] " : string.Empty) + "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}",
