@@ -161,6 +161,8 @@ namespace slskd.Core.API
 
             var list = new List<LogRecord>();
 
+            var currentLength = stream.Length;
+
             var reader = new StreamReader(stream);
             string line;
 
@@ -169,6 +171,15 @@ namespace slskd.Core.API
                 if (line.Length == 0)
                 {
                     continue;
+                }
+
+                if (stream.Position > currentLength)
+                {
+                    // if we're reading the latest file, Serilog can append it while we're inside of this loop,
+                    // or worse, a problem inside this loop appends lines. if this happens the position will grow
+                    // beyond the length at the start
+                    Log.Information("Parsing of log file {Filename} stopped before end of file; log was appended during the read");
+                    break;
                 }
 
                 try
