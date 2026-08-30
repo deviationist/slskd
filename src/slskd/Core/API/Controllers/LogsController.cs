@@ -35,6 +35,7 @@ namespace slskd.Core.API
     using System;
     using System.Collections.Generic;
     using System.IO;
+    using System.Text.RegularExpressions;
     using System.Threading;
     using System.Threading.Tasks;
     using Asp.Versioning;
@@ -61,6 +62,7 @@ namespace slskd.Core.API
 
         private FileService Files { get; }
         private ILogger Log { get; } = Serilog.Log.ForContext<ApplicationController>();
+        private Regex LogLineParseRegex { get; } = new Regex(@"^(\[?([a-zA-Z\.]*)\]?\s)?(\[((\d{4}-\d{2}-\d{2})T)?(\d{2}:\d{2}:\d{2}(?:.\d{3})?)\s([A-Z]+)\]\s)?(.*)", RegexOptions.Compiled);
 
         /// <summary>
         ///     Gets the last few application logs.
