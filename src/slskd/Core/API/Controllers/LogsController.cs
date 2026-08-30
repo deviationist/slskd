@@ -204,14 +204,52 @@ namespace slskd.Core.API
                         continue;
                     }
 
-                    var parts = line.TrimStart('[').Split(']', count: 2);
-                    var meta = parts[0].Split(' ');
+                    /*
+                        there should be 3 possible line types:
+
+                        debug:
+                            [Some.Context] [2000-1-1T11:11:11 WRN] foo bar
+
+                        info:
+                            [2000-1-1T11:11:11 WRN] foo bar
+
+                        line wrap/newline:
+                            foo bar
+
+                        additionally, date was added to disk log files around 9/1/26, so we need to gracefully handle
+                        cases where the timestamp contains only hh:mm:ss, and substitute the unix epoch for the date
+
+                        the regex includes 8 matching groups (hopefully this comment and the regex don't diverge!)
+                        using the debug log as an example, the groups are:
+
+                        0. [Some.Context] [2026-08-29T11:11:11 WRN] foo bar
+                        1. [Some.Context]<space>
+                        2. Some.Context
+                        3. [2000-01-01T11:11:11 WRN]<space>
+                        4. 2000-01-01T
+                        5. 2000-01-01
+                        6. 11:11:11
+                        7. WRN
+                        8. foo bar
+
+                        the final group in the regex is simply `.*`, so we're guaranteed to get a match for every line
+                    */
+                    match = LogLineParseRegex.Match(line);
+
+                    var grp = match.Groups;
+
+                    var date = grp[5].Success ? DateOnly.Parse(grp[5].Value) : DateOnly.FromDateTime(DateTime.UnixEpoch);
+                    var time = grp[6].Success ? TimeOnly.Parse(grp[6].Value) : TimeOnly.FromDateTime(DateTime.UnixEpoch);
+                    var dateTime = date.ToDateTime(time);
+
+                    var level = levels.ContainsKey(grp[7].Value) ? levels[grp[7].Value] : null;
 
                     list.Add(new LogRecord
                     {
-                        Timestamp = DateTime.Parse(meta[0]),
-                        Level = levels[meta[1]],
-                        Message = parts[1].TrimStart(),
+                        Context = grp[2].Value,
+                        Timestamp = dateTime,
+                        Level = level,
+                        Message = grp[8].Value,
                     });
                 }
                 catch (Exception ex)
