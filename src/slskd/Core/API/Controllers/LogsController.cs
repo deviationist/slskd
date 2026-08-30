@@ -129,6 +129,10 @@ namespace slskd.Core.API
                     return File(stream, "text/plain", filename);
                 }
 
+                // future optimization: use IAsyncEnumerable to 'stream' the log records instead of beating up
+                // memory to build a list. save each log in memory and then emit it when the next log
+                // (starting with '[') is read, which indicates that it's not multi-line. in other words, a 1-log buffer
+                // that is flushed when the next log is read, or the file is complete
                 var logs = await ParseLogEntriesAsync(stream);
 
                 return Ok(logs);
