@@ -165,6 +165,7 @@ namespace slskd.Core.API
 
             var reader = new StreamReader(stream);
             string line;
+            Match match = default;
 
             while ((line = await reader.ReadLineAsync()) is not null)
             {
@@ -251,13 +252,30 @@ namespace slskd.Core.API
                         Level = level,
                         Message = grp[8].Value,
                     });
+
+                    Log.Information("Added: {Text}", grp[8].Value);
                 }
                 catch (Exception ex)
                 {
-                    Log.Warning(ex, "Error parsing log message: {Message}", ex.Message);
-                    continue;
+                    Log.Debug("Error parsing log message: {Message}.  Line: {Line}", ex.Message, line);
+
+                    Log.Warning("Got {GroupCount} groups", match.Groups.Count);
+
+                    foreach (var key in match.Groups.Keys)
+                    {
+                        Log.Warning("Key: {Key}, Success: {Success}, Value: {Value}", key, match.Groups[key].Success, match.Groups[key].Value);
+                    }
+
+                    break;
+
+                    list.Add(new LogRecord
+                    {
+                        Message = line,
+                    });
                 }
             }
+
+            Log.Information("Returned {Lines}", list.Count);
 
             return list;
         }
