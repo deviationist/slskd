@@ -1245,7 +1245,7 @@ namespace slskd
                         e => OptionsAtStartup.Logger.Disk,
                         config => config.File(
                             Path.Combine(LogDirectory, $"{AppName}-.log"),
-                            outputTemplate: (OptionsAtStartup.Debug ? "[{SourceContext}] " : string.Empty) + "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}",
+                            outputTemplate: (OptionsAtStartup.Debug ? "[{SourceContext}] " : string.Empty) + "[{Timestamp:yyyy-MM-ddTHH:mm:ss.fff} {Level:u3}] {Message:lj}{NewLine}{Exception}",
                             rollingInterval: RollingInterval.Day,
                             retainedFileTimeLimit: TimeSpan.FromDays(OptionsAtStartup.Retention.Logs),
                             shared: true))) // allow log file to be read concurrently
