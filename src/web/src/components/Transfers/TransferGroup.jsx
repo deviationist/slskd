@@ -126,7 +126,7 @@ class TransferGroup extends Component {
   };
 
   render() {
-    const { direction, remoteFileManagement, user } = this.props;
+    const { deleteFileOnRemoval, direction, user } = this.props;
     const { isFolded } = this.state;
 
     const selected = this.getSelectedFiles();
@@ -218,7 +218,7 @@ class TransferGroup extends Component {
                 is not slskd's to delete.
               */}
               {allRemovable &&
-                remoteFileManagement &&
+                deleteFileOnRemoval &&
                 direction === 'download' && (
                   <>
                     <Button.Or />
