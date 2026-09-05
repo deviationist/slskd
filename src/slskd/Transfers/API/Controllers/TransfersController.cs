@@ -94,8 +94,7 @@ namespace slskd.Transfers.API
         /// <remarks>
         ///     Removing a download removes the record of it, and has never touched the file on disk. Passing
         ///     <paramref name="deleteFile"/> deletes the file the download produced as well, and requires the
-        ///     remote file management option to be enabled -- it is the same permission that governs deletion
-        ///     through the files API, because it is the same act.
+        ///     transfers.download.delete_file_on_removal option to be enabled.
         ///
         ///     Only a file this application knows it wrote is deleted, meaning one recorded when the download
         ///     was moved out of the incomplete directory. A download that never completed has no such record
@@ -104,7 +103,7 @@ namespace slskd.Transfers.API
         /// </remarks>
         /// <response code="200">The download was cancelled successfully, and the outcome of the file deletion is reported.</response>
         /// <response code="204">The download was cancelled successfully.</response>
-        /// <response code="403">File deletion was requested, but remote file management is disabled.</response>
+        /// <response code="403">File deletion was requested, but it is disabled.</response>
         /// <response code="404">The specified download was not found.</response>
         [HttpDelete("downloads/{username}/{id}")]
         [Authorize(Policy = AuthPolicy.Any)]
@@ -124,9 +123,9 @@ namespace slskd.Transfers.API
                 return BadRequest();
             }
 
-            if (deleteFile && !OptionsSnapshot.Value.RemoteFileManagement)
+            if (deleteFile && !OptionsSnapshot.Value.Transfers.Download.DeleteFileOnRemoval)
             {
-                Log.Warning("Deletion of the file for download {Id} forbidden; remote file management is disabled", guid);
+                Log.Warning("Deletion of the file for download {Id} forbidden; transfers.download.delete_file_on_removal is disabled", guid);
                 return Forbid();
             }
 

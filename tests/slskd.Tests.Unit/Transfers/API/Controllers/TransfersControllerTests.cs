@@ -53,9 +53,9 @@ namespace slskd.Tests.Unit.Transfers.API.Controllers
     /// </summary>
     /// <remarks>
     ///     Removing a download has never touched the disk, so everything here is about the one query
-    ///     parameter that changes that: that it is refused when remote file management is off, that it
-    ///     only ever deletes a file this application recorded writing, and that the answer says which of
-    ///     the three outcomes happened rather than leaving the caller to infer it from a 204.
+    ///     parameter that changes that: that it is refused unless the option is on, that it only ever
+    ///     deletes a file this application recorded writing, and that the answer says which of the three
+    ///     outcomes happened rather than leaving the caller to infer it from a 204.
     /// </remarks>
     public class TransfersControllerTests
     {
@@ -73,7 +73,7 @@ namespace slskd.Tests.Unit.Transfers.API.Controllers
             FileServiceMock = new Mock<FileService>(new Mock<IOptionsMonitor<slskd.Options>>().Object);
 
             OptionsSnapshotMock = new Mock<IOptionsSnapshot<slskd.Options>>();
-            SetRemoteFileManagement(true);
+            SetDeleteFileOnRemoval(true);
         }
 
         private Mock<IDownloadService> DownloadsMock { get; }
@@ -81,8 +81,17 @@ namespace slskd.Tests.Unit.Transfers.API.Controllers
         private Mock<FileService> FileServiceMock { get; }
         private Mock<IOptionsSnapshot<slskd.Options>> OptionsSnapshotMock { get; }
 
-        private void SetRemoteFileManagement(bool enabled)
-            => OptionsSnapshotMock.SetupGet(o => o.Value).Returns(new slskd.Options { RemoteFileManagement = enabled });
+        private void SetDeleteFileOnRemoval(bool enabled)
+            => OptionsSnapshotMock.SetupGet(o => o.Value).Returns(new slskd.Options
+            {
+                Transfers = new slskd.Options.TransfersOptions
+                {
+                    Download = new slskd.Options.TransfersOptions.GlobalDownloadOptions
+                    {
+                        DeleteFileOnRemoval = enabled,
+                    },
+                },
+            });
 
         private TransfersController Controller => new(
             transferService: TransferService,
@@ -112,9 +121,9 @@ namespace slskd.Tests.Unit.Transfers.API.Controllers
         }
 
         [Fact]
-        public async Task Deleting_Is_Forbidden_When_Remote_File_Management_Is_Disabled()
+        public async Task Deleting_Is_Forbidden_When_The_Option_Is_Disabled()
         {
-            SetRemoteFileManagement(false);
+            SetDeleteFileOnRemoval(false);
             var id = Guid.NewGuid();
 
             var result = await Controller.CancelDownloadAsync("user", id.ToString(), remove: true, deleteFile: true);

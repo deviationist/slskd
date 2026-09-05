@@ -158,11 +158,6 @@ directories:
 The application offers APIs for listing and deleting files within the 'Incomplete' and 'Downloads' directories.  Listing is always allowed, while the ability
 to delete is disabled by default.  Deletions can be enabled by enabling the remote file management option.
 
-This option also governs the deletion of a downloaded file when its transfer is removed from the Downloads page, which is the same act and therefore the same
-permission.  Removing a download has never deleted anything from disk and still does not; with this option enabled, a second action appears alongside 'Remove'
-that does both.  Only a file the application recorded writing is deleted, meaning one moved out of the 'Incomplete' directory by this instance -- a download
-that never completed, or one that completed before the application began recording where files land, removes its record and leaves the disk alone.
-
 | Command-Line               | Environment Variable           | Description                                                                               |
 | -------------------------- | ------------------------------ | ----------------------------------------------------------------------------------------- |
 | `--remote-file-management` | `SLSKD_REMOTE_FILE_MANAGEMENT` | Determines whether the remote management of 'Incomplete' and 'Downloads' files is allowed |
@@ -389,6 +384,30 @@ transfers:
     destination:
       permissions:
         mode: 644 # chmod syntax, e.g. 644, 777.  has no effect on Windows
+```
+
+## Deleting Files on Removal
+
+Removing a download removes the record of it and does not touch the file on disk.  Enabling this option adds a second action alongside 'Remove' on the Downloads
+page that does both.
+
+Only a file slskd recorded writing is deleted, meaning one moved out of the 'Incomplete' directory by this instance.  A download that never completed, or one
+that completed before slskd began recording where files land, removes its record and leaves the disk alone rather than deleting a path derived after the fact.
+
+This is deliberately its own option rather than a use of [Remote File Management](#remote-file-management), which grants deletion of any file under the
+'Incomplete' and 'Downloads' directories.  This grants deletion of one file, belonging to a transfer being removed, at a path slskd itself recorded -- strictly
+narrower, so requiring the wider grant to obtain it would mean enabling more than was asked for.  Deletion is still performed by the same file service and
+subject to the same containment checks.
+
+| Command-Line                 | Environment Variable             | Description                                                |
+| ---------------------------- | -------------------------------- | ---------------------------------------------------------- |
+| `--delete-file-on-removal`   | `SLSKD_DELETE_FILE_ON_REMOVAL`   | Allow the file to be deleted when a download is removed    |
+
+#### **YAML**
+```yaml
+transfers:
+  download:
+    delete_file_on_removal: false
 ```
 
 ## Global Upload Limits
