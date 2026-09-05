@@ -2,6 +2,7 @@ import * as transfers from '../../lib/transfers';
 import TransferList from './TransferList';
 import React, { Component } from 'react';
 import { Button, Card, Icon, Modal } from 'semantic-ui-react';
+import { toast } from 'react-toastify';
 
 class TransferGroup extends Component {
   constructor(props) {
@@ -86,7 +87,7 @@ class TransferGroup extends Component {
     selected,
     { deleteFile = false } = {},
   ) => {
-    await Promise.all(
+    const results = await Promise.all(
       selected.map((file) =>
         transfers
           .cancel({
@@ -96,9 +97,25 @@ class TransferGroup extends Component {
             remove: true,
             username,
           })
-          .then(() => this.removeFileSelection(file)),
+          .then((response) => {
+            this.removeFileSelection(file);
+            return { data: response?.data, ok: true };
+          })
+          // one file's failure must not abandon the rest of the batch, and it
+          // has to be reported rather than logged into the void
+          .catch((error) => ({ error, ok: false })),
       ),
     );
+
+    // Only for the deleting variant. A plain remove has always been silent and
+    // its result is visible anyway -- the rows go.
+    if (deleteFile) {
+      const summary = transfers.summariseDeletions(results);
+
+      if (summary) {
+        toast[summary.kind](summary.message);
+      }
+    }
   };
 
   handleRetry = async (file) => {

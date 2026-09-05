@@ -239,11 +239,15 @@ namespace slskd.Tests.Unit.Transfers.API.Controllers
         }
 
         [Fact]
-        public async Task A_Running_Download_Is_Not_Deleted_From_Under_Itself()
+        public async Task A_Running_Download_Is_Refused_Rather_Than_Deleted_From_Under_Itself()
         {
             // unlinking a file that is being written to is either allowed and confusing (POSIX: the
             // writer keeps the inode and the move at the end fails) or refused outright (Windows:
-            // FileShare.None). cancel first
+            // FileShare.None). cancel first.
+            //
+            // refused up front rather than reported in the result, and that matters to the caller:
+            // Remove() only touches terminal transfers, so the record would not have gone either --
+            // reporting "removed, but the file is still there" would have been two lies in one line.
             var id = Guid.NewGuid();
             var partial = Path.Combine(Path.GetTempPath(), "incomplete", "peer", "album", "01 track.flac");
 
@@ -251,15 +255,30 @@ namespace slskd.Tests.Unit.Transfers.API.Controllers
 
             var result = await Controller.CancelDownloadAsync("user", id.ToString(), remove: true, deleteFile: true);
 
-            var deletion = Assert.IsType<FileDeletionResult>(Assert.IsType<OkObjectResult>(result).Value);
-            Assert.False(deletion.Deleted);
-            Assert.Equal(partial, deletion.Filename);
-            Assert.Contains("cancel it first", deletion.Error);
-
+            Assert.IsType<BadRequestObjectResult>(result);
             FileServiceMock.Verify(f => f.DeleteFilesAsync(It.IsAny<string[]>()), Times.Never);
+            DownloadsMock.Verify(d => d.Remove(It.IsAny<Guid>()), Times.Never);
+            DownloadsMock.Verify(d => d.TryCancel(It.IsAny<Guid>()), Times.Never);
+        }
 
-            // and it is still cancelled, which is what the caller asked for first
-            DownloadsMock.Verify(d => d.TryCancel(id), Times.Once);
+        [Fact]
+        public async Task An_Error_In_The_Result_Always_Means_The_Record_Went_And_The_File_Did_Not()
+        {
+            // the contract the UI reports on. everything that would stop the removal -- the option
+            // being off, no `remove`, a transfer still running, an id that names nothing -- is refused
+            // before the removal happens, so a 200 carrying an Error is always a removal that succeeded
+            // beside a deletion that did not.
+            var id = Guid.NewGuid();
+            var filename = Path.Combine(Path.GetTempPath(), "downloads", "01 track.flac");
+
+            GivenDownload(id, filename);
+            GivenDeletionResult(filename, new UnauthorizedException("nope"));
+
+            var result = await Controller.CancelDownloadAsync("user", id.ToString(), remove: true, deleteFile: true);
+
+            var deletion = Assert.IsType<FileDeletionResult>(Assert.IsType<OkObjectResult>(result).Value);
+            Assert.NotNull(deletion.Error);
+            DownloadsMock.Verify(d => d.Remove(id), Times.Once);
         }
 
         [Fact]

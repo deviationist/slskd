@@ -56,6 +56,12 @@ namespace slskd.Transfers.API
         ///     Gets the reason the file could not be deleted, or null if there was nothing to delete or the
         ///     deletion succeeded.
         /// </summary>
+        /// <remarks>
+        ///     Only ever set for a deletion that was attempted and failed, which means the transfer itself
+        ///     was removed successfully -- everything that would stop the removal is refused before it
+        ///     happens. A caller can therefore report this as "removed, but the file is still there"
+        ///     without qualifying it.
+        /// </remarks>
         public string Error { get; init; }
     }
 }
