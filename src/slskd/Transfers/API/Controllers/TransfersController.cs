@@ -113,7 +113,7 @@ namespace slskd.Transfers.API
         /// <response code="404">The specified download was not found.</response>
         [HttpDelete("downloads/{username}/{id}")]
         [Authorize(Policy = AuthPolicy.Any)]
-        [ProducesResponseType(typeof(FileDeletionResult), 200)]
+        [ProducesResponseType(typeof(RemovalResult), 200)]
         [ProducesResponseType(204)]
         [ProducesResponseType(400)]
         [ProducesResponseType(403)]
@@ -168,24 +168,29 @@ namespace slskd.Transfers.API
                 // record would not be removed either -- Remove() only touches terminal transfers -- so
                 // honouring half of it would answer "removed, but the file is still there" to a caller
                 // whose download is also still listed and still running.
-                if (deleteFile && !transfer.State.HasFlag(TransferStates.Completed))
+                //
+                // the same predicate Remove() filters on, deliberately: `HasFlag(Completed)` and
+                // membership of this set are not the same question, and a check that disagrees with
+                // the thing it is guarding is worse than no check.
+                if (deleteFile && !TransferStateCategories.Completed.Contains(transfer.State))
                 {
                     return BadRequest("the transfer has not finished; cancel it first");
                 }
 
                 Transfers.Downloads.TryCancel(guid);
 
-                if (remove)
-                {
-                    Transfers.Downloads.Remove(guid);
-                }
+                // reported, not assumed. Remove() answers whether it removed anything, and the guards
+                // above are checked against a snapshot read before the cancellation -- so a caller told
+                // "removed, but the file is still there" deserves that first clause to be something we
+                // were told rather than something we inferred.
+                var removed = remove && Transfers.Downloads.Remove(guid);
 
                 if (!deleteFile)
                 {
                     return NoContent();
                 }
 
-                return Ok(await DeleteDownloadedFileAsync(transfer));
+                return Ok(await DeleteDownloadedFileAsync(transfer) with { Removed = removed });
             }
             catch (NotFoundException)
             {
@@ -203,7 +208,7 @@ namespace slskd.Transfers.API
         ///     those -- the downloads directory having been reconfigured since, for instance -- is refused
         ///     here exactly as it would be there.
         /// </remarks>
-        private async Task<FileDeletionResult> DeleteDownloadedFileAsync(slskd.Transfers.Transfer transfer)
+        private async Task<RemovalResult> DeleteDownloadedFileAsync(slskd.Transfers.Transfer transfer)
         {
             var filename = transfer?.LocalFilename;
 
@@ -212,7 +217,7 @@ namespace slskd.Transfers.API
                 // said rather than reported as a failure: a download from before this was recorded has no
                 // path, and that is an ordinary answer to "delete the file", not an error
                 Log.Debug("No local file is recorded for download {Id}; nothing to delete", transfer?.Id);
-                return new FileDeletionResult { Deleted = false, Filename = null, Error = null };
+                return new RemovalResult { Deleted = false, Filename = null, Error = null };
             }
 
             try
@@ -220,13 +225,13 @@ namespace slskd.Transfers.API
                 var results = await Files.DeleteFilesAsync(filename);
 
                 return results[filename].Match(
-                    success => new FileDeletionResult { Deleted = true, Filename = filename, Error = null },
-                    failure => new FileDeletionResult { Deleted = false, Filename = filename, Error = failure.Message });
+                    success => new RemovalResult { Deleted = true, Filename = filename, Error = null },
+                    failure => new RemovalResult { Deleted = false, Filename = filename, Error = failure.Message });
             }
             catch (Exception ex)
             {
                 Log.Warning(ex, "Failed to delete the file for download {Id}: {Message}", transfer.Id, ex.Message);
-                return new FileDeletionResult { Deleted = false, Filename = filename, Error = ex.Message };
+                return new RemovalResult { Deleted = false, Filename = filename, Error = ex.Message };
             }
         }
 

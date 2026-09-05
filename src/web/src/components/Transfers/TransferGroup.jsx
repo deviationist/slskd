@@ -1,8 +1,8 @@
 import * as transfers from '../../lib/transfers';
 import TransferList from './TransferList';
 import React, { Component } from 'react';
-import { Button, Card, Icon, Modal } from 'semantic-ui-react';
 import { toast } from 'react-toastify';
+import { Button, Card, Icon, Modal } from 'semantic-ui-react';
 
 class TransferGroup extends Component {
   constructor(props) {

@@ -19,13 +19,25 @@ describe('cancel', () => {
 });
 
 describe('summariseDeletions', () => {
-  const deleted = { data: { deleted: true, error: null, filename: '/a.flac' }, ok: true };
-  const unrecorded = { data: { deleted: false, error: null, filename: null }, ok: true };
+  const deleted = {
+    data: { deleted: true, error: null, filename: '/a.flac', removed: true },
+    ok: true,
+  };
+  const unrecorded = {
+    data: { deleted: false, error: null, filename: null, removed: true },
+    ok: true,
+  };
   const refused = {
-    data: { deleted: false, error: 'permission denied', filename: '/a.flac' },
+    data: { deleted: false, error: 'permission denied', filename: '/a.flac', removed: true },
     ok: true,
   };
   const failed = { error: { message: 'Network Error' }, ok: false };
+  // the API refuses up front everything it knows would stop a removal, so this
+  // should not happen -- which is not the same as cannot
+  const notRemoved = {
+    data: { deleted: false, error: null, filename: '/a.flac', removed: false },
+    ok: true,
+  };
 
   it('says nothing about nothing', () => {
     expect(transfers.summariseDeletions([])).toBeNull();
@@ -76,6 +88,22 @@ describe('summariseDeletions', () => {
       kind: 'error',
       message: '1 of 2 could not be removed: Network Error',
     });
+  });
+
+  // The bug this whole shape exists for: the message used to claim a removal on
+  // the strength of the deletion's error being set, over a request that removed
+  // nothing at all.
+  it('never claims a removal that did not happen', () => {
+    expect(transfers.summariseDeletions([notRemoved]).message).toBe(
+      '1 of 1 were not removed',
+    );
+    expect(transfers.summariseDeletions([notRemoved]).kind).toBe('error');
+  });
+
+  it('says so when a file went but the record did not', () => {
+    expect(transfers.summariseDeletions([deleted, notRemoved]).message).toBe(
+      '1 of 2 were not removed, though 1 file(s) were deleted',
+    );
   });
 
   it('leads with the failure that says the least happened', () => {
