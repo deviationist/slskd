@@ -13,6 +13,19 @@ describe('summariseDeletions', () => {
   };
   // a plain removal with the option off: 204, no body, nothing to report
   const removedOnly = { data: undefined, ok: true };
+  // a download that never started: no file was ever written, so the end state
+  // asked for holds and there is nothing to announce
+  const neverStarted = {
+    data: {
+      deleted: true,
+      error: null,
+      filename: null,
+      prunedDirectories: 0,
+      removed: true,
+    },
+    ok: true,
+  };
+
   const unrecorded = {
     data: { deleted: false, error: null, filename: null, removed: true },
     ok: true,
@@ -47,6 +60,26 @@ describe('summariseDeletions', () => {
 
     expect(transfers.summariseDeletions([withFolders]).message).toBe(
       'Removed 1 and deleted the file (2 empty folders removed)',
+    );
+  });
+
+  // A file that was already gone answers `deleted: true`: what was asked for is
+  // that it not be there, and it is not. Only a file that is there, should go
+  // and will not is a failure -- so the summary has nothing special to say
+  // about the already-gone case, and that is the point.
+  it('treats an already-gone file as the success it is', () => {
+    expect(transfers.summariseDeletions([deleted]).kind).toBe('success');
+  });
+
+  it('announces nothing over downloads that never wrote a file', () => {
+    // they are a success -- nothing was written, which is the end state asked
+    // for -- but "deleted 2 files" over two of them would be an invention.
+    expect(transfers.summariseDeletions([neverStarted, neverStarted])).toBeNull();
+  });
+
+  it('counts only the files it really deleted', () => {
+    expect(transfers.summariseDeletions([deleted, neverStarted]).message).toBe(
+      'Removed 2 and deleted the file',
     );
   });
 

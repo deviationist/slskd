@@ -115,9 +115,16 @@ export const summariseDeletions = (results = []) => {
   // the same as "cannot"
   const notRemoved = results.filter((r) => r.ok && r.data && !r.data.removed);
   const deleted = results.filter((r) => r.ok && r.data?.deleted);
+  // a download that never started reports success with no filename: nothing was
+  // ever written, so the end state holds. it counts as fine and counts as
+  // nothing to announce -- "deleted 3 files" over three transfers that never
+  // wrote one would be an invention.
+  const deletedFiles = deleted.filter((r) => r.data.filename);
   const refused = results.filter((r) => r.ok && r.data?.error);
-  // no path recorded: the download finished before slskd started recording
-  // where it wrote, so there is nothing it can honestly delete
+  // deleted nothing and did not fail, which is now only ever the one case: no
+  // path was recorded, so nothing is known about where the file is. a file that
+  // was already gone reports success, because the end state asked for is the
+  // end state there is.
   const unrecorded = results.filter(
     (r) => r.ok && r.data?.removed && !r.data.deleted && !r.data.error,
   );
@@ -134,7 +141,7 @@ export const summariseDeletions = (results = []) => {
   // a batch of plain removals: nothing was deleted and nothing claims to have
   // been, so there is nothing to say that the rows disappearing does not
   if (
-    !deleted.length &&
+    !deletedFiles.length &&
     !refused.length &&
     !unrecorded.length &&
     !failed.length &&
@@ -154,7 +161,9 @@ export const summariseDeletions = (results = []) => {
     return {
       kind: 'error',
       message: `${notRemoved.length} of ${total} were not removed${
-        deleted.length ? `, though ${deleted.length} file(s) were deleted` : ''
+        deletedFiles.length
+          ? `, though ${deletedFiles.length} file(s) were deleted`
+          : ''
       }`,
     };
   }
@@ -169,15 +178,15 @@ export const summariseDeletions = (results = []) => {
   if (unrecorded.length) {
     return {
       kind: 'warning',
-      message: deleted.length
-        ? `Removed ${total} and deleted ${deleted.length}; there is no record of where the other ${unrecorded.length} were written${folders}`
+      message: deletedFiles.length
+        ? `Removed ${total} and deleted ${deletedFiles.length}; there is no record of where the other ${unrecorded.length} were written${folders}`
         : `Removed ${total}, but deleted nothing: there is no record of where these were written`,
     };
   }
 
   return {
     kind: 'success',
-    message: `Removed ${total} and deleted ${deleted.length === 1 ? 'the file' : `${deleted.length} files`}${folders}`,
+    message: `Removed ${total} and deleted ${deletedFiles.length === 1 ? 'the file' : `${deletedFiles.length} files`}${folders}`,
   };
 };
 
