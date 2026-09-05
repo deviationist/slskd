@@ -96,10 +96,15 @@ namespace slskd.Transfers.API
         ///     <paramref name="deleteFile"/> deletes the file the download produced as well, and requires the
         ///     transfers.download.delete_file_on_removal option to be enabled.
         ///
-        ///     Only a file this application knows it wrote is deleted, meaning one recorded when the download
-        ///     was moved out of the incomplete directory. A download that never completed has no such record
-        ///     and nothing is deleted for it; neither is anything deleted for a download that completed before
-        ///     the application began recording this.
+        ///     Only a file this application knows it wrote is deleted, at the path recorded for the transfer:
+        ///     the finished file if the download completed, or the partial left in the incomplete directory if
+        ///     it was cancelled or failed. Both are deleted through the file service and subject to its
+        ///     containment checks, which allow those two directories and nothing else.
+        ///
+        ///     A transfer that is still running is not deleted from under itself -- it must be cancelled
+        ///     first, which the UI already requires, since Remove is only offered for terminal transfers.
+        ///     Nothing is deleted either for a download that finished before the application began recording
+        ///     where the bytes are; that is a null path, not a derivable one.
         /// </remarks>
         /// <response code="200">The download was cancelled successfully, and the outcome of the file deletion is reported.</response>
         /// <response code="204">The download was cancelled successfully.</response>
@@ -181,10 +186,27 @@ namespace slskd.Transfers.API
 
             if (string.IsNullOrWhiteSpace(filename))
             {
-                // said rather than reported as a failure: a download that never completed has no file, and
-                // that is an ordinary answer to "delete the file", not an error
+                // said rather than reported as a failure: a download from before this was recorded has no
+                // path, and that is an ordinary answer to "delete the file", not an error
                 Log.Debug("No local file is recorded for download {Id}; nothing to delete", transfer?.Id);
                 return new FileDeletionResult { Deleted = false, Filename = null, Error = null };
+            }
+
+            // the recorded path is the incomplete file while a download is running, and unlinking a file
+            // that is being written to is either allowed and confusing (POSIX: the writer keeps the inode
+            // and the move at the end fails) or refused outright (Windows: the stream is opened
+            // FileShare.None). Cancel first; the transfer is terminal a moment later and the partial is
+            // still there to delete. The UI cannot reach this -- Remove is only offered for terminal
+            // transfers -- so it is the API's own guard.
+            if (!transfer.State.HasFlag(TransferStates.Completed))
+            {
+                Log.Debug("Download {Id} has not finished; leaving {File} alone", transfer.Id, filename);
+                return new FileDeletionResult
+                {
+                    Deleted = false,
+                    Filename = filename,
+                    Error = "the transfer has not finished; cancel it first",
+                };
             }
 
             try

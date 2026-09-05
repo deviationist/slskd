@@ -391,8 +391,13 @@ transfers:
 Removing a download removes the record of it and does not touch the file on disk.  Enabling this option adds a second action alongside 'Remove' on the Downloads
 page that does both.
 
-Only a file slskd recorded writing is deleted, meaning one moved out of the 'Incomplete' directory by this instance.  A download that never completed, or one
-that completed before slskd began recording where files land, removes its record and leaves the disk alone rather than deleting a path derived after the fact.
+Only a file slskd recorded writing is deleted, at the path recorded for the transfer: the finished file if the download completed, or the partial left in the
+'Incomplete' directory if it was cancelled or failed.  Partials are otherwise removed only by [data retention](#data-retention), so a download abandoned
+half way leaves its bytes behind until that timer catches them.
+
+A transfer that is still running is not deleted from under itself and must be cancelled first, which the UI already requires -- 'Remove' is only offered for
+transfers in a terminal state.  A download that finished before slskd began recording where the bytes are has no recorded path; it removes its record and
+leaves the disk alone rather than deleting a path derived after the fact.
 
 This is deliberately its own option rather than a use of [Remote File Management](#remote-file-management), which grants deletion of any file under the
 'Incomplete' and 'Downloads' directories.  This grants deletion of one file, belonging to a transfer being removed, at a path slskd itself recorded -- strictly

@@ -99,10 +99,10 @@ namespace slskd.Tests.Unit.Transfers.API.Controllers
             fileService: FileServiceMock.Object,
             optionsSnapshot: OptionsSnapshotMock.Object);
 
-        private void GivenDownload(Guid id, string localFilename)
+        private void GivenDownload(Guid id, string localFilename, Soulseek.TransferStates state = Soulseek.TransferStates.Completed | Soulseek.TransferStates.Succeeded)
             => DownloadsMock
                 .Setup(d => d.Find(It.IsAny<Expression<Func<Transfer, bool>>>()))
-                .Returns(new Transfer { Id = id, LocalFilename = localFilename });
+                .Returns(new Transfer { Id = id, LocalFilename = localFilename, State = state });
 
         private void GivenDeletionResult(string filename, OneOf<bool, Exception> result)
             => FileServiceMock
@@ -186,6 +186,52 @@ namespace slskd.Tests.Unit.Transfers.API.Controllers
 
             // the record still goes; only the file was in question
             DownloadsMock.Verify(d => d.Remove(id), Times.Once);
+        }
+
+        [Fact]
+        public async Task A_Cancelled_Download_Has_Its_Partial_File_Deleted()
+        {
+            // the recorded path is the incomplete file until the download finishes and it is moved, so a
+            // transfer that was cancelled or failed still names something to delete. this is the case
+            // that leaves litter in the incomplete directory otherwise -- slskd keeps partials on
+            // purpose, to resume from, and only a retention timer ever removes them
+            var id = Guid.NewGuid();
+            var partial = Path.Combine(Path.GetTempPath(), "incomplete", "peer", "album", "01 track.flac");
+
+            GivenDownload(id, partial, Soulseek.TransferStates.Completed | Soulseek.TransferStates.Cancelled);
+            GivenDeletionResult(partial, true);
+
+            var result = await Controller.CancelDownloadAsync("user", id.ToString(), remove: true, deleteFile: true);
+
+            var deletion = Assert.IsType<FileDeletionResult>(Assert.IsType<OkObjectResult>(result).Value);
+            Assert.True(deletion.Deleted);
+            Assert.Equal(partial, deletion.Filename);
+
+            FileServiceMock.Verify(f => f.DeleteFilesAsync(partial), Times.Once);
+        }
+
+        [Fact]
+        public async Task A_Running_Download_Is_Not_Deleted_From_Under_Itself()
+        {
+            // unlinking a file that is being written to is either allowed and confusing (POSIX: the
+            // writer keeps the inode and the move at the end fails) or refused outright (Windows:
+            // FileShare.None). cancel first
+            var id = Guid.NewGuid();
+            var partial = Path.Combine(Path.GetTempPath(), "incomplete", "peer", "album", "01 track.flac");
+
+            GivenDownload(id, partial, Soulseek.TransferStates.InProgress);
+
+            var result = await Controller.CancelDownloadAsync("user", id.ToString(), remove: true, deleteFile: true);
+
+            var deletion = Assert.IsType<FileDeletionResult>(Assert.IsType<OkObjectResult>(result).Value);
+            Assert.False(deletion.Deleted);
+            Assert.Equal(partial, deletion.Filename);
+            Assert.Contains("cancel it first", deletion.Error);
+
+            FileServiceMock.Verify(f => f.DeleteFilesAsync(It.IsAny<string[]>()), Times.Never);
+
+            // and it is still cancelled, which is what the caller asked for first
+            DownloadsMock.Verify(d => d.TryCancel(id), Times.Once);
         }
 
         [Fact]
