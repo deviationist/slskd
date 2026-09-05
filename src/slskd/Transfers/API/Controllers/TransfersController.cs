@@ -155,9 +155,12 @@ namespace slskd.Transfers.API
                 // waits for the transfer to actually land in a terminal state rather than racing it.
                 // bounded, because a wait that cannot end is worse than one that gives up: if it does
                 // give up, Remove() reports removing nothing and the deletion reports why.
-                if (deleteFile && !TransferStateCategories.Completed.Contains(transfer.State))
+                var settled = !deleteFile || TransferStateCategories.Completed.Contains(transfer.State);
+
+                if (deleteFile && !settled)
                 {
                     transfer = await WaitForTerminalStateAsync(guid) ?? transfer;
+                    settled = TransferStateCategories.Completed.Contains(transfer.State);
                 }
 
                 // reported, not assumed. Remove() answers whether it removed anything, and everything
@@ -167,6 +170,21 @@ namespace slskd.Transfers.API
                 if (!deleteFile)
                 {
                     return NoContent();
+                }
+
+                // it did not stop, so its file is still being written to and is not ours to unlink.
+                // the wait exists to make this case rare; skipping the delete is what makes it safe
+                // when the wait is not enough, and saying so is what stops it being silent.
+                if (!settled)
+                {
+                    Log.Warning("Download {Id} was still running after being cancelled; its file was left alone", guid);
+                    return Ok(new RemovalResult
+                    {
+                        Removed = removed,
+                        Deleted = false,
+                        Filename = transfer.LocalFilename,
+                        Error = "the transfer did not stop in time; its file was left alone",
+                    });
                 }
 
                 return Ok(await DeleteDownloadedFileAsync(transfer) with { Removed = removed });
@@ -221,14 +239,34 @@ namespace slskd.Transfers.API
 
             if (string.IsNullOrWhiteSpace(filename))
             {
-                // said rather than reported as a failure: a download from before this was recorded has no
-                // path, and that is an ordinary answer to "delete the file", not an error
+                // two different things hide behind a missing path, and the byte count tells them apart.
+                //
+                // the path is recorded immediately before the download begins, so a transfer that has
+                // no path *and* transferred nothing never reached that point: queued, rejected, timed
+                // out, or cancelled while waiting. nothing was ever written anywhere, which is the end
+                // state the caller asked for -- so it is a success, the same as a file already gone.
+                if (transfer is not null
+                    && transfer.BytesTransferred == 0
+                    && !TransferStateCategories.Successful.Contains(transfer.State))
+                {
+                    Log.Debug("Download {Id} never started; there is no file to delete", transfer.Id);
+                    return new RemovalResult { Deleted = true, Filename = null, Error = null };
+                }
+
+                // bytes were written somewhere this instance did not record -- a download from before
+                // it began recording. its file may well be sitting in the downloads directory under a
+                // name nobody wrote down, so claiming the end state here would be claiming something
+                // never checked.
                 Log.Debug("No local file is recorded for download {Id}; nothing to delete", transfer?.Id);
                 return new RemovalResult { Deleted = false, Filename = null, Error = null };
             }
 
             try
             {
+                // a file that is already gone is a success, not a failure: what was asked for is that
+                // it not be there, and it is not. `File.Delete` not throwing over an empty path is the
+                // same rule, and this reports it the same way. failure is reserved for a file that is
+                // there, should go, and will not.
                 var results = await Files.DeleteFilesAsync(filename);
 
                 return await results[filename].Match(
@@ -275,13 +313,13 @@ namespace slskd.Transfers.API
 
             while (!string.IsNullOrWhiteSpace(directory))
             {
-                if (!System.IO.Directory.Exists(directory) || System.IO.Directory.EnumerateFileSystemEntries(directory).Any())
-                {
-                    break;
-                }
-
                 try
                 {
+                    if (!System.IO.Directory.Exists(directory) || System.IO.Directory.EnumerateFileSystemEntries(directory).Any())
+                    {
+                        break;
+                    }
+
                     var results = await Files.DeleteDirectoriesAsync(directory);
 
                     if (results[directory].TryPickT1(out var failure, out _))
@@ -292,7 +330,13 @@ namespace slskd.Transfers.API
                 }
                 catch (Exception ex)
                 {
-                    // the roots land here, which is how the walk knows where to stop
+                    // the roots land here, which is how the walk knows where to stop -- and so does
+                    // anything the filesystem throws while being asked what is still in a folder.
+                    //
+                    // this method must not throw, and that is not tidiness: it runs *after* the file
+                    // is gone, so an exception escaping here would be caught by the caller and
+                    // reported as a deletion that failed. the file would be deleted and the answer
+                    // would say it was not.
                     Log.Debug("Stopped pruning at {Directory}: {Message}", directory, ex.Message);
                     break;
                 }

@@ -394,8 +394,15 @@ transfer is unaffected -- cancelling is not removing, and the option is named fo
 
 Only a file slskd recorded writing is deleted, at the path recorded for the transfer: the finished file if the download completed, or the partial in the
 'Incomplete' directory if it did not.  Partials are otherwise removed only by [data retention](#data-retention), so a download abandoned half way leaves its
-bytes behind until that timer catches them.  A download that finished before slskd began recording where the bytes land has no recorded path; it removes its
-record and leaves the disk alone rather than deleting a path derived after the fact.
+bytes behind until that timer catches them.
+
+A file that is already gone is a success, not a failure: what was asked for is that it not be there, and it is not.  A download that never started is the same
+-- the path is recorded immediately before the download begins, so a transfer with no recorded path that transferred no bytes never wrote one anywhere.  Only a
+file that is present, should go, and will not is reported as a failure.
+
+A download that finished before slskd began recording where the bytes land has no recorded path, and its file may still be on disk under a name that was never
+written down.  Those remove their record and leave the disk alone rather than deleting a path derived after the fact, and say so rather than reporting a
+success that was never checked.
 
 Removing a download that is still running cancels it first and waits, briefly, for it to stop before touching either the record or the file.  Removal skips
 transfers that have not reached a terminal state, and unlinking a file that is still being written to is either allowed and confusing or refused outright,

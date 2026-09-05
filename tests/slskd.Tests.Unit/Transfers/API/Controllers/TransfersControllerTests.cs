@@ -100,18 +100,42 @@ namespace slskd.Tests.Unit.Transfers.API.Controllers
             fileService: FileServiceMock.Object,
             optionsSnapshot: OptionsSnapshotMock.Object);
 
-        private void GivenDownload(Guid id, string localFilename, Soulseek.TransferStates state = Soulseek.TransferStates.Completed | Soulseek.TransferStates.Succeeded)
+        private void GivenDownload(Guid id, string localFilename, Soulseek.TransferStates state = Soulseek.TransferStates.Completed | Soulseek.TransferStates.Succeeded, long bytesTransferred = 1024)
             => DownloadsMock
                 .Setup(d => d.Find(It.IsAny<Expression<Func<Transfer, bool>>>()))
-                .Returns(new Transfer { Id = id, LocalFilename = localFilename, State = state });
+                .Returns(new Transfer { Id = id, LocalFilename = localFilename, State = state, BytesTransferred = bytesTransferred });
 
         private void GivenTheRecordIsRemoved(bool removed = true)
             => DownloadsMock.Setup(d => d.Remove(It.IsAny<Guid>())).Returns(removed);
 
-        private void GivenDeletionResult(string filename, OneOf<bool, Exception> result)
-            => FileServiceMock
+        /// <summary>
+        ///     Puts a real file at <paramref name="filename"/> and makes the file service answer for it.
+        /// </summary>
+        /// <remarks>
+        ///     Real, because the deletion reports whether the file was actually there: `File.Delete` does
+        ///     not throw over a path that holds nothing, so a fixture that never created one would have
+        ///     the code under test reporting an absence and the test calling it a bug.
+        /// </remarks>
+        private void GivenDeletionResult(string filename, OneOf<bool, Exception> result, bool onDisk = true)
+        {
+            if (onDisk)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(filename));
+                File.WriteAllText(filename, "audio");
+            }
+
+            FileServiceMock
                 .Setup(f => f.DeleteFilesAsync(It.IsAny<string[]>()))
-                .ReturnsAsync(new Dictionary<string, OneOf<bool, Exception>> { { filename, result } });
+                .Returns((string[] files) =>
+                {
+                    foreach (var f in files.Where(File.Exists))
+                    {
+                        File.Delete(f);
+                    }
+
+                    return Task.FromResult(new Dictionary<string, OneOf<bool, Exception>> { { filename, result } });
+                });
+        }
 
         /// <summary>
         ///     A real directory tree, since the pruning walk asks the filesystem what is still in a
@@ -364,6 +388,126 @@ namespace slskd.Tests.Unit.Transfers.API.Controllers
             var outcome = Assert.IsType<RemovalResult>(Assert.IsType<OkObjectResult>(result).Value);
             Assert.Equal(0, outcome.PrunedDirectories);
             Assert.True(Directory.Exists(nested));
+        }
+
+        // --- the cases found by reading it back ----------------------------------------------------
+
+        [Fact]
+        public async Task A_Transfer_That_Does_Not_Stop_Keeps_Its_File()
+        {
+            // the wait makes this rare; skipping the delete is what makes it safe when the wait is not
+            // enough. unlinking a file that is still being written to is either allowed and confusing
+            // (POSIX keeps the inode for the writer, and the move at the end fails) or refused outright
+            var id = Guid.NewGuid();
+            var partial = Path.Combine(Temp, "01 track.flac");
+
+            // never reaches a terminal state, so the wait runs out
+            GivenDownload(id, partial, Soulseek.TransferStates.InProgress);
+            GivenTheRecordIsRemoved(false);
+            GivenDeletionResult(partial, true);
+
+            var result = await Controller.CancelDownloadAsync("user", id.ToString(), remove: true);
+
+            var outcome = Assert.IsType<RemovalResult>(Assert.IsType<OkObjectResult>(result).Value);
+            Assert.False(outcome.Deleted);
+            Assert.Contains("did not stop in time", outcome.Error);
+
+            FileServiceMock.Verify(f => f.DeleteFilesAsync(It.IsAny<string[]>()), Times.Never);
+            Assert.True(File.Exists(partial));
+        }
+
+        [Fact]
+        public async Task A_File_That_Is_Already_Gone_Is_A_Success()
+        {
+            // removing the same transfer twice, or a file removed by hand in between. what was asked
+            // for is that the file not be there, and it is not -- failure is for a file that is there,
+            // should go, and will not.
+            var id = Guid.NewGuid();
+            var filename = Path.Combine(Temp, "gone.flac");
+
+            GivenDownload(id, filename);
+            GivenTheRecordIsRemoved();
+            GivenDeletionResult(filename, true, onDisk: false);
+
+            var result = await Controller.CancelDownloadAsync("user", id.ToString(), remove: true);
+
+            var outcome = Assert.IsType<RemovalResult>(Assert.IsType<OkObjectResult>(result).Value);
+            Assert.True(outcome.Removed);
+            Assert.True(outcome.Deleted);
+            Assert.Null(outcome.Error);
+        }
+
+        [Fact]
+        public async Task A_Download_That_Wrote_Bytes_Somewhere_Unrecorded_Is_Not_A_Success()
+        {
+            // a download from before this instance began recording where it writes. its file may well
+            // be sitting in the downloads directory under a name nobody wrote down, so claiming the
+            // end state would be claiming something never checked.
+            var id = Guid.NewGuid();
+
+            GivenDownload(id, localFilename: null, bytesTransferred: 1024);
+            GivenTheRecordIsRemoved();
+
+            var result = await Controller.CancelDownloadAsync("user", id.ToString(), remove: true);
+
+            var outcome = Assert.IsType<RemovalResult>(Assert.IsType<OkObjectResult>(result).Value);
+            Assert.False(outcome.Deleted);
+            Assert.Null(outcome.Filename);
+        }
+
+        [Fact]
+        public async Task A_Download_That_Never_Started_Is_A_Success()
+        {
+            // the path is recorded immediately before the download begins, so no path and no bytes
+            // means it never got there: queued, rejected, timed out, or cancelled while waiting.
+            // nothing was written anywhere, which is the end state asked for.
+            var id = Guid.NewGuid();
+
+            GivenDownload(
+                id,
+                localFilename: null,
+                state: Soulseek.TransferStates.Completed | Soulseek.TransferStates.Cancelled,
+                bytesTransferred: 0);
+            GivenTheRecordIsRemoved();
+
+            var result = await Controller.CancelDownloadAsync("user", id.ToString(), remove: true);
+
+            var outcome = Assert.IsType<RemovalResult>(Assert.IsType<OkObjectResult>(result).Value);
+            Assert.True(outcome.Removed);
+            Assert.True(outcome.Deleted);
+            Assert.Null(outcome.Filename);
+            Assert.Null(outcome.Error);
+
+            FileServiceMock.Verify(f => f.DeleteFilesAsync(It.IsAny<string[]>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task A_Prune_That_Throws_Cannot_Turn_A_Deletion_Into_A_Failure()
+        {
+            // the pruning walk runs *after* the file is gone. an exception escaping it would be caught
+            // by the caller and reported as a deletion that failed -- the file deleted, the answer
+            // saying otherwise. it is the same false report this whole result shape exists to prevent
+            var root = Path.Combine(Temp, "complete");
+            var nested = Path.Combine(root, "peer", "Some Album");
+            Directory.CreateDirectory(nested);
+
+            var filename = Path.Combine(nested, "01 track.flac");
+            var id = Guid.NewGuid();
+
+            GivenDownload(id, filename);
+            GivenTheRecordIsRemoved();
+            GivenDeletionResult(filename, true);
+
+            FileServiceMock
+                .Setup(f => f.DeleteDirectoriesAsync(It.IsAny<string[]>()))
+                .ThrowsAsync(new IOException("the filesystem said no"));
+
+            var result = await Controller.CancelDownloadAsync("user", id.ToString(), remove: true);
+
+            var outcome = Assert.IsType<RemovalResult>(Assert.IsType<OkObjectResult>(result).Value);
+            Assert.True(outcome.Deleted);
+            Assert.Null(outcome.Error);
+            Assert.Equal(0, outcome.PrunedDirectories);
         }
     }
 }
