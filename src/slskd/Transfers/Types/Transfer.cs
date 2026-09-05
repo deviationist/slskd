@@ -73,14 +73,18 @@ public class Transfer
     public string Filename { get; init; }
 
     /// <summary>
-    ///     Gets or sets the fully qualified path of the file on the local filesystem, or null if the
-    ///     file is not (or is no longer known to be) there.
+    ///     Gets or sets the fully qualified path of this transfer's bytes on the local filesystem, or
+    ///     null if they are not (or are no longer known to be) there.
     /// </summary>
     /// <remarks>
-    ///     Set for downloads at the moment the file is moved out of the incomplete directory, which is
-    ///     the only moment the final path is known: the destination subdirectory is derived from options
-    ///     that may since have changed, and a name collision may have renamed the file. Deriving the path
-    ///     again later would be a guess, and a guess is not something to hand to a delete.
+    ///     Where the bytes are *now*, not where they will end up: it is the incomplete file while the
+    ///     download is running or after it was cancelled, and the final file once it has been moved. Set
+    ///     for downloads only.
+    ///
+    ///     Recorded at each of those two moments because they are the only moments the path is known.
+    ///     The destination subdirectory is derived from options that may since have changed and a name
+    ///     collision may have renamed the file, so deriving either path after the fact would be a guess
+    ///     -- and a guess is not something to hand to a delete.
     /// </remarks>
     public string LocalFilename { get; set; } = null;
 

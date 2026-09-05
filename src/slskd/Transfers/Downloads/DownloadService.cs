@@ -1354,6 +1354,12 @@ namespace slskd.Transfers.Downloads
 
                 Log.Debug("Invoking Soulseek DownloadAsync() for {Filename} from {Username}", transfer.Filename, transfer.Username);
                 transfer.Attempts = 1;
+
+                // the bytes are about to start landing here, so this is where they are until the file is
+                // moved. a download that is cancelled or fails leaves its partial at this path and
+                // nothing else records it, so without this there is no way to name the file afterwards
+                // except by deriving it again from options that may have changed since.
+                transfer.LocalFilename = incompleteFilename;
                 SynchronizedUpdate(transfer, semaphore: updateSyncRoot, cancellationToken: CancellationToken.None);
 
                 var completedTransfer = await Retry.Do(() =>
@@ -1492,11 +1498,11 @@ namespace slskd.Transfers.Downloads
 
                 Log.Information("Moved file {Filename} from {Username} from {Incomplete} to {Destination}", FileSafety.GetFileNameSafely(transfer.Filename), transfer.Username, incompleteFilename, finalFilename);
 
-                // record where the file actually landed. this is the only point at which that is known
-                // for certain; the destination is derived from options that can change, and MoveFile()
-                // may have renamed the file to avoid a collision. anything that wants to act on the file
-                // later -- deleting it along with the transfer, for one -- needs this rather than a
-                // recomputed guess.
+                // the bytes have moved, so the record of where they are moves with them. this is the
+                // only point at which the final path is known for certain: the destination is derived
+                // from options that can change, and MoveFile() may have renamed the file to avoid a
+                // collision. anything that wants to act on the file later -- deleting it along with the
+                // transfer, for one -- needs this rather than a recomputed guess.
                 transfer.LocalFilename = finalFilename;
                 SynchronizedUpdate(transfer, semaphore: updateSyncRoot, cancellationToken: CancellationToken.None);
 
