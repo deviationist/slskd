@@ -23,7 +23,7 @@ import Transfers from './Transfers/Transfers';
 import Users from './Users/Users';
 import React, { Component } from 'react';
 import { Link, Redirect, Route, Switch } from 'react-router-dom';
-import { ToastContainer } from 'react-toastify';
+import { toast, ToastContainer } from 'react-toastify';
 import {
   Button,
   Header,
@@ -161,6 +161,25 @@ class App extends Component {
   }
 
   componentDidMount() {
+    /*
+      Hand the toast API to whatever else is on this page.
+
+      This instance has scripts injected into it by a reverse proxy -- the
+      ingress button and the audio preview player, which live outside this
+      repo. They cannot import from the bundle, so until now they built their
+      own nodes wearing `Toastify__toast` classes and appended them to the
+      container. That imitation works and is wrong in every detail that is not
+      visible in a screenshot: no progress bar, no pause on hover, its own
+      timer, and a guessed container position that put it bottom-right while
+      this app puts its own bottom-centre.
+
+      One property rather than the module: a script reaching into React's
+      internals to find this would break on any upgrade, and the alternative
+      -- leaving it to keep guessing -- has already produced two toasts that
+      behave differently in the same corner.
+    */
+    window.slskdToast = toast;
+
     if (this.getSavedTheme() == null) {
       window
         .matchMedia('(prefers-color-scheme: dark)')
