@@ -181,11 +181,11 @@ const Transfers = ({ direction, options = {}, server }) => {
             cancelAll={cancelAll}
             direction={direction}
             key={user.username}
-            remove={remove}
-            removeAll={removeAll}
             // deleting a downloaded file is the same permission that governs
             // deleting one through the files API, so it is the same option
             remoteFileManagement={options?.remoteFileManagement}
+            remove={remove}
+            removeAll={removeAll}
             retry={retry}
             retryAll={retryAll}
             user={user}
