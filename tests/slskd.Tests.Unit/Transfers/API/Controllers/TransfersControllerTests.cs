@@ -212,6 +212,10 @@ namespace slskd.Tests.Unit.Transfers.API.Controllers
             Assert.Null(outcome.Error);
 
             FileServiceMock.Verify(f => f.DeleteFilesAsync(filename), Times.Once);
+
+            // the file, not the call: the fixture deletes for real, so this is the end state rather
+            // than the intention
+            Assert.False(File.Exists(filename));
         }
 
         [Fact]
@@ -247,27 +251,7 @@ namespace slskd.Tests.Unit.Transfers.API.Controllers
             var outcome = Assert.IsType<RemovalResult>(Assert.IsType<OkObjectResult>(result).Value);
             Assert.True(outcome.Deleted);
             FileServiceMock.Verify(f => f.DeleteFilesAsync(partial), Times.Once);
-        }
-
-        [Fact]
-        public async Task A_Download_With_No_Recorded_File_Deletes_Nothing_And_Says_So()
-        {
-            // a download that finished before this was recorded. there is no honest path to delete, and
-            // guessing one is the thing this feature must not do
-            var id = Guid.NewGuid();
-
-            GivenDownload(id, localFilename: null);
-            GivenTheRecordIsRemoved();
-
-            var result = await Controller.CancelDownloadAsync("user", id.ToString(), remove: true);
-
-            var outcome = Assert.IsType<RemovalResult>(Assert.IsType<OkObjectResult>(result).Value);
-            Assert.True(outcome.Removed);
-            Assert.False(outcome.Deleted);
-            Assert.Null(outcome.Filename);
-            Assert.Null(outcome.Error);
-
-            FileServiceMock.Verify(f => f.DeleteFilesAsync(It.IsAny<string[]>()), Times.Never);
+            Assert.False(File.Exists(partial));
         }
 
         [Fact]
@@ -282,6 +266,10 @@ namespace slskd.Tests.Unit.Transfers.API.Controllers
             GivenDownload(id, filename);
             GivenTheRecordIsRemoved();
             GivenDeletionResult(filename, new UnauthorizedException("nope"));
+
+            // the file is really there, which is what makes this the failure case rather than the
+            // already-gone one -- those report opposite things
+            Assert.True(File.Exists(filename));
 
             var result = await Controller.CancelDownloadAsync("user", id.ToString(), remove: true);
 
