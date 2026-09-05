@@ -1,0 +1,88 @@
+import * as transfers from './transfers';
+
+describe('cancel', () => {
+  // The option that permits a deletion is `delete_file_on_removal`, and
+  // deleting the file while keeping the record leaves a transfer listed as a
+  // completed download whose file is not there. The API rejects it; this
+  // refuses to send it, so the combination cannot be reached from the UI.
+  it('refuses to delete a file without removing the record', () => {
+    expect(() =>
+      transfers.cancel({
+        deleteFile: true,
+        direction: 'download',
+        id: 'abc',
+        remove: false,
+        username: 'peer',
+      }),
+    ).toThrow(/requires remove/);
+  });
+});
+
+describe('summariseDeletions', () => {
+  const deleted = { data: { deleted: true, error: null, filename: '/a.flac' }, ok: true };
+  const unrecorded = { data: { deleted: false, error: null, filename: null }, ok: true };
+  const refused = {
+    data: { deleted: false, error: 'permission denied', filename: '/a.flac' },
+    ok: true,
+  };
+  const failed = { error: { message: 'Network Error' }, ok: false };
+
+  it('says nothing about nothing', () => {
+    expect(transfers.summariseDeletions([])).toBeNull();
+  });
+
+  it('reports the plain success', () => {
+    expect(transfers.summariseDeletions([deleted, deleted])).toMatchObject({
+      kind: 'success',
+      message: 'Removed 2 and deleted 2 files',
+    });
+  });
+
+  it('counts one file as a file', () => {
+    expect(transfers.summariseDeletions([deleted]).message).toBe(
+      'Removed 1 and deleted the file',
+    );
+  });
+
+  // The case that would otherwise be silent, and the one every download
+  // predating the recording of local filenames lands in. "Removed" alone over
+  // this is how a delete that did nothing comes to look like one that worked.
+  it('does not let a delete that deleted nothing pass for one that worked', () => {
+    expect(transfers.summariseDeletions([unrecorded, unrecorded])).toMatchObject({
+      kind: 'warning',
+      message:
+        'Removed 2, but deleted nothing: there is no record of where these were written',
+    });
+  });
+
+  it('separates the ones it could delete from the ones it had no record of', () => {
+    expect(transfers.summariseDeletions([deleted, unrecorded]).message).toBe(
+      'Removed 2 and deleted 1; there is no record of where the other 1 were written',
+    );
+  });
+
+  // A refusal from the file service happens after the record is removed --
+  // everything that would stop the removal is refused before it happens -- so
+  // "removed, but" is accurate here and only here.
+  it('reports a refused deletion as a removal that happened', () => {
+    expect(transfers.summariseDeletions([deleted, refused])).toMatchObject({
+      kind: 'error',
+      message: 'Removed 2, but 1 file(s) could not be deleted: permission denied',
+    });
+  });
+
+  it('reports a request that never landed as neither removed nor deleted', () => {
+    expect(transfers.summariseDeletions([deleted, failed])).toMatchObject({
+      kind: 'error',
+      message: '1 of 2 could not be removed: Network Error',
+    });
+  });
+
+  it('leads with the failure that says the least happened', () => {
+    // A request that did not land is a bigger fact than a file that would not
+    // delete, so it is the one reported when a batch contains both.
+    expect(transfers.summariseDeletions([refused, failed]).message).toMatch(
+      /could not be removed/,
+    );
+  });
+});

@@ -102,37 +102,24 @@ const Transfers = ({ direction, options = {}, server }) => {
   };
 
   /**
-   * Removes the record of a transfer, and optionally deletes the file it
-   * produced.
+   * Removes the record of a transfer.
    *
-   * The deletion is reported by the API per file rather than by status code,
-   * because "the file is gone", "there was no file to delete" and "the file
-   * could not be deleted" are three different answers and only the first is
-   * what was asked for. A failure is surfaced; the removal itself has already
-   * succeeded by that point and is not undone.
+   * This is the bulk path, reached from the header, and it never asks for the
+   * file to be deleted -- that lives on the card, next to the selection it
+   * applies to, and reports itself there. Deleting from here would mean one
+   * button deleting files across every card on the page.
    */
-  const remove = async ({
-    deleteFile = false,
-    file,
-    suppressStateChange = false,
-  }) => {
+  const remove = async ({ file, suppressStateChange = false }) => {
     const { id, username } = file;
 
     try {
       if (!suppressStateChange) setRemoving(true);
-      const response = await transfersLibrary.cancel({
-        deleteFile,
+      await transfersLibrary.cancel({
         direction,
         id,
         remove: true,
         username,
       });
-
-      if (deleteFile && response?.data?.error) {
-        toast.error(
-          `Removed, but could not delete ${response.data.filename}: ${response.data.error}`,
-        );
-      }
 
       if (!suppressStateChange) setRemoving(false);
     } catch (error) {
@@ -142,11 +129,11 @@ const Transfers = ({ direction, options = {}, server }) => {
     }
   };
 
-  const removeAll = async (transfersToRemove, { deleteFile = false } = {}) => {
+  const removeAll = async (transfersToRemove) => {
     setRemoving(true);
     await Promise.all(
       transfersToRemove.map((file) =>
-        remove({ deleteFile, file, suppressStateChange: true }),
+        remove({ file, suppressStateChange: true }),
       ),
     );
     setRemoving(false);
