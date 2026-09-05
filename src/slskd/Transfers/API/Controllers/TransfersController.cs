@@ -138,6 +138,14 @@ namespace slskd.Transfers.API
                 // `Transfer` alone is Soulseek.NET's, this file having `using Soulseek`; ours is the record
                 slskd.Transfers.Transfer transfer = deleteFile ? Transfers.Downloads.Find(t => t.Id == guid) : null;
 
+                // an id that names no download is a 404, the same as it is for a cancellation. only
+                // checked when the record was read for deletion; without that this endpoint has never
+                // looked, and starting to look would be a change to what it answers
+                if (deleteFile && transfer is null)
+                {
+                    return NotFound();
+                }
+
                 Transfers.Downloads.TryCancel(guid);
 
                 if (remove)

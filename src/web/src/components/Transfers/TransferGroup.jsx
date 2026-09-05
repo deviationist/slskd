@@ -80,11 +80,22 @@ class TransferGroup extends Component {
    * download was moved out of the incomplete directory -- so a transfer that
    * never completed removes its record and leaves the disk alone.
    */
-  removeAll = async (direction, username, selected, { deleteFile = false } = {}) => {
+  removeAll = async (
+    direction,
+    username,
+    selected,
+    { deleteFile = false } = {},
+  ) => {
     await Promise.all(
       selected.map((file) =>
         transfers
-          .cancel({ deleteFile, direction, id: file.id, remove: true, username })
+          .cancel({
+            deleteFile,
+            direction,
+            id: file.id,
+            remove: true,
+            username,
+          })
           .then(() => this.removeFileSelection(file)),
       ),
     );
