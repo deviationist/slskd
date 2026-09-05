@@ -179,7 +179,9 @@ const Transfers = ({ direction, options = {}, server }) => {
           <TransferGroup
             cancel={cancel}
             cancelAll={cancelAll}
-            deleteFileOnRemoval={options?.transfers?.download?.deleteFileOnRemoval}
+            deleteFileOnRemoval={
+              options?.transfers?.download?.deleteFileOnRemoval
+            }
             direction={direction}
             key={user.username}
             remove={remove}
