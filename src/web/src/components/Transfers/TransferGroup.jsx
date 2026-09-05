@@ -2,7 +2,7 @@ import * as transfers from '../../lib/transfers';
 import TransferList from './TransferList';
 import React, { Component } from 'react';
 import { toast } from 'react-toastify';
-import { Button, Card, Icon, Modal } from 'semantic-ui-react';
+import { Button, Card, Icon } from 'semantic-ui-react';
 
 class TransferGroup extends Component {
   constructor(props) {
@@ -74,29 +74,19 @@ class TransferGroup extends Component {
   };
 
   /**
-   * Removes the selected transfers, and with `deleteFile` also deletes the
-   * files they produced.
+   * Removes the selected transfers.
    *
-   * Only a file slskd knows it wrote is deleted -- one recorded when the
-   * download was moved out of the incomplete directory -- so a transfer that
-   * never completed removes its record and leaves the disk alone.
+   * Whether the files go with them is not this button's decision: the server
+   * takes its files with a removal or it does not, according to
+   * `transfers.download.delete_file_on_removal`, and answers with what it did.
+   * A removal that deleted nothing answers 204 and there is nothing to report;
+   * one that deleted something answers with the outcome per file.
    */
-  removeAll = async (
-    direction,
-    username,
-    selected,
-    { deleteFile = false } = {},
-  ) => {
+  removeAll = async (direction, username, selected) => {
     const results = await Promise.all(
       selected.map((file) =>
         transfers
-          .cancel({
-            deleteFile,
-            direction,
-            id: file.id,
-            remove: true,
-            username,
-          })
+          .cancel({ direction, id: file.id, remove: true, username })
           .then((response) => {
             this.removeFileSelection(file);
             return { data: response?.data, ok: true };
@@ -107,14 +97,10 @@ class TransferGroup extends Component {
       ),
     );
 
-    // Only for the deleting variant. A plain remove has always been silent and
-    // its result is visible anyway -- the rows go.
-    if (deleteFile) {
-      const summary = transfers.summariseDeletions(results);
+    const summary = transfers.summariseDeletions(results);
 
-      if (summary) {
-        toast[summary.kind](summary.message);
-      }
+    if (summary) {
+      toast[summary.kind](summary.message);
     }
   };
 
@@ -143,7 +129,7 @@ class TransferGroup extends Component {
   };
 
   render() {
-    const { deleteFileOnRemoval, direction, user } = this.props;
+    const { direction, user } = this.props;
     const { isFolded } = this.state;
 
     const selected = this.getSelectedFiles();
@@ -226,54 +212,6 @@ class TransferGroup extends Component {
                   }
                 />
               )}
-              {/*
-                Deleting the file is a second action rather than an option on
-                the first, because Remove has never touched the disk and a
-                button that sometimes does would be the same button meaning two
-                things. Confirmed, since nothing here is recoverable, and shown
-                only for downloads -- an upload's file is a shared file, which
-                is not slskd's to delete.
-              */}
-              {allRemovable &&
-                deleteFileOnRemoval &&
-                direction === 'download' && (
-                  <>
-                    <Button.Or />
-                    <Modal
-                      actions={[
-                        'Cancel',
-                        {
-                          content: 'Remove & Delete',
-                          key: 'done',
-                          negative: true,
-                          onClick: () =>
-                            this.removeAll(direction, user.username, selected, {
-                              deleteFile: true,
-                            }),
-                        },
-                      ]}
-                      centered
-                      content={
-                        `${selected.length} file${selected.length === 1 ? '' : 's'} ` +
-                        'will be deleted from disk. This cannot be undone.'
-                      }
-                      header={
-                        <Modal.Header>
-                          <Icon name="trash alternate" />
-                          {` Confirm Remove & Delete`}
-                        </Modal.Header>
-                      }
-                      size="small"
-                      trigger={
-                        <Button
-                          color="red"
-                          content={`Remove${all} & Delete`}
-                          icon="trash alternate"
-                        />
-                      }
-                    />
-                  </>
-                )}
             </Button.Group>
           </Card.Content>
         )}

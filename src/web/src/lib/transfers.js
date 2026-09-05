@@ -57,58 +57,19 @@ export const enqueueBatch = ({
 };
 
 /**
- * Cancels a transfer, optionally removing the record of it, and optionally
- * deleting the file it produced.
+ * Cancels a transfer, optionally removing the record of it.
  *
- * `deleteFile` is only sent when it is asked for, so a caller that does not
- * know about it makes exactly the request it always made.
- *
- * It is only meaningful alongside `remove`: the option that permits it is
- * `delete_file_on_removal`, and deleting the file while keeping the record
- * leaves a transfer listed as a completed download whose file is not there.
- * The API rejects that combination; this refuses to send it.
+ * Whether a removal takes the file with it is the server's decision, made from
+ * `transfers.download.delete_file_on_removal` rather than from anything sent
+ * here -- so this is the request it always was, and a removal answers either
+ * 204 (nothing was deleted) or the outcome per file.
  */
-export const cancel = ({
-  deleteFile = false,
-  direction,
-  id,
-  remove = false,
-  username,
-}) => {
-  const query = new URLSearchParams({ remove });
-
-  if (deleteFile) {
-    if (!remove) {
-      throw new Error('deleteFile requires remove');
-    }
-
-    query.set('deleteFile', true);
-  }
-
+export const cancel = ({ direction, id, remove = false, username }) => {
   return api.delete(
-    `/transfers/${direction}s/${encodeURIComponent(username)}/${encodeURIComponent(id)}?${query}`,
+    `/transfers/${direction}s/${encodeURIComponent(username)}/${encodeURIComponent(id)}?remove=${remove}`,
   );
 };
 
-/**
- * What to say about a batch of removals that asked for the files to go too.
- *
- * Pure, so it can be tested without a DOM or a server: it takes one entry per
- * transfer, either `{ok: true, data}` carrying the API's FileDeletionResult or
- * `{ok: false, error}` for a request that did not land.
- *
- * The removal and the deletion are **two independent facts** and the API
- * reports both: `removed` comes from the removal itself, not from the absence
- * of an error. Deriving one from the other is how "Removed, but could not
- * delete" came to be said over a request that removed nothing at all.
- *
- * Saying only "removed" over a deletion that did nothing is the other half of
- * the same mistake -- it is how a delete that silently did nothing comes to
- * look like one that worked.
- *
- * One message for the batch rather than one per file: removing eleven tracks
- * from a folder is one gesture, and eleven toasts is not a report.
- */
 /**
  * The most useful thing to say about why a group of removals went wrong.
  *
@@ -122,6 +83,24 @@ const firstReason = (list) =>
   list[0]?.error?.message ??
   'see the log';
 
+/**
+ * What to say about a batch of removals, when the server took files with them.
+ *
+ * Returns null when it did not -- a removal that deletes nothing answers 204,
+ * carries no body, and needs no report: the rows going is the report.
+ *
+ * The removal and the deletion are **two independent facts** and the API
+ * reports both: `removed` comes from the removal itself, not from the absence
+ * of an error. Deriving one from the other is how "Removed, but could not
+ * delete" came to be said over a request that removed nothing at all.
+ *
+ * Saying only "removed" over a deletion that did nothing is the other half of
+ * the same mistake -- it is how a delete that silently did nothing comes to
+ * look like one that worked.
+ *
+ * One message for the batch rather than one per file: removing eleven tracks
+ * from a folder is one gesture, and eleven toasts is not a report.
+ */
 export const summariseDeletions = (results = []) => {
   const total = results.length;
 
@@ -142,6 +121,27 @@ export const summariseDeletions = (results = []) => {
   const unrecorded = results.filter(
     (r) => r.ok && r.data?.removed && !r.data.deleted && !r.data.error,
   );
+  const pruned = results.reduce(
+    (sum, r) => sum + (r.data?.prunedDirectories ?? 0),
+    0,
+  );
+  // said only when there were any, and never as the headline: a folder is
+  // bookkeeping, and the files are what the operator asked about
+  const folders = pruned
+    ? ` (${pruned} empty folder${pruned === 1 ? '' : 's'} removed)`
+    : '';
+
+  // a batch of plain removals: nothing was deleted and nothing claims to have
+  // been, so there is nothing to say that the rows disappearing does not
+  if (
+    !deleted.length &&
+    !refused.length &&
+    !unrecorded.length &&
+    !failed.length &&
+    !notRemoved.length
+  ) {
+    return null;
+  }
 
   if (failed.length) {
     return {
@@ -170,19 +170,15 @@ export const summariseDeletions = (results = []) => {
     return {
       kind: 'warning',
       message: deleted.length
-        ? `Removed ${total} and deleted ${deleted.length}; there is no record of where the other ${unrecorded.length} were written`
+        ? `Removed ${total} and deleted ${deleted.length}; there is no record of where the other ${unrecorded.length} were written${folders}`
         : `Removed ${total}, but deleted nothing: there is no record of where these were written`,
     };
   }
 
-  if (deleted.length) {
-    return {
-      kind: 'success',
-      message: `Removed ${total} and deleted ${deleted.length === 1 ? 'the file' : `${deleted.length} files`}`,
-    };
-  }
-
-  return null;
+  return {
+    kind: 'success',
+    message: `Removed ${total} and deleted ${deleted.length === 1 ? 'the file' : `${deleted.length} files`}${folders}`,
+  };
 };
 
 export const clearCompleted = ({ direction }) => {
