@@ -101,6 +101,26 @@ body {
     background-color: var(--background-color);
 }
 
+/* Restore the left border on the first button of a group.
+
+   The dark theme gives every button a border (--smui-button-border), but
+   Semantic zeroes border-left on the first button of a .ui.buttons group:
+
+       .ui.buttons .button:first-child { border-left: none; ... }
+
+   That rule is written for .ui.basic.buttons, where the *group* carries the
+   outer border and the children draw only the dividers between them. A plain
+   .ui.buttons group has no border of its own, so in dark the leading button
+   ends up with three sides instead of four -- visible wherever a group is
+   used, e.g. Retry/Cancel/Remove on the transfer pages.
+
+   Light is unaffected: buttons have no border there, so there is none to lose.
+   Vertical groups are unaffected too -- .ui.vertical.buttons .button:first-child
+   sets only the corner radii, never border-top. */
+:root.dark .ui.buttons .button:first-child {
+    border-left: var(--smui-button-border);
+}
+
 .ui.table td, th {
     padding-top: 5px !important;
     padding-bottom: 5px !important;
