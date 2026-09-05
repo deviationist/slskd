@@ -62,6 +62,11 @@ export const enqueueBatch = ({
  *
  * `deleteFile` is only sent when it is asked for, so a caller that does not
  * know about it makes exactly the request it always made.
+ *
+ * It is only meaningful alongside `remove`: the option that permits it is
+ * `delete_file_on_removal`, and deleting the file while keeping the record
+ * leaves a transfer listed as a completed download whose file is not there.
+ * The API rejects that combination; this refuses to send it.
  */
 export const cancel = ({
   deleteFile = false,
@@ -73,6 +78,10 @@ export const cancel = ({
   const query = new URLSearchParams({ remove });
 
   if (deleteFile) {
+    if (!remove) {
+      throw new Error('deleteFile requires remove');
+    }
+
     query.set('deleteFile', true);
   }
 
