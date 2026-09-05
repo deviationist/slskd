@@ -6,7 +6,7 @@ import TransfersHeader from './TransfersHeader';
 import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 
-const Transfers = ({ direction, options = {}, server }) => {
+const Transfers = ({ direction, server }) => {
   const [connecting, setConnecting] = useState(true);
   const [transfers, setTransfers] = useState([]);
 
@@ -102,19 +102,19 @@ const Transfers = ({ direction, options = {}, server }) => {
   };
 
   /**
-   * Removes the record of a transfer.
+   * Removes the record of a transfer, and returns what the server did with it.
    *
-   * This is the bulk path, reached from the header, and it never asks for the
-   * file to be deleted -- that lives on the card, next to the selection it
-   * applies to, and reports itself there. Deleting from here would mean one
-   * button deleting files across every card on the page.
+   * Whether the file goes too is the server's decision, from
+   * `transfers.download.delete_file_on_removal`. A removal that deleted nothing
+   * answers 204 and has nothing to report; one that deleted something answers
+   * with the outcome, and `removeAll` says so.
    */
   const remove = async ({ file, suppressStateChange = false }) => {
     const { id, username } = file;
 
     try {
       if (!suppressStateChange) setRemoving(true);
-      await transfersLibrary.cancel({
+      const response = await transfersLibrary.cancel({
         direction,
         id,
         remove: true,
@@ -122,21 +122,32 @@ const Transfers = ({ direction, options = {}, server }) => {
       });
 
       if (!suppressStateChange) setRemoving(false);
+      return { data: response?.data, ok: true };
     } catch (error) {
       console.error(error);
       toast.error(error?.response?.data ?? error?.message ?? error);
       if (!suppressStateChange) setRemoving(false);
+      return { error, ok: false };
     }
   };
 
   const removeAll = async (transfersToRemove) => {
     setRemoving(true);
-    await Promise.all(
+    const results = await Promise.all(
       transfersToRemove.map((file) =>
         remove({ file, suppressStateChange: true }),
       ),
     );
     setRemoving(false);
+
+    // this is the header's bulk remove, and with the option on it deletes files
+    // across every card on the page. a deletion is never silent, wherever it
+    // was asked for
+    const summary = transfersLibrary.summariseDeletions(results);
+
+    if (summary) {
+      toast[summary.kind](summary.message);
+    }
   };
 
   if (connecting) {
@@ -166,9 +177,6 @@ const Transfers = ({ direction, options = {}, server }) => {
           <TransferGroup
             cancel={cancel}
             cancelAll={cancelAll}
-            deleteFileOnRemoval={
-              options?.transfers?.download?.deleteFileOnRemoval
-            }
             direction={direction}
             key={user.username}
             remove={remove}

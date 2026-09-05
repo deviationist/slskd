@@ -68,6 +68,16 @@ namespace slskd.Transfers.API
         public string Filename { get; init; }
 
         /// <summary>
+        ///     Gets the number of directories removed because deleting the file left them empty.
+        /// </summary>
+        /// <remarks>
+        ///     Counted upwards from the file: a download arrives inside the folder the peer named,
+        ///     sometimes nested several deep, and removing one level would move the litter outwards
+        ///     rather than clear it.
+        /// </remarks>
+        public int PrunedDirectories { get; init; }
+
+        /// <summary>
         ///     Gets the reason the file could not be deleted, or null if there was nothing to delete or the
         ///     deletion succeeded.
         /// </summary>

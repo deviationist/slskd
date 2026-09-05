@@ -388,16 +388,22 @@ transfers:
 
 ## Deleting Files on Removal
 
-Removing a download removes the record of it and does not touch the file on disk.  Enabling this option adds a second action alongside 'Remove' on the Downloads
-page that does both.
+Removing a download removes the record of it and does not touch the file on disk.  With this option enabled, removing a download deletes its file as well.
+There is no second button and no per-request flag: this option is the whole of the decision, made once by the operator rather than per removal.  Cancelling a
+transfer is unaffected -- cancelling is not removing, and the option is named for the removal.
 
-Only a file slskd recorded writing is deleted, at the path recorded for the transfer: the finished file if the download completed, or the partial left in the
-'Incomplete' directory if it was cancelled or failed.  Partials are otherwise removed only by [data retention](#data-retention), so a download abandoned
-half way leaves its bytes behind until that timer catches them.
+Only a file slskd recorded writing is deleted, at the path recorded for the transfer: the finished file if the download completed, or the partial in the
+'Incomplete' directory if it did not.  Partials are otherwise removed only by [data retention](#data-retention), so a download abandoned half way leaves its
+bytes behind until that timer catches them.  A download that finished before slskd began recording where the bytes land has no recorded path; it removes its
+record and leaves the disk alone rather than deleting a path derived after the fact.
 
-A transfer that is still running is not deleted from under itself and must be cancelled first, which the UI already requires -- 'Remove' is only offered for
-transfers in a terminal state.  A download that finished before slskd began recording where the bytes are has no recorded path; it removes its record and
-leaves the disk alone rather than deleting a path derived after the fact.
+Removing a download that is still running cancels it first and waits, briefly, for it to stop before touching either the record or the file.  Removal skips
+transfers that have not reached a terminal state, and unlinking a file that is still being written to is either allowed and confusing or refused outright,
+depending on the platform.
+
+The directories the deletion empties are removed with it, innermost first, stopping at the first directory that still holds something and at the 'Incomplete'
+and 'Downloads' roots.  A download arrives inside the folder the peer named, sometimes nested several deep, so removing a single level would move the empty
+structure outwards rather than clear it.
 
 This is deliberately its own option rather than a use of [Remote File Management](#remote-file-management), which grants deletion of any file under the
 'Incomplete' and 'Downloads' directories.  This grants deletion of one file, belonging to a transfer being removed, at a path slskd itself recorded -- strictly

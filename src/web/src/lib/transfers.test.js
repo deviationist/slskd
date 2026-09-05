@@ -1,28 +1,18 @@
 import * as transfers from './transfers';
 
-describe('cancel', () => {
-  // The option that permits a deletion is `delete_file_on_removal`, and
-  // deleting the file while keeping the record leaves a transfer listed as a
-  // completed download whose file is not there. The API rejects it; this
-  // refuses to send it, so the combination cannot be reached from the UI.
-  it('refuses to delete a file without removing the record', () => {
-    expect(() =>
-      transfers.cancel({
-        deleteFile: true,
-        direction: 'download',
-        id: 'abc',
-        remove: false,
-        username: 'peer',
-      }),
-    ).toThrow(/requires remove/);
-  });
-});
-
 describe('summariseDeletions', () => {
   const deleted = {
-    data: { deleted: true, error: null, filename: '/a.flac', removed: true },
+    data: {
+      deleted: true,
+      error: null,
+      filename: '/a.flac',
+      prunedDirectories: 0,
+      removed: true,
+    },
     ok: true,
   };
+  // a plain removal with the option off: 204, no body, nothing to report
+  const removedOnly = { data: undefined, ok: true };
   const unrecorded = {
     data: { deleted: false, error: null, filename: null, removed: true },
     ok: true,
@@ -41,6 +31,23 @@ describe('summariseDeletions', () => {
 
   it('says nothing about nothing', () => {
     expect(transfers.summariseDeletions([])).toBeNull();
+  });
+
+  // With the option off, removing is what it always was and the rows going is
+  // the whole report. A toast there would be noise on an unchanged action.
+  it('says nothing when no files were in play', () => {
+    expect(transfers.summariseDeletions([removedOnly, removedOnly])).toBeNull();
+  });
+
+  it('counts the folders it cleared up, but never leads with them', () => {
+    const withFolders = {
+      data: { ...deleted.data, prunedDirectories: 2 },
+      ok: true,
+    };
+
+    expect(transfers.summariseDeletions([withFolders]).message).toBe(
+      'Removed 1 and deleted the file (2 empty folders removed)',
+    );
   });
 
   it('reports the plain success', () => {

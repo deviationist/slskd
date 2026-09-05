@@ -35,6 +35,7 @@ namespace slskd.Tests.Unit.Transfers.API.Controllers
     using System;
     using System.Collections.Generic;
     using System.IO;
+    using System.Linq;
     using System.Linq.Expressions;
     using System.Threading.Tasks;
     using Microsoft.AspNetCore.Mvc;
@@ -52,10 +53,10 @@ namespace slskd.Tests.Unit.Transfers.API.Controllers
     ///     Deleting the downloaded file along with the download.
     /// </summary>
     /// <remarks>
-    ///     Removing a download has never touched the disk, so everything here is about the one query
-    ///     parameter that changes that: that it is refused unless the option is on, that it only ever
-    ///     deletes a file this application recorded writing, and that the answer says which of the three
-    ///     outcomes happened rather than leaving the caller to infer it from a 204.
+    ///     Removing a download has never touched the disk. With the option on it does, and everything
+    ///     here is about that: that the option alone decides, that only a file this application recorded
+    ///     writing is deleted, that the folders the deletion empties go with it, and that the answer says
+    ///     which of the outcomes happened rather than leaving the caller to infer it from a 204.
     /// </remarks>
     public class TransfersControllerTests
     {
@@ -112,202 +113,137 @@ namespace slskd.Tests.Unit.Transfers.API.Controllers
                 .Setup(f => f.DeleteFilesAsync(It.IsAny<string[]>()))
                 .ReturnsAsync(new Dictionary<string, OneOf<bool, Exception>> { { filename, result } });
 
-        [Fact]
-        public async Task Removing_Without_Asking_To_Delete_Answers_204_And_Touches_No_File()
-        {
-            var id = Guid.NewGuid();
+        /// <summary>
+        ///     A real directory tree, since the pruning walk asks the filesystem what is still in a
+        ///     folder and a mock of that would only ever confirm what the mock was told to believe.
+        /// </summary>
+        private string Temp { get; } = Directory.CreateTempSubdirectory("slskd.test.").FullName;
 
-            var result = await Controller.CancelDownloadAsync("user", id.ToString(), remove: true);
+        /// <summary>
+        ///     Makes the file service's directory deletion behave like the real one: it removes the
+        ///     directory, and refuses the root the way `DeleteDirectoriesAsync` does.
+        /// </summary>
+        private void GivenDirectoriesCanBePruned(string root)
+            => FileServiceMock
+                .Setup(f => f.DeleteDirectoriesAsync(It.IsAny<string[]>()))
+                .Returns((string[] dirs) =>
+                {
+                    if (dirs.Any(d => d == root))
+                    {
+                        throw new ArgumentException("Deletion of application-controlled directory roots is not supported");
+                    }
+
+                    foreach (var d in dirs)
+                    {
+                        Directory.Delete(d);
+                    }
+
+                    return Task.FromResult(dirs.ToDictionary(d => d, _ => (OneOf<bool, Exception>)true));
+                });
+
+        // --- the option is the only switch -------------------------------------------------------
+
+        [Fact]
+        public async Task With_The_Option_Off_A_Removal_Deletes_Nothing_And_Answers_204()
+        {
+            SetDeleteFileOnRemoval(false);
+            GivenTheRecordIsRemoved();
+
+            var result = await Controller.CancelDownloadAsync("user", Guid.NewGuid().ToString(), remove: true);
 
             Assert.IsType<NoContentResult>(result);
             FileServiceMock.Verify(f => f.DeleteFilesAsync(It.IsAny<string[]>()), Times.Never);
+
+            // it does not even look the record up: with the option off this endpoint is what it was
+            DownloadsMock.Verify(d => d.Find(It.IsAny<Expression<Func<Transfer, bool>>>()), Times.Never);
         }
 
         [Fact]
-        public async Task Deleting_Without_Removing_Is_Refused()
+        public async Task A_Cancellation_Never_Deletes_Anything_Whatever_The_Option_Says()
         {
-            // the option is `delete_file_on_removal`, and that is the whole scope of what it grants.
-            // it would also leave a transfer listed as a completed download whose file is not there,
-            // which is the stale state this feature exists to stop producing
-            var id = Guid.NewGuid();
-            GivenDownload(id, Path.Combine(Path.GetTempPath(), "downloads", "01 track.flac"));
-
-            var result = await Controller.CancelDownloadAsync("user", id.ToString(), remove: false, deleteFile: true);
-
-            Assert.IsType<BadRequestObjectResult>(result);
-            FileServiceMock.Verify(f => f.DeleteFilesAsync(It.IsAny<string[]>()), Times.Never);
-
-            // refused before anything happened at all, cancellation included
-            DownloadsMock.Verify(d => d.TryCancel(It.IsAny<Guid>()), Times.Never);
-        }
-
-        [Fact]
-        public async Task Cancelling_Without_Removing_Still_Works()
-        {
-            // the pairing is only required when a deletion is asked for; cancel-without-remove is what
-            // the Cancel button has always done
+            // `remove=false` is the Cancel button, and cancelling is not removing. the option is named
+            // for the removal and grants nothing here.
             var result = await Controller.CancelDownloadAsync("user", Guid.NewGuid().ToString(), remove: false);
 
             Assert.IsType<NoContentResult>(result);
-        }
-
-        [Fact]
-        public async Task Deleting_Is_Forbidden_When_The_Option_Is_Disabled()
-        {
-            SetDeleteFileOnRemoval(false);
-            var id = Guid.NewGuid();
-
-            var result = await Controller.CancelDownloadAsync("user", id.ToString(), remove: true, deleteFile: true);
-
-            Assert.IsType<ForbidResult>(result);
             FileServiceMock.Verify(f => f.DeleteFilesAsync(It.IsAny<string[]>()), Times.Never);
-
-            // and the transfer is left alone; a refused request must not half-happen
-            DownloadsMock.Verify(d => d.Remove(It.IsAny<Guid>()), Times.Never);
         }
 
         [Fact]
-        public async Task Deleting_Answers_404_When_There_Is_No_Such_Download()
+        public async Task With_The_Option_On_A_Removal_Deletes_The_Recorded_File()
+        {
+            var id = Guid.NewGuid();
+            var filename = Path.Combine(Temp, "01 track.flac");
+
+            GivenDownload(id, filename);
+            GivenTheRecordIsRemoved();
+            GivenDeletionResult(filename, true);
+
+            var result = await Controller.CancelDownloadAsync("user", id.ToString(), remove: true);
+
+            var outcome = Assert.IsType<RemovalResult>(Assert.IsType<OkObjectResult>(result).Value);
+            Assert.True(outcome.Removed);
+            Assert.True(outcome.Deleted);
+            Assert.Equal(filename, outcome.Filename);
+            Assert.Null(outcome.Error);
+
+            FileServiceMock.Verify(f => f.DeleteFilesAsync(filename), Times.Once);
+        }
+
+        [Fact]
+        public async Task Answers_404_When_There_Is_No_Such_Download()
         {
             DownloadsMock
                 .Setup(d => d.Find(It.IsAny<Expression<Func<Transfer, bool>>>()))
                 .Returns((Transfer)null);
 
-            var result = await Controller.CancelDownloadAsync("user", Guid.NewGuid().ToString(), remove: true, deleteFile: true);
+            var result = await Controller.CancelDownloadAsync("user", Guid.NewGuid().ToString(), remove: true);
 
             Assert.IsType<NotFoundResult>(result);
         }
 
-        [Fact]
-        public async Task Deleting_Removes_The_Recorded_File()
-        {
-            var id = Guid.NewGuid();
-            var filename = Path.Combine(Path.GetTempPath(), "downloads", "album", "01 track.flac");
-
-            GivenDownload(id, filename);
-            GivenTheRecordIsRemoved();
-            GivenDeletionResult(filename, true);
-
-            var result = await Controller.CancelDownloadAsync("user", id.ToString(), remove: true, deleteFile: true);
-
-            var deletion = Assert.IsType<RemovalResult>(Assert.IsType<OkObjectResult>(result).Value);
-            Assert.True(deletion.Deleted);
-            Assert.Equal(filename, deletion.Filename);
-            Assert.Null(deletion.Error);
-
-            FileServiceMock.Verify(f => f.DeleteFilesAsync(filename), Times.Once);
-            DownloadsMock.Verify(d => d.Remove(id), Times.Once);
-        }
+        // --- what gets deleted ---------------------------------------------------------------------
 
         [Fact]
-        public async Task Deleting_A_Download_With_No_Recorded_File_Deletes_Nothing_And_Says_So()
-        {
-            // a download that never completed, or one that completed before this was recorded. there is
-            // no honest path to delete, and guessing one is the thing this feature must not do
-            var id = Guid.NewGuid();
-            GivenDownload(id, localFilename: null);
-            GivenTheRecordIsRemoved();
-
-            var result = await Controller.CancelDownloadAsync("user", id.ToString(), remove: true, deleteFile: true);
-
-            var deletion = Assert.IsType<RemovalResult>(Assert.IsType<OkObjectResult>(result).Value);
-            Assert.False(deletion.Deleted);
-            Assert.Null(deletion.Filename);
-            Assert.Null(deletion.Error);
-
-            FileServiceMock.Verify(f => f.DeleteFilesAsync(It.IsAny<string[]>()), Times.Never);
-
-            // the record still goes; only the file was in question
-            DownloadsMock.Verify(d => d.Remove(id), Times.Once);
-        }
-
-        [Fact]
-        public async Task A_Cancelled_Download_Has_Its_Partial_File_Deleted()
+        public async Task A_Cancelled_Download_Has_Its_Partial_Deleted()
         {
             // the recorded path is the incomplete file until the download finishes and it is moved, so a
             // transfer that was cancelled or failed still names something to delete. this is the case
-            // that leaves litter in the incomplete directory otherwise -- slskd keeps partials on
-            // purpose, to resume from, and only a retention timer ever removes them
+            // that leaves litter otherwise -- slskd keeps partials on purpose, to resume from, and only
+            // a retention timer ever removes them
             var id = Guid.NewGuid();
-            var partial = Path.Combine(Path.GetTempPath(), "incomplete", "peer", "album", "01 track.flac");
+            var partial = Path.Combine(Temp, "01 track.flac");
 
             GivenDownload(id, partial, Soulseek.TransferStates.Completed | Soulseek.TransferStates.Cancelled);
             GivenTheRecordIsRemoved();
             GivenDeletionResult(partial, true);
 
-            var result = await Controller.CancelDownloadAsync("user", id.ToString(), remove: true, deleteFile: true);
+            var result = await Controller.CancelDownloadAsync("user", id.ToString(), remove: true);
 
-            var deletion = Assert.IsType<RemovalResult>(Assert.IsType<OkObjectResult>(result).Value);
-            Assert.True(deletion.Deleted);
-            Assert.Equal(partial, deletion.Filename);
-
+            var outcome = Assert.IsType<RemovalResult>(Assert.IsType<OkObjectResult>(result).Value);
+            Assert.True(outcome.Deleted);
             FileServiceMock.Verify(f => f.DeleteFilesAsync(partial), Times.Once);
         }
 
         [Fact]
-        public async Task A_Running_Download_Is_Refused_Rather_Than_Deleted_From_Under_Itself()
+        public async Task A_Download_With_No_Recorded_File_Deletes_Nothing_And_Says_So()
         {
-            // unlinking a file that is being written to is either allowed and confusing (POSIX: the
-            // writer keeps the inode and the move at the end fails) or refused outright (Windows:
-            // FileShare.None). cancel first.
-            //
-            // refused up front rather than reported in the result, and that matters to the caller:
-            // Remove() only touches terminal transfers, so the record would not have gone either --
-            // reporting "removed, but the file is still there" would have been two lies in one line.
+            // a download that finished before this was recorded. there is no honest path to delete, and
+            // guessing one is the thing this feature must not do
             var id = Guid.NewGuid();
-            var partial = Path.Combine(Path.GetTempPath(), "incomplete", "peer", "album", "01 track.flac");
 
-            GivenDownload(id, partial, Soulseek.TransferStates.InProgress);
+            GivenDownload(id, localFilename: null);
+            GivenTheRecordIsRemoved();
 
-            var result = await Controller.CancelDownloadAsync("user", id.ToString(), remove: true, deleteFile: true);
-
-            Assert.IsType<BadRequestObjectResult>(result);
-            FileServiceMock.Verify(f => f.DeleteFilesAsync(It.IsAny<string[]>()), Times.Never);
-            DownloadsMock.Verify(d => d.Remove(It.IsAny<Guid>()), Times.Never);
-            DownloadsMock.Verify(d => d.TryCancel(It.IsAny<Guid>()), Times.Never);
-        }
-
-        [Fact]
-        public async Task The_Removal_Is_Reported_By_Remove_Itself_Not_Inferred()
-        {
-            // the guards are checked against a snapshot read before the cancellation, and Remove()
-            // applies its own filter afterwards. if it says it removed nothing, that is what is
-            // reported -- a caller told "removed, but the file is still there" would otherwise be
-            // reading a claim nobody made.
-            var id = Guid.NewGuid();
-            var filename = Path.Combine(Path.GetTempPath(), "downloads", "01 track.flac");
-
-            GivenDownload(id, filename);
-            GivenTheRecordIsRemoved(false);
-            GivenDeletionResult(filename, true);
-
-            var result = await Controller.CancelDownloadAsync("user", id.ToString(), remove: true, deleteFile: true);
+            var result = await Controller.CancelDownloadAsync("user", id.ToString(), remove: true);
 
             var outcome = Assert.IsType<RemovalResult>(Assert.IsType<OkObjectResult>(result).Value);
-            Assert.False(outcome.Removed);
-            Assert.True(outcome.Deleted);
-        }
+            Assert.True(outcome.Removed);
+            Assert.False(outcome.Deleted);
+            Assert.Null(outcome.Filename);
+            Assert.Null(outcome.Error);
 
-        [Fact]
-        public async Task An_Error_In_The_Result_Always_Means_The_Record_Went_And_The_File_Did_Not()
-        {
-            // the contract the UI reports on. everything that would stop the removal -- the option
-            // being off, no `remove`, a transfer still running, an id that names nothing -- is refused
-            // before the removal happens, so a 200 carrying an Error is always a removal that succeeded
-            // beside a deletion that did not.
-            var id = Guid.NewGuid();
-            var filename = Path.Combine(Path.GetTempPath(), "downloads", "01 track.flac");
-
-            GivenDownload(id, filename);
-            GivenTheRecordIsRemoved();
-            GivenDeletionResult(filename, new UnauthorizedException("nope"));
-
-            var result = await Controller.CancelDownloadAsync("user", id.ToString(), remove: true, deleteFile: true);
-
-            var deletion = Assert.IsType<RemovalResult>(Assert.IsType<OkObjectResult>(result).Value);
-            Assert.NotNull(deletion.Error);
-            Assert.True(deletion.Removed);
-            DownloadsMock.Verify(d => d.Remove(id), Times.Once);
+            FileServiceMock.Verify(f => f.DeleteFilesAsync(It.IsAny<string[]>()), Times.Never);
         }
 
         [Fact]
@@ -317,18 +253,117 @@ namespace slskd.Tests.Unit.Transfers.API.Controllers
             // a recorded path can become if those are reconfigured. the removal has already happened by
             // then and must not read as a failure of the whole request
             var id = Guid.NewGuid();
-            var filename = Path.Combine(Path.GetTempPath(), "elsewhere", "01 track.flac");
+            var filename = Path.Combine(Temp, "01 track.flac");
 
             GivenDownload(id, filename);
             GivenTheRecordIsRemoved();
             GivenDeletionResult(filename, new UnauthorizedException("nope"));
 
-            var result = await Controller.CancelDownloadAsync("user", id.ToString(), remove: true, deleteFile: true);
+            var result = await Controller.CancelDownloadAsync("user", id.ToString(), remove: true);
 
-            var deletion = Assert.IsType<RemovalResult>(Assert.IsType<OkObjectResult>(result).Value);
-            Assert.False(deletion.Deleted);
-            Assert.Equal(filename, deletion.Filename);
-            Assert.Equal("nope", deletion.Error);
+            var outcome = Assert.IsType<RemovalResult>(Assert.IsType<OkObjectResult>(result).Value);
+            Assert.True(outcome.Removed);
+            Assert.False(outcome.Deleted);
+            Assert.Equal("nope", outcome.Error);
+        }
+
+        [Fact]
+        public async Task The_Removal_Is_Reported_By_Remove_Itself_Not_Inferred()
+        {
+            // Remove() applies its own filter and answers whether it removed anything. a caller told
+            // "removed, but the file is still there" would otherwise be reading a claim nobody made.
+            var id = Guid.NewGuid();
+            var filename = Path.Combine(Temp, "01 track.flac");
+
+            GivenDownload(id, filename);
+            GivenTheRecordIsRemoved(false);
+            GivenDeletionResult(filename, true);
+
+            var result = await Controller.CancelDownloadAsync("user", id.ToString(), remove: true);
+
+            var outcome = Assert.IsType<RemovalResult>(Assert.IsType<OkObjectResult>(result).Value);
+            Assert.False(outcome.Removed);
+            Assert.True(outcome.Deleted);
+        }
+
+        // --- and the folders it empties ------------------------------------------------------------
+
+        [Fact]
+        public async Task The_Folders_The_Deletion_Empties_Go_With_It()
+        {
+            // a download arrives inside the folder the peer named, sometimes nested several deep.
+            // removing one level would move the litter outwards rather than clear it.
+            var root = Path.Combine(Temp, "complete");
+            var nested = Path.Combine(root, "peer", "Some Album", "CD1");
+            Directory.CreateDirectory(nested);
+
+            var filename = Path.Combine(nested, "01 track.flac");
+            var id = Guid.NewGuid();
+
+            GivenDownload(id, filename);
+            GivenTheRecordIsRemoved();
+            GivenDeletionResult(filename, true);
+            GivenDirectoriesCanBePruned(root);
+
+            var result = await Controller.CancelDownloadAsync("user", id.ToString(), remove: true);
+
+            var outcome = Assert.IsType<RemovalResult>(Assert.IsType<OkObjectResult>(result).Value);
+            Assert.Equal(3, outcome.PrunedDirectories);
+
+            Assert.False(Directory.Exists(Path.Combine(root, "peer")));
+
+            // and never the root, which is the shared guard's rule rather than the walk's
+            Assert.True(Directory.Exists(root));
+        }
+
+        [Fact]
+        public async Task The_Walk_Stops_At_The_First_Folder_That_Still_Holds_Something()
+        {
+            var root = Path.Combine(Temp, "complete");
+            var album = Path.Combine(root, "peer", "Some Album");
+            var disc = Path.Combine(album, "CD1");
+            Directory.CreateDirectory(disc);
+
+            // a cover image beside the disc folder: the album folder is not empty and must survive
+            File.WriteAllText(Path.Combine(album, "cover.jpg"), "art");
+
+            var filename = Path.Combine(disc, "01 track.flac");
+            var id = Guid.NewGuid();
+
+            GivenDownload(id, filename);
+            GivenTheRecordIsRemoved();
+            GivenDeletionResult(filename, true);
+            GivenDirectoriesCanBePruned(root);
+
+            var result = await Controller.CancelDownloadAsync("user", id.ToString(), remove: true);
+
+            var outcome = Assert.IsType<RemovalResult>(Assert.IsType<OkObjectResult>(result).Value);
+            Assert.Equal(1, outcome.PrunedDirectories);
+
+            Assert.False(Directory.Exists(disc));
+            Assert.True(Directory.Exists(album));
+        }
+
+        [Fact]
+        public async Task Nothing_Is_Pruned_When_The_File_Was_Not_Deleted()
+        {
+            var root = Path.Combine(Temp, "complete");
+            var nested = Path.Combine(root, "peer", "Some Album");
+            Directory.CreateDirectory(nested);
+
+            var filename = Path.Combine(nested, "01 track.flac");
+            var id = Guid.NewGuid();
+
+            GivenDownload(id, filename);
+            GivenTheRecordIsRemoved();
+            GivenDeletionResult(filename, new UnauthorizedException("nope"));
+            GivenDirectoriesCanBePruned(root);
+
+            var result = await Controller.CancelDownloadAsync("user", id.ToString(), remove: true);
+
+            var outcome = Assert.IsType<RemovalResult>(Assert.IsType<OkObjectResult>(result).Value);
+            Assert.Equal(0, outcome.PrunedDirectories);
+            Assert.True(Directory.Exists(nested));
         }
     }
 }
