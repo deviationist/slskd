@@ -97,16 +97,31 @@ export const cancel = ({
  * transfer, either `{ok: true, data}` carrying the API's FileDeletionResult or
  * `{ok: false, error}` for a request that did not land.
  *
- * There are four outcomes and they are not interchangeable. A file that was
- * deleted, a file the API refused to delete (the removal still happened -- the
- * API refuses up front anything that would stop it), a download with no
- * recorded path so nothing to delete, and a request that failed outright.
- * Saying only "removed" over any of the last three is how a delete that
- * silently did nothing comes to look like one that worked.
+ * The removal and the deletion are **two independent facts** and the API
+ * reports both: `removed` comes from the removal itself, not from the absence
+ * of an error. Deriving one from the other is how "Removed, but could not
+ * delete" came to be said over a request that removed nothing at all.
+ *
+ * Saying only "removed" over a deletion that did nothing is the other half of
+ * the same mistake -- it is how a delete that silently did nothing comes to
+ * look like one that worked.
  *
  * One message for the batch rather than one per file: removing eleven tracks
  * from a folder is one gesture, and eleven toasts is not a report.
  */
+/**
+ * The most useful thing to say about why a group of removals went wrong.
+ *
+ * Reaches for the API's own explanation first, then the body of a failed
+ * request, then its message -- three shapes for the same question, depending
+ * on how far the request got.
+ */
+const firstReason = (list) =>
+  list[0]?.data?.error ??
+  list[0]?.error?.response?.data ??
+  list[0]?.error?.message ??
+  'see the log';
+
 export const summariseDeletions = (results = []) => {
   const total = results.length;
 
@@ -115,31 +130,39 @@ export const summariseDeletions = (results = []) => {
   }
 
   const failed = results.filter((r) => !r.ok);
+  // a request that landed but removed nothing. the API refuses up front
+  // everything it knows would stop a removal, so this should not happen -- and
+  // is reported rather than assumed away precisely because "should not" is not
+  // the same as "cannot"
+  const notRemoved = results.filter((r) => r.ok && r.data && !r.data.removed);
   const deleted = results.filter((r) => r.ok && r.data?.deleted);
   const refused = results.filter((r) => r.ok && r.data?.error);
   // no path recorded: the download finished before slskd started recording
   // where it wrote, so there is nothing it can honestly delete
   const unrecorded = results.filter(
-    (r) => r.ok && r.data && !r.data.deleted && !r.data.error,
+    (r) => r.ok && r.data?.removed && !r.data.deleted && !r.data.error,
   );
-
-  const reason = (list) =>
-    list[0]?.data?.error ??
-    list[0]?.error?.response?.data ??
-    list[0]?.error?.message ??
-    'see the log';
 
   if (failed.length) {
     return {
       kind: 'error',
-      message: `${failed.length} of ${total} could not be removed: ${reason(failed)}`,
+      message: `${failed.length} of ${total} could not be removed: ${firstReason(failed)}`,
+    };
+  }
+
+  if (notRemoved.length) {
+    return {
+      kind: 'error',
+      message: `${notRemoved.length} of ${total} were not removed${
+        deleted.length ? `, though ${deleted.length} file(s) were deleted` : ''
+      }`,
     };
   }
 
   if (refused.length) {
     return {
       kind: 'error',
-      message: `Removed ${total}, but ${refused.length} file(s) could not be deleted: ${reason(refused)}`,
+      message: `Removed ${total}, but ${refused.length} file(s) could not be deleted: ${firstReason(refused)}`,
     };
   }
 
