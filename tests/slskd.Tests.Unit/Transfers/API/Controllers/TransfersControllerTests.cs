@@ -121,6 +121,34 @@ namespace slskd.Tests.Unit.Transfers.API.Controllers
         }
 
         [Fact]
+        public async Task Deleting_Without_Removing_Is_Refused()
+        {
+            // the option is `delete_file_on_removal`, and that is the whole scope of what it grants.
+            // it would also leave a transfer listed as a completed download whose file is not there,
+            // which is the stale state this feature exists to stop producing
+            var id = Guid.NewGuid();
+            GivenDownload(id, Path.Combine(Path.GetTempPath(), "downloads", "01 track.flac"));
+
+            var result = await Controller.CancelDownloadAsync("user", id.ToString(), remove: false, deleteFile: true);
+
+            Assert.IsType<BadRequestObjectResult>(result);
+            FileServiceMock.Verify(f => f.DeleteFilesAsync(It.IsAny<string[]>()), Times.Never);
+
+            // refused before anything happened at all, cancellation included
+            DownloadsMock.Verify(d => d.TryCancel(It.IsAny<Guid>()), Times.Never);
+        }
+
+        [Fact]
+        public async Task Cancelling_Without_Removing_Still_Works()
+        {
+            // the pairing is only required when a deletion is asked for; cancel-without-remove is what
+            // the Cancel button has always done
+            var result = await Controller.CancelDownloadAsync("user", Guid.NewGuid().ToString(), remove: false);
+
+            Assert.IsType<NoContentResult>(result);
+        }
+
+        [Fact]
         public async Task Deleting_Is_Forbidden_When_The_Option_Is_Disabled()
         {
             SetDeleteFileOnRemoval(false);

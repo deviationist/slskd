@@ -108,12 +108,14 @@ namespace slskd.Transfers.API
         /// </remarks>
         /// <response code="200">The download was cancelled successfully, and the outcome of the file deletion is reported.</response>
         /// <response code="204">The download was cancelled successfully.</response>
+        /// <response code="400">File deletion was requested without removal, which is not what the option grants.</response>
         /// <response code="403">File deletion was requested, but it is disabled.</response>
         /// <response code="404">The specified download was not found.</response>
         [HttpDelete("downloads/{username}/{id}")]
         [Authorize(Policy = AuthPolicy.Any)]
         [ProducesResponseType(typeof(FileDeletionResult), 200)]
         [ProducesResponseType(204)]
+        [ProducesResponseType(400)]
         [ProducesResponseType(403)]
         [ProducesResponseType(404)]
         public async Task<IActionResult> CancelDownloadAsync([FromRoute, UrlEncoded, Required] string username, [FromRoute, Required] string id, [FromQuery] bool remove = false, [FromQuery] bool deleteFile = false)
@@ -126,6 +128,15 @@ namespace slskd.Transfers.API
             if (!Guid.TryParse(id, out var guid))
             {
                 return BadRequest();
+            }
+
+            // the option is `delete_file_on_removal`, and that is the whole scope of what it grants.
+            // deleting the file while keeping the record is a different thing, which nobody enabled --
+            // and it leaves a transfer listed as a completed download whose file is not there, which is
+            // exactly the stale state this feature exists to stop producing.
+            if (deleteFile && !remove)
+            {
+                return BadRequest("deleteFile requires remove; the file is deleted when the download is removed");
             }
 
             if (deleteFile && !OptionsSnapshot.Value.Transfers.Download.DeleteFileOnRemoval)
