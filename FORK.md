@@ -42,6 +42,35 @@ That only works if the base is chosen *before* the change is written — start i
 on `main` and it will grow to depend on whatever else is already there, after
 which it cannot be lifted out without being rewritten.
 
+## How a change gets in
+
+**Through a pull request into `main`, merged when the operator says so.** Not
+by a local `git merge` that happens to have been run first — the PR is the
+gate, and a change that is already on `main` before it is reviewed has skipped
+the only step that was asked for.
+
+```sh
+git checkout -b pr/feat-thing upstream/master   # base: upstream, never main
+# ...build it, test it, commit...
+git push -u origin pr/feat-thing
+gh pr create --repo deviationist/slskd --base main --head pr/feat-thing --draft
+# ...operator reviews, says all good...
+gh pr ready  <n> --repo deviationist/slskd
+gh pr merge  <n> --repo deviationist/slskd --merge
+git checkout main && git pull                   # then build and deploy from main
+```
+
+**The base is `main`, not `master`.** `master` is the mirror; a PR merged there
+puts our commits on it and breaks `--ff-only` permanently. Basing the *branch*
+on `upstream/master` is what keeps its diff clean — and because the merge base
+is `upstream/master` either way, a PR into `main` still shows that feature
+alone even once `main` carries several others. There is no tradeoff to make
+here; an earlier PR on this fork was based on `master` for a diff it would have
+got anyway, and could then only be closed rather than merged.
+
+Deploying before the merge is fine and often necessary — the image has to be
+built to be tested. Merging before the review is not.
+
 ## Taking upstream's changes
 
 ```sh
