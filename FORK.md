@@ -60,7 +60,7 @@ commits record when each upstream state was taken.
 
 | Branch | What it does | Upstream |
 |---|---|---|
-| `pr/feat-delete-files-on-remove` | A second action beside *Remove* on the Downloads page that also deletes the file from disk, behind a new `transfers.download.delete_file_on_removal` option. Records `Transfer.LocalFilename` — where the bytes are *now*: the partial while downloading, the finished file after the move — because those are the only moments either path is known. Covers a cancelled download's partial as well as a completed file. | [#1361](https://github.com/slskd/slskd/issues/1361), open |
+| `pr/feat-delete-files-on-remove` | Makes *Remove* on the Downloads page delete the file too, behind a new `transfers.download.delete_file_on_removal` option — the option is the whole decision, there is no second button and no per-request flag. Covers a cancelled download's partial as well as a completed file, and clears the folders the deletion empties. Records `Transfer.LocalFilename` — where the bytes are *now* — because a completed file's path is unreproducible once `MoveFile` has renamed it around a collision. | [#1361](https://github.com/slskd/slskd/issues/1361), open |
 
 Upstream's own *Remove* only clears the transfer record, and always has. The
 capability to delete a downloaded file exists — the files API, behind
