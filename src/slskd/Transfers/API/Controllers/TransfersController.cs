@@ -45,6 +45,7 @@ namespace slskd.Transfers.API
     using Microsoft.AspNetCore.Http;
     using Microsoft.AspNetCore.Mvc;
     using Serilog;
+    using slskd.Files;
     using slskd.Users;
     using Soulseek;
 
@@ -66,16 +67,19 @@ namespace slskd.Transfers.API
         public TransfersController(
             TransferService transferService,
             IUserService userService,
+            FileService fileService,
             IOptionsSnapshot<Options> optionsSnapshot)
         {
             Transfers = transferService;
             Users = userService;
+            Files = fileService;
             OptionsSnapshot = optionsSnapshot;
         }
 
         private static SemaphoreSlim DownloadRequestLimiter { get; } = new SemaphoreSlim(2, 2);
         private TransferService Transfers { get; }
         private IUserService Users { get; }
+        private FileService Files { get; }
         private IOptionsSnapshot<Options> OptionsSnapshot { get; }
         private ILogger Log { get; set; } = Serilog.Log.ForContext<TransfersController>();
 
@@ -85,14 +89,30 @@ namespace slskd.Transfers.API
         /// <param name="username">The username of the download source.</param>
         /// <param name="id">The id of the download.</param>
         /// <param name="remove">A value indicating whether the tracked download should be removed after cancellation.</param>
+        /// <param name="deleteFile">A value indicating whether the downloaded file should also be deleted from disk.</param>
         /// <returns></returns>
+        /// <remarks>
+        ///     Removing a download removes the record of it, and has never touched the file on disk. Passing
+        ///     <paramref name="deleteFile"/> deletes the file the download produced as well, and requires the
+        ///     remote file management option to be enabled -- it is the same permission that governs deletion
+        ///     through the files API, because it is the same act.
+        ///
+        ///     Only a file this application knows it wrote is deleted, meaning one recorded when the download
+        ///     was moved out of the incomplete directory. A download that never completed has no such record
+        ///     and nothing is deleted for it; neither is anything deleted for a download that completed before
+        ///     the application began recording this.
+        /// </remarks>
+        /// <response code="200">The download was cancelled successfully, and the outcome of the file deletion is reported.</response>
         /// <response code="204">The download was cancelled successfully.</response>
+        /// <response code="403">File deletion was requested, but remote file management is disabled.</response>
         /// <response code="404">The specified download was not found.</response>
         [HttpDelete("downloads/{username}/{id}")]
         [Authorize(Policy = AuthPolicy.Any)]
+        [ProducesResponseType(typeof(FileDeletionResult), 200)]
         [ProducesResponseType(204)]
+        [ProducesResponseType(403)]
         [ProducesResponseType(404)]
-        public IActionResult CancelDownloadAsync([FromRoute, UrlEncoded, Required] string username, [FromRoute, Required] string id, [FromQuery] bool remove = false)
+        public async Task<IActionResult> CancelDownloadAsync([FromRoute, UrlEncoded, Required] string username, [FromRoute, Required] string id, [FromQuery] bool remove = false, [FromQuery] bool deleteFile = false)
         {
             if (Program.IsRelayAgent)
             {
@@ -104,8 +124,20 @@ namespace slskd.Transfers.API
                 return BadRequest();
             }
 
+            if (deleteFile && !OptionsSnapshot.Value.RemoteFileManagement)
+            {
+                Log.Warning("Deletion of the file for download {Id} forbidden; remote file management is disabled", guid);
+                return Forbid();
+            }
+
             try
             {
+                // read the record before removing it, while it is still there to be read; Remove() is a soft
+                // delete, but Find() would still be a second trip and this is the only thing that knows where
+                // the file is
+                // `Transfer` alone is Soulseek.NET's, this file having `using Soulseek`; ours is the record
+                slskd.Transfers.Transfer transfer = deleteFile ? Transfers.Downloads.Find(t => t.Id == guid) : null;
+
                 Transfers.Downloads.TryCancel(guid);
 
                 if (remove)
@@ -113,11 +145,53 @@ namespace slskd.Transfers.API
                     Transfers.Downloads.Remove(guid);
                 }
 
-                return NoContent();
+                if (!deleteFile)
+                {
+                    return NoContent();
+                }
+
+                return Ok(await DeleteDownloadedFileAsync(transfer));
             }
             catch (NotFoundException)
             {
                 return NotFound();
+            }
+        }
+
+        /// <summary>
+        ///     Deletes the file produced by the specified <paramref name="transfer"/>, if it produced one.
+        /// </summary>
+        /// <remarks>
+        ///     Delegates to the file service rather than deleting directly, so that this inherits the same
+        ///     guards as every other deletion: absolute paths only, no traversal segments, and nothing outside
+        ///     the configured downloads and incomplete directories. A recorded path that no longer satisfies
+        ///     those -- the downloads directory having been reconfigured since, for instance -- is refused
+        ///     here exactly as it would be there.
+        /// </remarks>
+        private async Task<FileDeletionResult> DeleteDownloadedFileAsync(slskd.Transfers.Transfer transfer)
+        {
+            var filename = transfer?.LocalFilename;
+
+            if (string.IsNullOrWhiteSpace(filename))
+            {
+                // said rather than reported as a failure: a download that never completed has no file, and
+                // that is an ordinary answer to "delete the file", not an error
+                Log.Debug("No local file is recorded for download {Id}; nothing to delete", transfer?.Id);
+                return new FileDeletionResult { Deleted = false, Filename = null, Error = null };
+            }
+
+            try
+            {
+                var results = await Files.DeleteFilesAsync(filename);
+
+                return results[filename].Match(
+                    success => new FileDeletionResult { Deleted = true, Filename = filename, Error = null },
+                    failure => new FileDeletionResult { Deleted = false, Filename = filename, Error = failure.Message });
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "Failed to delete the file for download {Id}: {Message}", transfer.Id, ex.Message);
+                return new FileDeletionResult { Deleted = false, Filename = filename, Error = ex.Message };
             }
         }
 

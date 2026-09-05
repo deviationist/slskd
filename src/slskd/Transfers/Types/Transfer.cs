@@ -73,6 +73,18 @@ public class Transfer
     public string Filename { get; init; }
 
     /// <summary>
+    ///     Gets or sets the fully qualified path of the file on the local filesystem, or null if the
+    ///     file is not (or is no longer known to be) there.
+    /// </summary>
+    /// <remarks>
+    ///     Set for downloads at the moment the file is moved out of the incomplete directory, which is
+    ///     the only moment the final path is known: the destination subdirectory is derived from options
+    ///     that may since have changed, and a name collision may have renamed the file. Deriving the path
+    ///     again later would be a guess, and a guess is not something to hand to a delete.
+    /// </remarks>
+    public string LocalFilename { get; set; } = null;
+
+    /// <summary>
     ///     Gets or sets the remote size of the file.
     /// </summary>
     public long Size { get; set; }

@@ -656,6 +656,7 @@ class App extends Component {
                             <Transfers
                               {...props}
                               direction="download"
+                              options={applicationOptions}
                               server={applicationState.server}
                             />
                           </div>,

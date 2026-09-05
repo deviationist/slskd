@@ -1492,6 +1492,14 @@ namespace slskd.Transfers.Downloads
 
                 Log.Information("Moved file {Filename} from {Username} from {Incomplete} to {Destination}", FileSafety.GetFileNameSafely(transfer.Filename), transfer.Username, incompleteFilename, finalFilename);
 
+                // record where the file actually landed. this is the only point at which that is known
+                // for certain; the destination is derived from options that can change, and MoveFile()
+                // may have renamed the file to avoid a collision. anything that wants to act on the file
+                // later -- deleting it along with the transfer, for one -- needs this rather than a
+                // recomputed guess.
+                transfer.LocalFilename = finalFilename;
+                SynchronizedUpdate(transfer, semaphore: updateSyncRoot, cancellationToken: CancellationToken.None);
+
                 if (OptionsMonitor.CurrentValue.Relay.Enabled)
                 {
                     _ = Relay.NotifyFileDownloadCompleteAsync(finalFilename);

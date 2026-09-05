@@ -158,6 +158,11 @@ directories:
 The application offers APIs for listing and deleting files within the 'Incomplete' and 'Downloads' directories.  Listing is always allowed, while the ability
 to delete is disabled by default.  Deletions can be enabled by enabling the remote file management option.
 
+This option also governs the deletion of a downloaded file when its transfer is removed from the Downloads page, which is the same act and therefore the same
+permission.  Removing a download has never deleted anything from disk and still does not; with this option enabled, a second action appears alongside 'Remove'
+that does both.  Only a file the application recorded writing is deleted, meaning one moved out of the 'Incomplete' directory by this instance -- a download
+that never completed, or one that completed before the application began recording where files land, removes its record and leaves the disk alone.
+
 | Command-Line               | Environment Variable           | Description                                                                               |
 | -------------------------- | ------------------------------ | ----------------------------------------------------------------------------------------- |
 | `--remote-file-management` | `SLSKD_REMOTE_FILE_MANAGEMENT` | Determines whether the remote management of 'Incomplete' and 'Downloads' files is allowed |

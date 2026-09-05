@@ -6,7 +6,7 @@ import TransfersHeader from './TransfersHeader';
 import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 
-const Transfers = ({ direction, server }) => {
+const Transfers = ({ direction, options = {}, server }) => {
   const [connecting, setConnecting] = useState(true);
   const [transfers, setTransfers] = useState([]);
 
@@ -101,12 +101,39 @@ const Transfers = ({ direction, server }) => {
     setCancelling(false);
   };
 
-  const remove = async ({ file, suppressStateChange = false }) => {
+  /**
+   * Removes the record of a transfer, and optionally deletes the file it
+   * produced.
+   *
+   * The deletion is reported by the API per file rather than by status code,
+   * because "the file is gone", "there was no file to delete" and "the file
+   * could not be deleted" are three different answers and only the first is
+   * what was asked for. A failure is surfaced; the removal itself has already
+   * succeeded by that point and is not undone.
+   */
+  const remove = async ({
+    deleteFile = false,
+    file,
+    suppressStateChange = false,
+  }) => {
     const { id, username } = file;
 
     try {
       if (!suppressStateChange) setRemoving(true);
-      await transfersLibrary.cancel({ direction, id, remove: true, username });
+      const response = await transfersLibrary.cancel({
+        deleteFile,
+        direction,
+        id,
+        remove: true,
+        username,
+      });
+
+      if (deleteFile && response?.data?.error) {
+        toast.error(
+          `Removed, but could not delete ${response.data.filename}: ${response.data.error}`,
+        );
+      }
+
       if (!suppressStateChange) setRemoving(false);
     } catch (error) {
       console.error(error);
@@ -115,11 +142,11 @@ const Transfers = ({ direction, server }) => {
     }
   };
 
-  const removeAll = async (transfersToRemove) => {
+  const removeAll = async (transfersToRemove, { deleteFile = false } = {}) => {
     setRemoving(true);
     await Promise.all(
       transfersToRemove.map((file) =>
-        remove({ file, suppressStateChange: true }),
+        remove({ deleteFile, file, suppressStateChange: true }),
       ),
     );
     setRemoving(false);
@@ -156,6 +183,9 @@ const Transfers = ({ direction, server }) => {
             key={user.username}
             remove={remove}
             removeAll={removeAll}
+            // deleting a downloaded file is the same permission that governs
+            // deleting one through the files API, so it is the same option
+            remoteFileManagement={options?.remoteFileManagement}
             retry={retry}
             retryAll={retryAll}
             user={user}

@@ -56,9 +56,28 @@ export const enqueueBatch = ({
   });
 };
 
-export const cancel = ({ direction, username, id, remove = false }) => {
+/**
+ * Cancels a transfer, optionally removing the record of it, and optionally
+ * deleting the file it produced.
+ *
+ * `deleteFile` is only sent when it is asked for, so a caller that does not
+ * know about it makes exactly the request it always made.
+ */
+export const cancel = ({
+  deleteFile = false,
+  direction,
+  id,
+  remove = false,
+  username,
+}) => {
+  const query = new URLSearchParams({ remove });
+
+  if (deleteFile) {
+    query.set('deleteFile', true);
+  }
+
   return api.delete(
-    `/transfers/${direction}s/${encodeURIComponent(username)}/${encodeURIComponent(id)}?remove=${remove}`,
+    `/transfers/${direction}s/${encodeURIComponent(username)}/${encodeURIComponent(id)}?${query}`,
   );
 };
 
