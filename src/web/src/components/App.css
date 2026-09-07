@@ -85,6 +85,12 @@
     --smui-modal-color: var(--smui-site-body-text-color);
     --smui-modal-border: 1px solid var(--slskd-tertiary-border-color);
 
+    /* modules/popup */
+    --smui-popup-background: var(--slskd-overlay-background);
+    --smui-popup-color: var(--smui-site-body-text-color);
+    --smui-popup-border: 1px solid var(--slskd-tertiary-border-color);
+    --smui-popup-arrow-color: var(--slskd-tertiary-border-color);
+
     /* views/item */
     --smui-item-meta-color: var(--slskd-color-subtle);
     --smui-item-description-color: var(--slskd-color);
