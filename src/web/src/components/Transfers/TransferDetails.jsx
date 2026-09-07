@@ -84,25 +84,27 @@ const TransferDetails = ({ file }) => {
   ];
 
   return (
-    <Table
-      basic="very"
-      compact
-      size="small"
-    >
-      <Table.Body>
-        {fields.map((field) => {
-          const value = file[field];
-          return (
-            <Table.Row key={field}>
-              <Table.Cell style={{ fontWeight: 'bold', paddingRight: '1em' }}>
-                {formatFieldName(field)}
-              </Table.Cell>
-              <Table.Cell>{formatValue(field, value)}</Table.Cell>
-            </Table.Row>
-          );
-        })}
-      </Table.Body>
-    </Table>
+    <div className="transfer-details">
+      <Table
+        basic="very"
+        compact
+        size="small"
+      >
+        <Table.Body>
+          {fields.map((field) => {
+            const value = file[field];
+            return (
+              <Table.Row key={field}>
+                <Table.Cell style={{ fontWeight: 'bold', paddingRight: '1em' }}>
+                  {formatFieldName(field)}
+                </Table.Cell>
+                <Table.Cell>{formatValue(field, value)}</Table.Cell>
+              </Table.Row>
+            );
+          })}
+        </Table.Body>
+      </Table>
+    </div>
   );
 };
 
