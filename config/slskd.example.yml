@@ -55,6 +55,7 @@
 #   upload:
 #     slots: 20
 #     speed_limit: 1000 # in kibibytes
+#     default_sort: newest # 'newest' or 'oldest'
 #     limits:
 #       queued:
 #         files: 500
@@ -70,6 +71,7 @@
 #   download:
 #     slots: 500
 #     speed_limit: 1000
+#     default_sort: newest # 'newest' or 'oldest'
 #     retry:
 #       partial: resume # 'overwrite' or 'resume'
 #       attempts: 3

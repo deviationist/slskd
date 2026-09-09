@@ -243,6 +243,30 @@ export const SORT_OPTIONS = [
 
 export const DEFAULT_SORT = 'newest';
 
+const isSortOption = (value) =>
+  SORT_OPTIONS.some((option) => option.value === value);
+
+/**
+ * Which order to show the list in, from what this browser chose and what the
+ * server's configured default says.
+ *
+ * The stored choice wins where there is one -- it is the operator's own, made
+ * here. Where there is none the configured default applies, which is what lets
+ * `transfers.<direction>.default_sort` reach a browser that has never touched
+ * the control, and keep reaching it: options arrive over the hub rather than at
+ * page load, so a default edited in System -> Options lands without a reload.
+ *
+ * The corollary is worth knowing: once an order has been picked in a browser,
+ * that browser stops following the setting. A default only defaults.
+ *
+ * Anything unrecognised on either side is discarded rather than honoured. The
+ * server validates its own value against the same two names, so a bad one
+ * should not arrive; a stored one can be whatever a past or future version left
+ * behind.
+ */
+export const resolveSort = (stored, configured) =>
+  [stored, configured].find((value) => isSortOption(value)) ?? DEFAULT_SORT;
+
 /**
  * When a transfer was asked for, as a number, or 0 when that cannot be read.
  *

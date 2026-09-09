@@ -283,3 +283,38 @@ describe('sortTransfers', () => {
     );
   });
 });
+
+describe('resolveSort', () => {
+  it('prefers what this browser chose', () => {
+    expect(transfers.resolveSort('oldest', 'newest')).toBe('oldest');
+    expect(transfers.resolveSort('newest', 'oldest')).toBe('newest');
+  });
+
+  it('falls back to the configured default when nothing is stored', () => {
+    expect(transfers.resolveSort(null, 'oldest')).toBe('oldest');
+    expect(transfers.resolveSort(undefined, 'oldest')).toBe('oldest');
+  });
+
+  it('falls back again when there is no configured default either', () => {
+    // options arrive over the hub, so this is the state of every first render
+    expect(transfers.resolveSort(null, undefined)).toBe('newest');
+    expect(transfers.resolveSort(null, null)).toBe('newest');
+  });
+
+  it('discards a stored value it does not recognise', () => {
+    // whatever a past or future version left in localStorage
+    expect(transfers.resolveSort('sideways', 'oldest')).toBe('oldest');
+    expect(transfers.resolveSort('', 'oldest')).toBe('oldest');
+  });
+
+  it('discards a configured value it does not recognise', () => {
+    // the server validates its own, so this should not arrive
+    expect(transfers.resolveSort(null, 'sideways')).toBe('newest');
+  });
+
+  it('is the two names the sort itself understands, and no others', () => {
+    for (const { value } of transfers.SORT_OPTIONS) {
+      expect(transfers.resolveSort(value, undefined)).toBe(value);
+    }
+  });
+});
