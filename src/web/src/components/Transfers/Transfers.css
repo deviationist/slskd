@@ -63,3 +63,32 @@
 .transfers-header-sort {
   display: inline;
 }
+
+/* The details popup is portalled to the end of <body>, so nothing but the
+   window bounds its size. Cap both axes against the viewport -- the width here
+   and the height on the content below -- so a popup that cannot fit scrolls
+   instead of running off the screen with its tail unreachable.
+
+   The scroll container is the content, not .ui.popup itself: the popup's arrow
+   is a :before drawn outside its own box, and overflow on the popup would clip
+   it away. The width still has to be capped on the popup, which is the element
+   the max-width applies to. */
+.ui.popup.transfer-details-popup {
+  max-width: min(600px, calc(100vw - 2rem)) !important;
+}
+
+.transfer-details {
+  max-height: calc(100vh - 6rem);
+  overflow-y: auto;
+}
+
+/* A filename is one long unbroken run often enough that without this the
+   table's min-content width exceeds the cap above and the popup is wide again.
+   The field names take the opposite rule so they never wrap mid-word. */
+.transfer-details td {
+  overflow-wrap: anywhere;
+}
+
+.transfer-details td:first-child {
+  white-space: nowrap;
+}

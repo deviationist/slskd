@@ -12,6 +12,46 @@ import {
   Table,
 } from 'semantic-ui-react';
 
+/* Distance the popup keeps from the edge of the window, in px. */
+const VIEWPORT_MARGIN = 8;
+
+/* Semantic UI React turns Popper's preventOverflow modifier on only when an
+   `offset` prop is given, so by default a popup is drawn wherever its
+   placement puts it -- including off the edge of the window, where the part
+   that did not fit is simply not reachable. This one is a nineteen-row table
+   anchored to a row that can sit anywhere in a long list, so it overflows
+   often.
+
+   Turning preventOverflow back on lets it slide along both axes into the space
+   that exists, and the fallback placements let it move to another side of the
+   icon entirely when neither left nor right has room. `tether: false` is what
+   allows the slide to detach the popup from the icon; without it the popup
+   stays glued to the row and overflows anyway.
+
+   Only base placements are listed: Semantic maps `left-start` and its
+   siblings to no class at all, which would leave the popup without an arrow.
+   Sliding costs the arrow its alignment with the icon -- Semantic draws it as
+   a :before at a fixed spot rather than through Popper's arrow modifier --
+   which is the lesser of the two problems. */
+const detailsPopperModifiers = [
+  {
+    name: 'flip',
+    options: {
+      fallbackPlacements: ['right', 'top', 'bottom'],
+      padding: VIEWPORT_MARGIN,
+    },
+  },
+  {
+    enabled: true,
+    name: 'preventOverflow',
+    options: {
+      altAxis: true,
+      padding: VIEWPORT_MARGIN,
+      tether: false,
+    },
+  },
+];
+
 const getColor = (state) => {
   switch (state) {
     case 'InProgress':
@@ -201,10 +241,11 @@ class TransferList extends Component {
                         </Table.Cell>
                         <Table.Cell className="transferlist-detail">
                           <Popup
+                            className="transfer-details-popup"
                             content={<TransferDetails file={f} />}
                             on="click"
+                            popperModifiers={detailsPopperModifiers}
                             position="left center"
-                            style={{ maxWidth: '600px' }}
                             trigger={
                               <Icon
                                 color="grey"
