@@ -42,6 +42,14 @@ That only works if the base is chosen *before* the change is written — start i
 on `main` and it will grow to depend on whatever else is already there, after
 which it cannot be lifted out without being rewritten.
 
+**One `pr/` branch is based on another rather than on `upstream/master`:**
+`pr/feat-transfers-default-sort` sits on `pr/feat-sort-transfers`, because it
+configures the thing that branch adds and is meaningless without it. The rule
+it bends is a means to an end — a diff against `upstream/master` that carries
+nothing unrelated — and that still holds: the two together are one feature and
+answer one issue. A second `pr/` branch on top of a first is fine whenever it
+is the *same* piece of work; it is a base on `main` that is not.
+
 ## How a change gets in
 
 **Through a pull request into `main`, merged when the operator says so.** Not
@@ -90,9 +98,11 @@ commits record when each upstream state was taken.
 | Branch | What it does | Upstream |
 |---|---|---|
 | `pr/feat-delete-files-on-remove` | Makes *Remove* on the Downloads page delete the file too, behind a new `transfers.download.delete_file_on_removal` option — the option is the whole decision, there is no second button and no per-request flag. Covers a cancelled download's partial as well as a completed file, and clears the folders the deletion empties. Records `Transfer.LocalFilename` — where the bytes are *now* — because a completed file's path is unreproducible once `MoveFile` has renamed it around a collision. | [#1361](https://github.com/slskd/slskd/issues/1361), open |
+| `pr/feat-sort-transfers` | Puts a sort control on the Transfers header, so the newest user card and folder can be at the top rather than the bottom. Ordered on `requestedAt`, which is set once and never moves — the list re-fetches every second, so `startedAt`/`endedAt` would have cards climbing out from under the pointer. A group takes its *newest* transfer's instant under Newest and its *oldest* under Oldest, so a folder still taking delivery climbs back up and Oldest still reproduces the API's order. Files inside a folder keep filename order, since they were all enqueued in one gesture and ordering them by time only reverses an album. | [#1798](https://github.com/slskd/slskd/issues/1798), open |
+| `pr/feat-transfers-default-sort` | Makes the order the list *starts* in configurable: `transfers.upload.default_sort` and `transfers.download.default_sort`, each `newest` or `oldest`, validated against the same two names the sort understands. Based on `pr/feat-sort-transfers` rather than `upstream/master` — see *Branches*. A default rather than an instruction: the control on the page still overrides it for the browser it was used in, and only a browser that has never touched the control follows the configured value. Which is also the thing to know when a change to it appears to do nothing. | [#1798](https://github.com/slskd/slskd/issues/1798), open |
 
-Upstream's own *Remove* only clears the transfer record, and always has. The
-capability to delete a downloaded file exists — the files API, behind
+On the first of those: upstream's own *Remove* only clears the transfer record,
+and always has. The capability to delete a downloaded file exists — the files API, behind
 `remote_file_management` — but it lives in a separate browser under System, so
 getting rid of a download and its file is two operations in two places.
 
