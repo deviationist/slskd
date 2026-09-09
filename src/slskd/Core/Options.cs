@@ -943,6 +943,21 @@ namespace slskd
                 public int SpeedLimit { get; init; } = int.MaxValue;
 
                 /// <summary>
+                ///     Gets the order in which the web UI lists uploads by default.
+                /// </summary>
+                /// <remarks>
+                ///     Presentation only; it changes nothing about the transfers themselves.
+                ///     It is a default rather than a setting: a browser in which the operator
+                ///     has picked an order keeps that order, and only one that has not picked
+                ///     follows this.
+                /// </remarks>
+                [Argument(default, "upload-default-sort")]
+                [EnvironmentVariable("UPLOAD_DEFAULT_SORT")]
+                [Description("the order in which the web UI lists uploads by default")]
+                [Enum(typeof(TransferSortOrder))]
+                public string DefaultSort { get; init; } = TransferSortOrder.Newest.ToString().ToLowerInvariant();
+
+                /// <summary>
                 ///     Gets global limits.
                 /// </summary>
                 [Validate]
@@ -972,6 +987,21 @@ namespace slskd
                 [Description("the total download speed limit")]
                 [Range(1, int.MaxValue)]
                 public int SpeedLimit { get; init; } = int.MaxValue;
+
+                /// <summary>
+                ///     Gets the order in which the web UI lists downloads by default.
+                /// </summary>
+                /// <remarks>
+                ///     Presentation only; it changes nothing about the transfers themselves.
+                ///     It is a default rather than a setting: a browser in which the operator
+                ///     has picked an order keeps that order, and only one that has not picked
+                ///     follows this.
+                /// </remarks>
+                [Argument(default, "download-default-sort")]
+                [EnvironmentVariable("DOWNLOAD_DEFAULT_SORT")]
+                [Description("the order in which the web UI lists downloads by default")]
+                [Enum(typeof(TransferSortOrder))]
+                public string DefaultSort { get; init; } = TransferSortOrder.Newest.ToString().ToLowerInvariant();
 
                 /// <summary>
                 ///     Gets download retry options.

@@ -348,6 +348,28 @@ transfers:
     speed_limit: 1000
 ```
 
+## Default Sort Order
+
+The Downloads and Uploads pages can list transfers newest-first or oldest-first, and each page has its own default. `newest` puts the most recently requested user and folder at the top, which is where a transfer just enqueued appears; `oldest` reproduces the order the API returns.
+
+This is presentation only; it changes nothing about the transfers themselves.
+
+It is a *default*, not a setting the web UI obeys. The sort control on each page overrides it for the browser it was used in, and that browser then keeps its own choice rather than following changes made here. A browser that has never used the control follows this value, and follows it live -- options reach the UI over the application hub, so a change takes effect without a reload.
+
+| Command-Line              | Environment Variable          | Description                                                |
+| ------------------------- | ----------------------------- | ---------------------------------------------------------- |
+| `--upload-default-sort`   | `SLSKD_UPLOAD_DEFAULT_SORT`   | The order in which the web UI lists uploads by default     |
+| `--download-default-sort` | `SLSKD_DOWNLOAD_DEFAULT_SORT` | The order in which the web UI lists downloads by default   |
+
+#### **YAML**
+```yaml
+transfers:
+  upload:
+    default_sort: newest # 'newest' or 'oldest'
+  download:
+    default_sort: newest
+```
+
 ## Retry Behavior
 
 Failed downloads can be retried automatically up to the configured number of attempts.  If an attempt fails initially, the application delays the second attempt by the configured delay, and an exponential backoff is used to compute the delay for all subsequent events, up to the configured maximum delay.
