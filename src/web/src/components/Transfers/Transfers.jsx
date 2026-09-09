@@ -6,9 +6,35 @@ import TransfersHeader from './TransfersHeader';
 import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 
+const sortStorageKey = (direction) => `slskd-transfers-${direction}-sort`;
+
+/**
+ * The order last chosen for this direction, or the default.
+ *
+ * Guarded because localStorage throws outright in a browser with site data
+ * blocked, and this runs on the first render of the page: an exception here
+ * would cost the whole list rather than a preference. An unrecognised stored
+ * value is treated the same way, so a key left behind by a future version
+ * cannot leave the list in an order nothing can name.
+ */
+const readSort = (direction) => {
+  try {
+    const stored = window.localStorage.getItem(sortStorageKey(direction));
+
+    return transfersLibrary.SORT_OPTIONS.some(
+      (option) => option.value === stored,
+    )
+      ? stored
+      : transfersLibrary.DEFAULT_SORT;
+  } catch {
+    return transfersLibrary.DEFAULT_SORT;
+  }
+};
+
 const Transfers = ({ direction, server }) => {
   const [connecting, setConnecting] = useState(true);
   const [transfers, setTransfers] = useState([]);
+  const [sort, setSort] = useState(() => readSort(direction));
 
   const [retrying, setRetrying] = useState(false);
   const [cancelling, setCancelling] = useState(false);
@@ -48,7 +74,27 @@ const Transfers = ({ direction, server }) => {
     // before the connecting animation shows.  this memo fires the instant
     // the direction prop changes, preventing this flash.
     setConnecting(true);
+
+    // the preference is per direction, and this component is reused across
+    // both -- see above -- so it has to be re-read rather than initialised once
+    setSort(readSort(direction));
   }, [direction]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const changeSort = (value) => {
+    setSort(value);
+
+    try {
+      window.localStorage.setItem(sortStorageKey(direction), value);
+    } catch {
+      // a preference that cannot be stored is still worth honouring for this
+      // visit, and there is nothing here to tell the operator about
+    }
+  };
+
+  const sorted = useMemo(
+    () => transfersLibrary.sortTransfers(transfers, sort),
+    [sort, transfers],
+  );
 
   const retry = async ({ file, suppressStateChange = false }) => {
     const { filename, size, username } = file;
@@ -162,9 +208,11 @@ const Transfers = ({ direction, server }) => {
         onCancelAll={cancelAll}
         onRemoveAll={removeAll}
         onRetryAll={retryAll}
+        onSortChange={changeSort}
         removing={removing}
         retrying={retrying}
         server={server}
+        sort={sort}
         transfers={transfers}
       />
       {transfers.length === 0 ? (
@@ -173,7 +221,7 @@ const Transfers = ({ direction, server }) => {
           icon={direction}
         />
       ) : (
-        transfers.map((user) => (
+        sorted.map((user) => (
           <TransferGroup
             cancel={cancel}
             cancelAll={cancelAll}

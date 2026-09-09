@@ -1,8 +1,12 @@
-import { isStateCancellable, isStateRetryable } from '../../lib/transfers';
+import {
+  isStateCancellable,
+  isStateRetryable,
+  SORT_OPTIONS,
+} from '../../lib/transfers';
 import { Div, Nbsp } from '../Shared';
 import ShrinkableDropdownButton from '../Shared/ShrinkableDropdownButton';
 import React, { useMemo, useState } from 'react';
-import { Icon, Segment } from 'semantic-ui-react';
+import { Dropdown, Icon, Segment } from 'semantic-ui-react';
 
 const getRetryableFiles = ({ files, retryOption }) => {
   switch (retryOption) {
@@ -65,9 +69,11 @@ const TransfersHeader = ({
   onCancelAll,
   onRemoveAll,
   onRetryAll,
+  onSortChange,
   removing = false,
   retrying = false,
   server = { isConnected: true },
+  sort,
   transfers,
 }) => {
   const [removeOption, setRemoveOption] = useState('Succeeded');
@@ -103,6 +109,23 @@ const TransfersHeader = ({
           size="big"
         />
       </div>
+      <Div
+        className="transfers-header-sort"
+        hidden={empty}
+      >
+        <Dropdown
+          button
+          className="icon"
+          /* the arrow follows the order, so the button says which way the list
+             runs without having to be opened */
+          icon={sort === 'oldest' ? 'sort amount up' : 'sort amount down'}
+          labeled
+          onChange={(_, data) => onSortChange(data.value)}
+          options={SORT_OPTIONS}
+          text={SORT_OPTIONS.find((option) => option.value === sort)?.text}
+          value={sort}
+        />
+      </Div>
       <Div
         className="transfers-header-buttons"
         hidden={empty}

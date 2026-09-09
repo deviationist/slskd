@@ -57,6 +57,13 @@
   margin-left: auto;
 }
 
+/* Sits between the direction icon and the action buttons. It takes no
+   margin-left:auto of its own -- the buttons keep theirs, and stay hard right
+   whether this is shown or not. */
+.transfers-header-sort {
+  display: inline;
+}
+
 /* The details popup is portalled to the end of <body>, so nothing but the
    window bounds its size. Cap both axes against the viewport -- the width here
    and the height on the content below -- so a popup that cannot fit scrolls
