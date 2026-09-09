@@ -56,3 +56,10 @@
   display: inline;
   margin-left: auto;
 }
+
+/* Sits between the direction icon and the action buttons. It takes no
+   margin-left:auto of its own -- the buttons keep theirs, and stay hard right
+   whether this is shown or not. */
+.transfers-header-sort {
+  display: inline;
+}
