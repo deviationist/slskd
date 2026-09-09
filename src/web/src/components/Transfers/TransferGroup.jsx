@@ -1,6 +1,7 @@
 import * as transfers from '../../lib/transfers';
 import TransferList from './TransferList';
 import React, { Component } from 'react';
+import { toast } from 'react-toastify';
 import { Button, Card, Icon } from 'semantic-ui-react';
 
 class TransferGroup extends Component {
@@ -72,14 +73,35 @@ class TransferGroup extends Component {
     );
   };
 
+  /**
+   * Removes the selected transfers.
+   *
+   * Whether the files go with them is not this button's decision: the server
+   * takes its files with a removal or it does not, according to
+   * `transfers.download.delete_file_on_removal`, and answers with what it did.
+   * A removal that deleted nothing answers 204 and there is nothing to report;
+   * one that deleted something answers with the outcome per file.
+   */
   removeAll = async (direction, username, selected) => {
-    await Promise.all(
+    const results = await Promise.all(
       selected.map((file) =>
         transfers
           .cancel({ direction, id: file.id, remove: true, username })
-          .then(() => this.removeFileSelection(file)),
+          .then((response) => {
+            this.removeFileSelection(file);
+            return { data: response?.data, ok: true };
+          })
+          // one file's failure must not abandon the rest of the batch, and it
+          // has to be reported rather than logged into the void
+          .catch((error) => ({ error, ok: false })),
       ),
     );
+
+    const summary = transfers.summariseDeletions(results);
+
+    if (summary) {
+      toast[summary.kind](summary.message);
+    }
   };
 
   handleRetry = async (file) => {

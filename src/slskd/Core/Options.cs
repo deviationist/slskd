@@ -974,6 +974,22 @@ namespace slskd
                 public int SpeedLimit { get; init; } = int.MaxValue;
 
                 /// <summary>
+                ///     Gets a value indicating whether the file associated with a download may be
+                ///     deleted from disk when the download is removed.
+                /// </summary>
+                /// <remarks>
+                ///     Deliberately its own option rather than a use of remote file management, which
+                ///     grants deletion of any file under the Downloads and Incomplete directories. This
+                ///     grants deletion of one file, belonging to a transfer being removed, at a path
+                ///     this application recorded writing -- strictly narrower, so requiring the wider
+                ///     grant to obtain it would mean enabling more than the operator asked for.
+                /// </remarks>
+                [Argument(default, "delete-file-on-removal")]
+                [EnvironmentVariable("DELETE_FILE_ON_REMOVAL")]
+                [Description("allow the file to be deleted when a download is removed")]
+                public bool DeleteFileOnRemoval { get; init; } = false;
+
+                /// <summary>
                 ///     Gets download retry options.
                 /// </summary>
                 [Validate]

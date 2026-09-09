@@ -1,3 +1,14 @@
 /*******************************
     User Variable Overrides
 *******************************/
+
+@background: var(--smui-popup-background, @white);
+@color: var(--smui-popup-color, @textColor);
+
+/* @border and @arrowColor rather than the @borderColor both are derived from:
+   Less evaluates every declaration in a scope, including the ones a later
+   declaration shadows, so leaving darken(@borderColor, 10) upstream to be
+   evaluated against a var() would fail the build. Their defaults here are
+   upstream's, spelled out. */
+@border: var(--smui-popup-border, @borderWidth solid @solidBorderColor);
+@arrowColor: var(--smui-popup-arrow-color, darken(@solidBorderColor, 10));

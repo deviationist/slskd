@@ -386,6 +386,48 @@ transfers:
         mode: 644 # chmod syntax, e.g. 644, 777.  has no effect on Windows
 ```
 
+## Deleting Files on Removal
+
+Removing a download removes the record of it and does not touch the file on disk.  With this option enabled, removing a download deletes its file as well.
+There is no second button and no per-request flag: this option is the whole of the decision, made once by the operator rather than per removal.  Cancelling a
+transfer is unaffected -- cancelling is not removing, and the option is named for the removal.
+
+Only a file slskd recorded writing is deleted, at the path recorded for the transfer: the finished file if the download completed, or the partial in the
+'Incomplete' directory if it did not.  Partials are otherwise removed only by [data retention](#data-retention), so a download abandoned half way leaves its
+bytes behind until that timer catches them.
+
+A file that is already gone is a success, not a failure: what was asked for is that it not be there, and it is not.  A download that never started is the same
+-- the path is recorded immediately before the download begins, so a transfer with no recorded path that transferred no bytes never wrote one anywhere.  Only a
+file that is present, should go, and will not is reported as a failure.
+
+A download that finished before slskd began recording where the bytes land has no recorded path, and its file may still be on disk under a name that was never
+written down.  Those remove their record and leave the disk alone rather than deleting a path derived after the fact, and say so rather than reporting a
+success that was never checked.
+
+Removing a download that is still running cancels it first and waits, briefly, for it to stop before touching either the record or the file.  Removal skips
+transfers that have not reached a terminal state, and unlinking a file that is still being written to is either allowed and confusing or refused outright,
+depending on the platform.
+
+The directories the deletion empties are removed with it, innermost first, stopping at the first directory that still holds something and at the 'Incomplete'
+and 'Downloads' roots.  A download arrives inside the folder the peer named, sometimes nested several deep, so removing a single level would move the empty
+structure outwards rather than clear it.
+
+This is deliberately its own option rather than a use of [Remote File Management](#remote-file-management), which grants deletion of any file under the
+'Incomplete' and 'Downloads' directories.  This grants deletion of one file, belonging to a transfer being removed, at a path slskd itself recorded -- strictly
+narrower, so requiring the wider grant to obtain it would mean enabling more than was asked for.  Deletion is still performed by the same file service and
+subject to the same containment checks.
+
+| Command-Line                 | Environment Variable             | Description                                                |
+| ---------------------------- | -------------------------------- | ---------------------------------------------------------- |
+| `--delete-file-on-removal`   | `SLSKD_DELETE_FILE_ON_REMOVAL`   | Allow the file to be deleted when a download is removed    |
+
+#### **YAML**
+```yaml
+transfers:
+  download:
+    delete_file_on_removal: false
+```
+
 ## Global Upload Limits
 
 Global upload limits define the number of queued, daily, and weekly uploads on a _per user_ basis.  These limits behave as defaults and are applied if limits for a user's group have not been set.
