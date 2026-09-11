@@ -354,3 +354,55 @@ describe('describeRetrievalError', () => {
     );
   });
 });
+
+describe('isRetrievalPermanentlyGone', () => {
+  // the distinction the row's button depends on: a file that is gone is gone,
+  // and something downstream moving finished files out of the downloads
+  // directory makes that the normal end of a download's life rather than a
+  // fault worth offering to retry
+  it('is true when the server says there is no file', () => {
+    expect(transfers.isRetrievalPermanentlyGone(blobBodied(404))).toBe(true);
+  });
+
+  it('is false when the server refuses, which a config change could undo', () => {
+    expect(transfers.isRetrievalPermanentlyGone(blobBodied(403))).toBe(false);
+  });
+
+  it('is false for a request that never landed', () => {
+    expect(transfers.isRetrievalPermanentlyGone(undefined)).toBe(false);
+    expect(transfers.isRetrievalPermanentlyGone(new Error('offline'))).toBe(
+      false,
+    );
+  });
+});
+
+describe('describeArchiveError', () => {
+  // unlike a single-file retrieval these are ordinary JSON calls, so the body
+  // is readable and is the most specific thing available
+  it('prefers what the server said', () => {
+    expect(
+      transfers.describeArchiveError({
+        message: 'Request failed',
+        response: { data: "'nope' is not a valid download id", status: 400 },
+      }),
+    ).toBe("'nope' is not a valid download id");
+  });
+
+  it('names the option when the server refuses without a body', () => {
+    expect(
+      transfers.describeArchiveError({
+        message: 'Request failed',
+        response: { data: undefined, status: 403 },
+      }),
+    ).toContain('remote_file_retrieval');
+  });
+
+  it('falls back to the error message, then to something sayable', () => {
+    expect(transfers.describeArchiveError(new Error('offline'))).toBe(
+      'offline',
+    );
+    expect(transfers.describeArchiveError(undefined)).toBe(
+      'the archive could not be started',
+    );
+  });
+});
