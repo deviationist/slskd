@@ -160,7 +160,7 @@ const Searches = ({ server } = {}) => {
   // search's id -- so there is nothing to watch until the search exists
   const createWatch = async (watch) => {
     const ref = inputRef?.current?.inputRef?.current;
-    const searchText = watchDraft?.searchText || ref?.value;
+    const searchText = watchDraft?.searchText ?? ref?.value;
     const id = uuidv4();
 
     try {
@@ -346,6 +346,18 @@ const Searches = ({ server } = {}) => {
         <WatchModal
           onClose={() => setWatchDraft(undefined)}
           onSave={createWatch}
+          onSearchTextChange={(searchText) => {
+            setWatchDraft({ searchText });
+
+            // the field underneath is uncontrolled and read from a ref, so it
+            // has to be written to directly; leaving the two to disagree would
+            // mean closing the modal silently reverted what was typed in it
+            const input = inputRef?.current?.inputRef?.current;
+
+            if (input) {
+              input.value = searchText;
+            }
+          }}
           open
           searchText={watchDraft.searchText}
         />

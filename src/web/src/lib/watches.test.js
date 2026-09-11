@@ -152,18 +152,33 @@ describe('watchBadge', () => {
 });
 
 describe('validateDraft', () => {
+  const searchText = 'aphex twin';
+
   it('accepts a draft with a preset and no address', () => {
-    expect(watches.validateDraft({ hour: 3, key: 'daily' }).ok).toBe(true);
+    expect(
+      watches.validateDraft({ hour: 3, key: 'daily', searchText }).ok,
+    ).toBe(true);
   });
 
   it('refuses one with no schedule', () => {
-    expect(watches.validateDraft({}).ok).toBe(false);
+    expect(watches.validateDraft({ searchText }).ok).toBe(false);
+  });
+
+  it('refuses one with no phrase to search for', () => {
+    // the phrase can be edited here while a watch is being created, so it can
+    // be emptied here; the refusal is the server's own wording, the same one
+    // the search buttons answer with
+    const result = watches.validateDraft({ key: 'daily', searchText: '  ' });
+
+    expect(result.ok).toBe(false);
+    expect(result.reason).toContain('SearchText');
   });
 
   it('accepts a blank address, which means the configured one', () => {
-    expect(watches.validateDraft({ key: 'daily', notifyEmail: '   ' }).ok).toBe(
-      true,
-    );
+    expect(
+      watches.validateDraft({ key: 'daily', notifyEmail: '   ', searchText })
+        .ok,
+    ).toBe(true);
   });
 
   it('refuses an address that is not one', () => {
@@ -172,6 +187,7 @@ describe('validateDraft', () => {
     const result = watches.validateDraft({
       key: 'daily',
       notifyEmail: 'someone@',
+      searchText,
     });
 
     expect(result.ok).toBe(false);

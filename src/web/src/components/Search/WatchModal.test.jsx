@@ -29,11 +29,25 @@ const render = (overrides = {}) =>
     />,
   );
 
+const countOf = (html, pattern) => (html.match(pattern) ?? []).length;
+
 const inputs = (html) => (html.match(/<input/gu) ?? []).length;
 
 describe('WatchForm', () => {
-  it('shows the search it is about', () => {
-    expect(render()).toContain('aphex twin selected ambient');
+  it('lets the phrase be corrected while the watch is being created', () => {
+    const html = render();
+
+    expect(html).toContain('aphex twin selected ambient');
+    expect(html).toContain('<input');
+  });
+
+  it('shows the phrase but does not offer to change it when editing', () => {
+    // the search already exists by then, and what the watch has reported is
+    // keyed on its id -- so the phrase is a heading rather than a dead field
+    const html = render({ existing: { enabled: true } });
+
+    expect(html).toContain('aphex twin selected ambient');
+    expect(html).not.toContain('>Search<');
   });
 
   it('renders a control for every field, not just its label', () => {
@@ -76,10 +90,8 @@ describe('WatchForm', () => {
     // the page can close it
     const html = render();
 
-    expect(html.match(/<select/gu) ?? []).toHaveLength(2);
-    expect(html.match(/<option/gu) ?? []).toHaveLength(
-      watches.PRESETS.length + 24,
-    );
+    expect(countOf(html, /<select/gu)).toBe(2);
+    expect(countOf(html, /<option/gu)).toBe(watches.PRESETS.length + 24);
   });
 
   it('offers to skip what is already found only when creating', () => {
