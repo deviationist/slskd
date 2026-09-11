@@ -7,8 +7,10 @@ namespace slskd.Tests.Unit.Transfers.API.Controllers
     using System.Linq;
     using System.Linq.Expressions;
     using System.Text;
+    using System.Threading;
     using System.Threading.Tasks;
     using Microsoft.AspNetCore.Http;
+    using Microsoft.AspNetCore.Http.Features;
     using Microsoft.AspNetCore.Mvc;
     using Microsoft.Extensions.Options;
     using Moq;
@@ -357,7 +359,13 @@ namespace slskd.Tests.Unit.Transfers.API.Controllers
         private TransfersController Controller(DownloadTicketService tickets = null)
         {
             var httpContext = new DefaultHttpContext();
-            httpContext.Response.Body = new MemoryStream();
+
+            // Kestrel refuses synchronous writes to the response body *unless* this feature says otherwise, so the
+            // stream below consults it rather than refusing outright. That is what makes these tests able to tell the
+            // difference between an archive that can be served and one that dies partway through being written.
+            var bodyControl = new BodyControlFeature();
+            httpContext.Features.Set<IHttpBodyControlFeature>(bodyControl);
+            httpContext.Response.Body = new SynchronousWriteRefusingStream(bodyControl);
 
             return new TransfersController(
                 transferService: TransferService,
@@ -416,10 +424,98 @@ namespace slskd.Tests.Unit.Transfers.API.Controllers
             Assert.Equal("application/zip", controller.Response.ContentType);
             Assert.Contains("attachment", controller.Response.Headers.ContentDisposition.ToString());
 
-            return ((MemoryStream)controller.Response.Body).ToArray();
+            return ((SynchronousWriteRefusingStream)controller.Response.Body).ToArray();
         }
 
         private async Task<ZipArchive> ArchiveOf(params Transfer[] downloads)
             => new(new MemoryStream(await ArchiveBytesOf(downloads)), ZipArchiveMode.Read);
+
+        /// <summary>
+        ///     A response body that refuses synchronous writes, as Kestrel's does.
+        /// </summary>
+        /// <remarks>
+        ///     <para>
+        ///         A plain MemoryStream accepts both, which is exactly how an archive missing its central directory
+        ///         reached a browser while every test here passed: ZipArchive streams entries asynchronously but writes
+        ///         the central directory synchronously when disposed, so only the last few hundred bytes of the response
+        ///         are affected, and only against a stream that cares.
+        ///     </para>
+        ///     <para>
+        ///         Every test in this class writes through this, so the archive each of them reads back is one that
+        ///         could actually have been served -- and the action has to ask for synchronous I/O to be allowed, as
+        ///         it must against Kestrel, before any of them can pass.
+        ///     </para>
+        /// </remarks>
+        private sealed class BodyControlFeature : IHttpBodyControlFeature
+        {
+            public bool AllowSynchronousIO { get; set; }
+        }
+
+        private sealed class SynchronousWriteRefusingStream : Stream
+        {
+            private readonly MemoryStream inner = new();
+            private readonly IHttpBodyControlFeature bodyControl;
+
+            public SynchronousWriteRefusingStream(IHttpBodyControlFeature bodyControl)
+            {
+                this.bodyControl = bodyControl;
+            }
+
+            public override bool CanRead => false;
+            public override bool CanSeek => false;
+            public override bool CanWrite => true;
+            public override long Length => inner.Length;
+
+            public override long Position
+            {
+                get => inner.Position;
+                set => throw new NotSupportedException();
+            }
+
+            public byte[] ToArray() => inner.ToArray();
+
+            public override void Flush() => RefuseUnlessAllowed();
+
+            public override void Write(byte[] buffer, int offset, int count)
+            {
+                RefuseUnlessAllowed();
+                inner.Write(buffer, offset, count);
+            }
+
+            public override void Write(ReadOnlySpan<byte> buffer)
+            {
+                RefuseUnlessAllowed();
+                inner.Write(buffer);
+            }
+
+            public override void WriteByte(byte value)
+            {
+                RefuseUnlessAllowed();
+                inner.WriteByte(value);
+            }
+
+            private void RefuseUnlessAllowed()
+            {
+                if (!bodyControl.AllowSynchronousIO)
+                {
+                    throw new InvalidOperationException("Synchronous operations are disallowed. Call WriteAsync or set AllowSynchronousIO to true instead.");
+                }
+            }
+
+            public override Task FlushAsync(CancellationToken cancellationToken)
+                => inner.FlushAsync(cancellationToken);
+
+            public override Task WriteAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+                => inner.WriteAsync(buffer, offset, count, cancellationToken);
+
+            public override ValueTask WriteAsync(ReadOnlyMemory<byte> buffer, CancellationToken cancellationToken = default)
+                => inner.WriteAsync(buffer, cancellationToken);
+
+            public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+            public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+            public override void SetLength(long value) => throw new NotSupportedException();
+        }
     }
 }

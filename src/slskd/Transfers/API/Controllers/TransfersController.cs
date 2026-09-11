@@ -1142,7 +1142,28 @@ namespace slskd.Transfers.API
 
             try
             {
-                using var archive = new ZipArchive(Response.Body, ZipArchiveMode.Create, leaveOpen: true);
+                // ZipArchive cannot write an archive to this response without synchronous writes, and Kestrel
+                // disallows those on the response body by default. The bookkeeping parts of the format -- each entry's
+                // data descriptor, written when the entry stream is disposed, and the central directory, written when
+                // the archive is -- go out through Stream.Write, and neither DirectToArchiveWriterStream nor the entry
+                // stream returned by OpenAsync implements DisposeAsync, so `await using` falls back to the synchronous
+                // path. Verified against the framework directly on .NET 10.0.12, not inferred.
+                //
+                // The consequence of not doing this is worse than a failed request: the file *contents* stream fine,
+                // so the browser saves every byte of every file and then the request dies before the central directory
+                // is written. What lands on disk is a plausible-looking archive with nothing at the end to say what is
+                // in it, which macOS reports as "Error 79 - Inappropriate file type or format".
+                //
+                // Scoped to this request, and only the format's bookkeeping actually travels this way -- the file
+                // contents are copied with CopyToAsync and stay asynchronous.
+                var bodyControl = HttpContext.Features.Get<IHttpBodyControlFeature>();
+
+                if (bodyControl is not null)
+                {
+                    bodyControl.AllowSynchronousIO = true;
+                }
+
+                await using var archive = await ZipArchive.CreateAsync(Response.Body, ZipArchiveMode.Create, leaveOpen: true, entryNameEncoding: null, HttpContext.RequestAborted);
 
                 for (var i = 0; i < downloads.Count; i++)
                 {
@@ -1159,7 +1180,7 @@ namespace slskd.Transfers.API
                     {
                         var entry = archive.CreateEntry(entryNames[i], CompressionLevel.NoCompression);
 
-                        await using var target = entry.Open();
+                        await using var target = await entry.OpenAsync(HttpContext.RequestAborted);
                         await source.CopyToAsync(target, HttpContext.RequestAborted);
                     }
                 }
@@ -1170,7 +1191,7 @@ namespace slskd.Transfers.API
                 {
                     var entry = archive.CreateEntry(ArchiveNaming.MissingEntryName, CompressionLevel.NoCompression);
 
-                    await using var target = entry.Open();
+                    await using var target = await entry.OpenAsync(HttpContext.RequestAborted);
                     await using var writer = new StreamWriter(target);
 
                     await writer.WriteLineAsync($"{skipped.Count} of the {downloads.Count} selected file(s) could not be added to this archive.");
