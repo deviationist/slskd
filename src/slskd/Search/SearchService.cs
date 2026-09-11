@@ -96,7 +96,11 @@ namespace slskd.Search
         /// <param name="scope">The search scope.</param>
         /// <param name="options">Search options.</param>
         /// <returns>The completed search.</returns>
-        Task<Search> StartAsync(Guid id, SearchQuery query, SearchScope scope, SearchOptions options = null);
+        /// <param name="replaceExisting">
+        ///     A value indicating whether an existing search with the same id should be replaced, rather than the
+        ///     start being refused.
+        /// </param>
+        Task<Search> StartAsync(Guid id, SearchQuery query, SearchScope scope, SearchOptions options = null, bool replaceExisting = false);
 
         /// <summary>
         ///     Cancels the search matching the specified <paramref name="id"/>, if it is in progress.
@@ -234,7 +238,7 @@ namespace slskd.Search
         /// <param name="scope">The search scope.</param>
         /// <param name="options">Search options.</param>
         /// <returns>The completed search.</returns>
-        public async Task<Search> StartAsync(Guid id, SearchQuery query, SearchScope scope, SearchOptions options = null)
+        public async Task<Search> StartAsync(Guid id, SearchQuery query, SearchScope scope, SearchOptions options = null, bool replaceExisting = false)
         {
             var token = Client.GetNextToken();
 
@@ -260,6 +264,21 @@ namespace slskd.Search
             try
             {
                 using var context = ContextFactory.CreateDbContext();
+
+                // a watch re-runs its search *in place*, because the set of files it has already reported is keyed on
+                // the search's id -- a new row would mean a new id, and a memory reset on every run. removed rather
+                // than updated so the responses of the previous run go with it
+                if (replaceExisting)
+                {
+                    var existing = context.Searches.FirstOrDefault(s => s.Id == id);
+
+                    if (existing is not null)
+                    {
+                        context.Searches.Remove(existing);
+                        context.SaveChanges();
+                    }
+                }
+
                 context.Add(search);
                 context.SaveChanges();
 
@@ -438,9 +457,16 @@ namespace slskd.Search
                 // unlike other pruning operations, we don't care about state, since there's a 60 minute minimum
                 // and searches are guaranteed to be at least 60 minutes old by the time they can be pruned, they will
                 // be completed unless someone applied some rather dumb settings
+                // a watched search is never expired, however long ago it last ran. retention defaults to seven
+                // days and a weekly watch is always older than that by the time the pruner looks, so without this
+                // a watch is deleted out from under itself and the feature simply stops, quietly
+                var watched = context.Watches.Select(w => w.SearchId).ToHashSet();
+
                 var expired = context.Searches
                     .Where(s => s.EndedAt.HasValue && s.EndedAt.Value < cutoffDateTime)
                     .WithoutResponses()
+                    .ToList()
+                    .Where(s => !watched.Contains(s.Id))
                     .ToList();
 
                 // defer the deletion to DeleteAsync() so that SignalR broadcasting works properly and the UI

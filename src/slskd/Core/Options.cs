@@ -290,6 +290,12 @@ namespace slskd
         public WebOptions Web { get; init; } = new WebOptions();
 
         /// <summary>
+        ///     Gets search options.
+        /// </summary>
+        [Validate]
+        public SearchesOptions Searches { get; init; } = new SearchesOptions();
+
+        /// <summary>
         ///     Gets retention options.
         /// </summary>
         [Validate]
@@ -1477,6 +1483,81 @@ namespace slskd
         /// <summary>
         ///     Retention options.
         /// </summary>
+        /// <summary>
+        ///     Search options.
+        /// </summary>
+        public class SearchesOptions
+        {
+            /// <summary>
+            ///     Gets search watch options.
+            /// </summary>
+            [Validate]
+            public WatchesOptions Watches { get; init; } = new WatchesOptions();
+
+            /// <summary>
+            ///     Search watch options.
+            /// </summary>
+            /// <remarks>
+            ///     These exist because of the Soulseek server, not because of this application: searching too often
+            ///     gets a client disconnected and refused for twenty minutes or so, and nothing local can shorten
+            ///     that. The defaults are deliberately unadventurous.
+            /// </remarks>
+            public class WatchesOptions
+            {
+                /// <summary>
+                ///     Gets a value indicating whether watches run.
+                /// </summary>
+                [Argument(default, "watches")]
+                [EnvironmentVariable("WATCHES")]
+                [Description("enable search watches")]
+                public bool Enabled { get; init; } = true;
+
+                /// <summary>
+                ///     Gets the shortest interval a watch may recur at, in minutes.
+                /// </summary>
+                /// <remarks>
+                ///     A rule whose occurrences fall closer together than this is refused when it is set, rather than
+                ///     quietly slowed down later -- an operator who asked for every ten minutes should be told no, not
+                ///     left wondering why it runs hourly.
+                /// </remarks>
+                [Argument(default, "watch-minimum-interval")]
+                [EnvironmentVariable("WATCH_MINIMUM_INTERVAL")]
+                [Description("the shortest interval a watch may recur at, in minutes")]
+                [Range(5, int.MaxValue)]
+                public int MinimumInterval { get; init; } = 60;
+
+                /// <summary>
+                ///     Gets the quiet time between one watch's search and the next, in seconds.
+                /// </summary>
+                /// <remarks>
+                ///     Applied after a run completes, and globally rather than per watch: the server counts searches
+                ///     from a client, and does not care which watch asked.
+                /// </remarks>
+                [Argument(default, "watch-gap")]
+                [EnvironmentVariable("WATCH_GAP")]
+                [Description("the quiet time between one watch's search and the next, in seconds")]
+                [Range(0, 3600)]
+                public int Gap { get; init; } = 10;
+
+                /// <summary>
+                ///     Gets the most watches that may be enabled at once.
+                /// </summary>
+                [Argument(default, "watch-limit")]
+                [EnvironmentVariable("WATCH_LIMIT")]
+                [Description("the most watches that may be enabled at once")]
+                [Range(1, 1000)]
+                public int Limit { get; init; } = 25;
+
+                /// <summary>
+                ///     Gets the default IANA time zone for a watch that does not name one.
+                /// </summary>
+                [Argument(default, "watch-timezone")]
+                [EnvironmentVariable("WATCH_TIMEZONE")]
+                [Description("the default IANA time zone in which to interpret a watch's schedule")]
+                public string TimeZone { get; init; } = "Etc/UTC";
+            }
+        }
+
         public class RetentionOptions
         {
             /// <summary>

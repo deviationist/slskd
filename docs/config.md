@@ -1064,6 +1064,53 @@ throttling:
       response_file_limit: 500 # maximum number of files to return in a single search response
 ```
 
+# Search Watches
+
+A **watch** turns a one-off search into a standing one: slskd re-runs it on a schedule and sends mail when a file
+appears that it has not reported before.  It exists for the rare track whose only holder is offline when you look.
+
+A watch re-runs its search **in place** — same row, same id, same url.  That is not incidental: the set of files it
+has already reported is keyed on the search's id, so a run that created a new row would reset the memory every time.
+Two watches over the same text are two independent memories, and the second will report a file the first already
+mentioned; a new watch is a new question.
+
+What counts as a hit is the same filter language the results page uses, evaluated on the server.  Both
+implementations are held to one shared corpus of vectors (`tests/fixtures/search-filter-vectors.json`), because a
+watch that judged a file differently from the page showing it would be worse than no watch.
+
+> **Worth knowing before writing a filter.** An attribute no peer reported is compared as zero, so `minbitrate:320`
+> excludes a file whose bitrate is unknown rather than letting it through — and peers commonly report a sample rate
+> and bit depth for lossless files *instead of* a bitrate.  `islossless minbitrate:320` therefore rejects most real
+> FLACs.  This is how the results page has always behaved; a watch matches it deliberately.
+
+Scheduling is deliberately conservative, and the reason is the Soulseek server rather than this application: searching
+too often gets a client disconnected and refused for twenty minutes or so, and nothing local shortens that.  So one
+watch searches at a time across the whole application, a gap is left after each, a rule that would recur faster than
+`minimum_interval` is refused when it is *set* rather than quietly slowed down later, and a watch that is due while
+the server is unreachable is left due rather than run — it runs once when the connection returns, not once for every
+occurrence it missed.
+
+Schedules are stored as RFC 5545 recurrence rules and read in a named IANA time zone, not in UTC and not in the
+server's local time.  "Every day at 03:00" is a different instant in summer than in winter, and an operator who asked
+for 03:00 meant 03:00 where they are.
+
+Mail goes out through the [Mail](#mail) integration, so that must be configured; a watch may name its own recipient or
+use the configured default.  Every notification is recorded, including the ones that failed, so a watch whose mail has
+been bouncing says so rather than appearing to have found nothing.
+
+A watched search is **never** pruned by `retention.search`, however long ago it last ran.
+
+#### **YAML**
+```yaml
+searches:
+  watches:
+    enabled: true
+    minimum_interval: 60
+    gap: 10
+    limit: 25
+    timezone: Etc/UTC
+```
+
 # Integrations
 
 ## Mail
