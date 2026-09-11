@@ -56,17 +56,30 @@
 /* A download icon with a stroke through it: the same affordance, visibly
    struck out, rather than a blank cell that leaves an operator wondering why
    this row has no button when the one above it does. */
+/* The two glyphs are stacked in one grid cell rather than in Semantic's own
+   Icon.Group, which centres an overlay on the *group box* -- and gives its
+   first child a trailing margin-right (`@distanceFromText`) that the box
+   includes. The overlay therefore lands half a gap to the right of the icon it
+   is meant to cross. One cell, both items centred in it, margins zeroed: the
+   stacking no longer depends on how Semantic sizes the group. */
 .transferlist-retrieve-struck {
+  display: inline-grid;
+  place-items: center;
   cursor: default;
+  line-height: 1;
 }
 
-/* Semantic already centres a non-first icon in a group, with an absolute
-   position and a translate(-50%, -50%). Setting position, left/top or a size
-   here undoes that and hangs the mark off the corner -- only how big and how
-   dark it is belongs to us. */
+.transferlist-retrieve-struck > i.icon {
+  grid-area: 1 / 1;
+  margin: 0 !important;
+}
+
+/* Big enough to read as a mark across the icon rather than a speck on it. The
+   download glyph does not fill its own em box, so matching sizes would leave
+   the ban visibly smaller than the thing it crosses. */
 .transferlist-retrieve-strike {
-  font-size: 1.4em !important;
-  opacity: 0.9;
+  font-size: 1.5em !important;
+  opacity: 0.85;
   text-shadow: unset !important;
 }
 

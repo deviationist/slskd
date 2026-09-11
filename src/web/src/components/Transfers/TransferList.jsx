@@ -314,20 +314,19 @@ class TransferList extends Component {
                                   })}
                                   position="left center"
                                   trigger={
-                                    <Icon.Group
-                                      className="transferlist-retrieve-struck"
-                                      size="small"
-                                    >
+                                    <span className="transferlist-retrieve-struck">
                                       <Icon
                                         disabled
                                         name="download"
+                                        size="small"
                                       />
                                       <Icon
                                         className="transferlist-retrieve-strike"
                                         color="red"
                                         name="ban"
+                                        size="small"
                                       />
-                                    </Icon.Group>
+                                    </span>
                                   }
                                 />
                               ) : (
