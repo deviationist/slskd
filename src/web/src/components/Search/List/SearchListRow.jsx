@@ -30,7 +30,7 @@ const SearchListRow = ({ onRemove, onStop, search, watch = undefined }) => {
       <Table.Cell>
         <SearchStatusIcon state={search.state} />
       </Table.Cell>
-      <Table.Cell>
+      <Table.Cell className="search-list-phrase-cell">
         <Link to={`${match.url}/${search.id}`}>{search.searchText}</Link>
         {badge && (
           <Popup
@@ -39,9 +39,7 @@ const SearchListRow = ({ onRemove, onStop, search, watch = undefined }) => {
             trigger={
               <Label
                 color={badge.color}
-                horizontal
                 size="tiny"
-                style={{ marginLeft: '0.5em' }}
               >
                 <Icon name={badge.icon} />
                 {badge.label}

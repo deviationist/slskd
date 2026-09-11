@@ -205,3 +205,14 @@
     border-bottom-right-radius: 0.28571429rem !important;
   }
 }
+
+/* The phrase and its badge, centred against each other.
+   A label is a taller inline-block than the text beside it, so in normal inline
+   flow it aligns on the baseline and sits low in the row. A flex row centres
+   both whatever their heights, and the gap replaces the margin the horizontal
+   variant was there to provide. */
+.search-list-phrase-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+}
