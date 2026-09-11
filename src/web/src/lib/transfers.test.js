@@ -318,3 +318,39 @@ describe('resolveSort', () => {
     }
   });
 });
+
+// the request asks for a Blob, so the *body* of an error response is a Blob
+// too -- unreadable without unpacking it, and '[object Blob]' if toasted. the
+// status is the part that is readable, and the part that says what to do next
+const blobBodied = (status) => ({
+  message: 'Request failed',
+  response: { data: new Blob(['nope']), status },
+});
+
+describe('describeRetrievalError', () => {
+  it('names the option when the server refuses', () => {
+    expect(transfers.describeRetrievalError(blobBodied(403))).toContain(
+      'remote_file_retrieval',
+    );
+  });
+
+  it('says there is no file when there is none', () => {
+    expect(transfers.describeRetrievalError(blobBodied(404))).toBe(
+      'There is no file on disk for this download',
+    );
+  });
+
+  it('falls back to the error message for anything else', () => {
+    expect(transfers.describeRetrievalError(blobBodied(500))).toBe(
+      'Request failed',
+    );
+  });
+
+  it('says something useful when there is no response at all', () => {
+    // a request that never landed: no status to read, and undefined is not a
+    // message
+    expect(transfers.describeRetrievalError(undefined)).toBe(
+      'the file could not be retrieved',
+    );
+  });
+});

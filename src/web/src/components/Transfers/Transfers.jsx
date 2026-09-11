@@ -98,6 +98,12 @@ const Transfers = ({ direction, server }) => {
   const configuredSort = options?.transfers?.[direction]?.defaultSort;
   const sort = transfersLibrary.resolveSort(storedSort, configuredSort);
 
+  // whether the server will hand a downloaded file back over the API. the
+  // button is hidden rather than shown and refused: options arrive over the
+  // hub, so this is false until it connects, which errs towards not offering
+  // something that would not work
+  const retrievalEnabled = options?.remoteFileRetrieval === true;
+
   const sorted = useMemo(
     () => transfersLibrary.sortTransfers(transfers, sort),
     [sort, transfers],
@@ -236,6 +242,7 @@ const Transfers = ({ direction, server }) => {
             key={user.username}
             remove={remove}
             removeAll={removeAll}
+            retrievalEnabled={retrievalEnabled}
             retry={retry}
             retryAll={retryAll}
             user={user}

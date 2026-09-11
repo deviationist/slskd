@@ -66,6 +66,9 @@ const TransferDetails = ({ file }) => {
     'username',
     'direction',
     'filename',
+    // where the file actually is on the server. it is also what says why a
+    // completed download has no download button: nothing was recorded to serve
+    'localFilename',
     'size',
     'startOffset',
     'state',

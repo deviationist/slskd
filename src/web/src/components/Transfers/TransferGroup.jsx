@@ -174,6 +174,7 @@ class TransferGroup extends Component {
                 onPlaceInQueueRequested={this.handleFetchPlaceInQueue}
                 onRetryRequested={this.handleRetry}
                 onSelectionChange={this.handleSelectionChange}
+                retrievalEnabled={this.props.retrievalEnabled}
                 username={user.username}
               />
             ))}

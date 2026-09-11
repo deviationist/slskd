@@ -1,4 +1,5 @@
 import api from './api';
+import { downloadFile } from './util';
 
 export const getAll = async ({ direction }) => {
   const response = (
@@ -188,6 +189,54 @@ export const summariseDeletions = (results = []) => {
     kind: 'success',
     message: `Removed ${total} and deleted ${deletedFiles.length === 1 ? 'the file' : `${deletedFiles.length} files`}${folders}`,
   };
+};
+
+/**
+ * Fetches the file a completed download produced, and hands it to the browser
+ * as a save.
+ *
+ * The transfer is named by its **id**. The path of the file is resolved
+ * server-side, from what the application recorded when it wrote it -- no path
+ * is sent from here, which is what makes a traversal impossible rather than
+ * merely guarded against.
+ *
+ * The response is read into a Blob before it is saved, because the API is
+ * authenticated with a bearer token and a plain `<a download>` link cannot
+ * carry one. The endpoint itself streams and serves ranges, so a deployment
+ * that authenticates some other way -- a reverse proxy in front of it, or
+ * `no_auth` -- can fetch the URL directly and stream it without this hop.
+ * @param {object} params
+ * @param {string} params.username - The user the download came from.
+ * @param {string} params.id - The id of the download.
+ * @param {string} params.filename - The name to save as.
+ * @returns {Promise<void>} Resolves once the save has been handed to the browser.
+ */
+export const retrieveFile = async ({ username, id, filename }) => {
+  const response = await api.get(
+    `/transfers/downloads/${encodeURIComponent(username)}/${encodeURIComponent(id)}/file`,
+    { responseType: 'blob' },
+  );
+
+  downloadFile(response.data, filename, response.headers['content-type']);
+};
+
+/**
+ * What to say when a retrieval fails.
+ *
+ * The request asks for a Blob, so axios hands back a *Blob* on an error
+ * response too -- the body of a 403 is a Blob, not a string, and toasting it
+ * would print '[object Blob]'. The status is the part that is readable without
+ * unpacking it, and it is the part that says what to do next.
+ */
+export const describeRetrievalError = (error) => {
+  switch (error?.response?.status) {
+    case 403:
+      return 'Downloading files to the browser is not enabled on this server (remote_file_retrieval)';
+    case 404:
+      return 'There is no file on disk for this download';
+    default:
+      return error?.message ?? 'the file could not be retrieved';
+  }
 };
 
 export const clearCompleted = ({ direction }) => {
