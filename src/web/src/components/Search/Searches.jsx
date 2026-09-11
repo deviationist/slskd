@@ -281,12 +281,22 @@ const Searches = ({ server } = {}) => {
                   <Button
                     disabled={creating || !server.isConnected}
                     icon="clock outline"
-                    onClick={() =>
-                      setWatchDraft({
-                        searchText:
-                          inputRef?.current?.inputRef?.current?.value ?? '',
-                      })
-                    }
+                    onClick={() => {
+                      const searchText =
+                        inputRef?.current?.inputRef?.current?.value ?? '';
+                      const validation = library.validateSearchText(searchText);
+
+                      // refused here rather than at the end of the modal: this
+                      // button is the only one of the three that does not reach
+                      // the server, and a modal that cannot be saved is a worse
+                      // way to learn there is nothing to search for
+                      if (!validation.ok) {
+                        toast.error(validation.reason);
+                        return;
+                      }
+
+                      setWatchDraft({ searchText });
+                    }}
                   />
                 }
               />

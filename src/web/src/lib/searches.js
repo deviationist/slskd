@@ -1,5 +1,30 @@
 import api from './api';
 
+/**
+ * Whether a phrase can be searched for.
+ *
+ * The plus and magnifier buttons learn this from the server, which refuses the
+ * request; the watch button never reaches the server, because a watch is set up
+ * before the search is created. The rule is the server's own -- null, empty, or
+ * only whitespace -- and so is the wording, so that the three buttons refuse
+ * the same thing in the same words.
+ *
+ * See SearchRequest.Validate in src/slskd/Search/API/DTO/SearchRequest.cs.
+ * @param {string} searchText - The phrase.
+ * @returns {{ok: boolean, reason?: string}} Whether it can be searched for.
+ */
+export const validateSearchText = (searchText) => {
+  if (!searchText || searchText.trim().length === 0) {
+    return {
+      ok: false,
+      reason:
+        'The field SearchText can not be null, empty, or consist of only whitespace',
+    };
+  }
+
+  return { ok: true };
+};
+
 export const getAll = async () => {
   return (await api.get('/searches')).data;
 };
