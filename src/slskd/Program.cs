@@ -789,6 +789,7 @@ namespace slskd
             services.AddSingleton<IBatchService, BatchService>();
             services.AddSingleton<FileService>();
             services.AddSingleton<DownloadTicketService>();
+            services.AddSingleton<DownloadFileAvailability>();
 
             services.AddSingleton<IRelayService, RelayService>();
 

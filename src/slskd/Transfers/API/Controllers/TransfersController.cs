@@ -70,17 +70,20 @@ namespace slskd.Transfers.API
         /// <param name="transferService"></param>
         /// <param name="fileService"></param>
         /// <param name="downloadTicketService"></param>
+        /// <param name="downloadFileAvailability"></param>
         public TransfersController(
             TransferService transferService,
             IUserService userService,
             FileService fileService,
             DownloadTicketService downloadTicketService,
+            DownloadFileAvailability downloadFileAvailability,
             IOptionsSnapshot<Options> optionsSnapshot)
         {
             Transfers = transferService;
             Users = userService;
             Files = fileService;
             Tickets = downloadTicketService;
+            FileAvailability = downloadFileAvailability;
             OptionsSnapshot = optionsSnapshot;
         }
 
@@ -105,6 +108,7 @@ namespace slskd.Transfers.API
         private IUserService Users { get; }
         private FileService Files { get; }
         private DownloadTicketService Tickets { get; }
+        private DownloadFileAvailability FileAvailability { get; }
         private IOptionsSnapshot<Options> OptionsSnapshot { get; }
         private ILogger Log { get; set; } = Serilog.Log.ForContext<TransfersController>();
 
@@ -706,6 +710,17 @@ namespace slskd.Transfers.API
 
             var downloads = Transfers.Downloads.List(includeRemoved: includeRemoved);
 
+            // say whether each finished download's file is still there, rather than leaving the UI to find out by
+            // being refused. the answer is cached; see DownloadFileAvailability for why it is not a stat per row per
+            // poll, and why it is a stat rather than an open
+            foreach (var download in downloads)
+            {
+                if (download.State.HasFlag(TransferStates.Completed) && download.State.HasFlag(TransferStates.Succeeded))
+                {
+                    download.LocalFileExists = FileAvailability.Exists(download.LocalFilename);
+                }
+            }
+
             var response = downloads.GroupBy(t => t.Username).Select(grouping => new UserResponse()
             {
                 Username = grouping.Key,
@@ -927,6 +942,11 @@ namespace slskd.Transfers.API
             catch (NotFoundException)
             {
                 Log.Debug("The file recorded for download {Id} no longer exists at '{File}'", guid, filename);
+
+                // the list may have said this file was there moments ago. it has just been proven wrong, and a cached
+                // answer that outlives the proof by half a minute would keep offering a button that cannot work
+                FileAvailability.Forget(filename);
+
                 return NotFound();
             }
         }

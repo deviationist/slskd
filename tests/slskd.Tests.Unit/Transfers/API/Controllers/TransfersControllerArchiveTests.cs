@@ -372,6 +372,7 @@ namespace slskd.Tests.Unit.Transfers.API.Controllers
                 userService: new Mock<IUserService>().Object,
                 fileService: FileService,
                 downloadTicketService: tickets ?? Tickets,
+                downloadFileAvailability: new DownloadFileAvailability(),
                 optionsSnapshot: OptionsSnapshotMock.Object)
             {
                 ControllerContext = new ControllerContext { HttpContext = httpContext },

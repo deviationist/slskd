@@ -92,6 +92,15 @@ const isFinishedDownload = (file) =>
 const isRetrievable = (file) =>
   isFinishedDownload(file) && Boolean(file.localFilename);
 
+/* Whether this row's file is known to have gone.
+ *
+ * Two sources, and the order matters. The list carries the server's answer,
+ * which is cached and so may be up to half a minute behind the filesystem; a
+ * retrieval that has actually been refused is proof, and outranks it. Anything
+ * else -- including a server that did not answer -- leaves the row alone. */
+const isGone = (file, refused) =>
+  refused.has(file.id) || file.localFileExists === false;
+
 const formatBytesTransferred = ({ size, transferred }) => {
   const [s, sExtension] = formatBytes(size, 1).split(' ');
   const t = formatBytesAsUnit(transferred, sExtension, 1);
@@ -297,11 +306,11 @@ class TransferList extends Component {
                         {retrievalEnabled && (
                           <Table.Cell className="transferlist-retrieve">
                             {isFinishedDownload(f) &&
-                              (!isRetrievable(f) || unavailable.has(f.id) ? (
+                              (!isRetrievable(f) || isGone(f, unavailable) ? (
                                 <Popup
                                   content={transfers.describeUnretrievable({
                                     file: f,
-                                    gone: unavailable.has(f.id),
+                                    gone: isGone(f, unavailable),
                                   })}
                                   position="left center"
                                   trigger={
