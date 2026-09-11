@@ -170,3 +170,20 @@
 .watch-panel-actions {
   flex: 0 0 auto;
 }
+
+/* The destructive action is a sibling of the group rather than its last button:
+   it no longer shares an edge with 'Emails', and on a narrow screen it can take
+   a row of its own instead of being squeezed against the others. */
+.watch-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.5em;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 550px) {
+  .watch-panel-stop {
+    flex-basis: 100%;
+  }
+}

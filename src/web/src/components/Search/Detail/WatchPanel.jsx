@@ -102,55 +102,55 @@ const WatchPanel = ({ searchId, searchText }) => {
             )}
           </div>
         </div>
-        <Button.Group
-          className="watch-panel-actions"
-          size="small"
-        >
-          <Popup
-            content={
-              watch.enabled
-                ? 'Stop running this search, but keep what it has reported'
-                : 'Start running this search again'
-            }
-            trigger={
-              <Button
-                disabled={working}
-                icon={watch.enabled ? 'pause' : 'play'}
-                onClick={() =>
-                  act(
-                    () =>
-                      library.put({
-                        id: searchId,
-                        watch: { ...watch, enabled: !watch.enabled },
-                      }),
-                    watch.enabled ? 'Watch paused' : 'Watch resumed',
-                  )
-                }
-              />
-            }
-          />
+        <div className="watch-panel-actions">
+          <Button.Group size="small">
+            <Popup
+              content={
+                watch.enabled
+                  ? 'Stop running this search, but keep what it has reported'
+                  : 'Start running this search again'
+              }
+              trigger={
+                <Button
+                  disabled={working}
+                  icon={watch.enabled ? 'pause' : 'play'}
+                  onClick={() =>
+                    act(
+                      () =>
+                        library.put({
+                          id: searchId,
+                          watch: { ...watch, enabled: !watch.enabled },
+                        }),
+                      watch.enabled ? 'Watch paused' : 'Watch resumed',
+                    )
+                  }
+                />
+              }
+            />
+            <Button
+              content="Run now"
+              disabled={working}
+              icon="play circle"
+              loading={working}
+              onClick={() =>
+                act(() => library.run({ id: searchId }), 'Watch run')
+              }
+            />
+            <Button
+              content="Edit"
+              disabled={working}
+              icon="pencil"
+              onClick={() => setEditing(true)}
+            />
+            <Button
+              content={`Emails (${notifications.length})`}
+              disabled={working}
+              icon="mail"
+              onClick={() => setShowingLog(true)}
+            />
+          </Button.Group>
           <Button
-            content="Run now"
-            disabled={working}
-            icon="play circle"
-            loading={working}
-            onClick={() =>
-              act(() => library.run({ id: searchId }), 'Watch run')
-            }
-          />
-          <Button
-            content="Edit"
-            disabled={working}
-            icon="pencil"
-            onClick={() => setEditing(true)}
-          />
-          <Button
-            content={`Emails (${notifications.length})`}
-            disabled={working}
-            icon="mail"
-            onClick={() => setShowingLog(true)}
-          />
-          <Button
+            className="watch-panel-stop"
             content="Stop watching"
             disabled={working}
             icon="trash alternate"
@@ -161,8 +161,9 @@ const WatchPanel = ({ searchId, searchText }) => {
                 'No longer watching this search',
               )
             }
+            size="small"
           />
-        </Button.Group>
+        </div>
       </div>
       {editing && (
         <WatchModal
