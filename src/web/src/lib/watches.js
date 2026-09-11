@@ -1,4 +1,5 @@
 import api from './api';
+import { validateSearchText } from './searches';
 
 /**
  * The recurrences a watch can be given.
@@ -199,6 +200,14 @@ export const watchBadge = ({ watch, notifications = [] }) => {
  * @returns {{ok: boolean, reason?: string}} Whether it can, and why not.
  */
 export const validateDraft = (draft) => {
+  // the phrase is editable here, so it can be emptied here. the rule and the
+  // wording are the server's, the same ones the search buttons answer with
+  const searchText = validateSearchText(draft?.searchText);
+
+  if (!searchText.ok) {
+    return searchText;
+  }
+
   if (!rruleFor({ hour: draft?.hour, key: draft?.key })) {
     return { ok: false, reason: 'Choose how often this search should run' };
   }

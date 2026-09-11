@@ -25,22 +25,38 @@ const PRESETS_BY_KEY = Object.fromEntries(
  * a version of this shipped with every field silently dropped.
  * @param {object} params
  * @param {object} params.draft - The draft being edited.
+ * @param {Function} params.onSearchTextChange - Called when the phrase is edited.
  * @param {Function} params.set - Applies changes to the draft.
  * @param {object} params.existing - The watch being edited, if any.
  * @param {string} params.searchText - The search this watch is for.
  * @returns {object} The form.
  */
-export const WatchForm = ({ draft, existing, searchText, set }) => {
+export const WatchForm = ({
+  draft,
+  existing,
+  onSearchTextChange = () => {},
+  searchText,
+  set,
+}) => {
   const takesHour = PRESETS_BY_KEY[draft.key]?.hour;
 
   return (
     <Form>
-      <Form.Field
-        control={Input}
-        disabled
-        label="Search"
-        value={searchText ?? ''}
-      />
+      {existing ? (
+        // a watch's search cannot be changed once it exists: the search is
+        // already created, and what the watch has reported is keyed on its id.
+        // shown as a heading rather than a field nobody can use
+        <Form.Field>
+          <strong>{searchText}</strong>
+        </Form.Field>
+      ) : (
+        <Form.Field
+          control={Input}
+          label="Search"
+          onChange={(_event, { value }) => onSearchTextChange(value)}
+          value={searchText ?? ''}
+        />
+      )}
       <Form.Group widths="equal">
         <Form.Field>
           <label htmlFor="watch-recurrence">How often</label>
@@ -147,6 +163,7 @@ const WatchModal = ({
   existing = undefined,
   onClose,
   onSave,
+  onSearchTextChange = () => {},
   open,
   searchText,
 }) => {
@@ -168,7 +185,7 @@ const WatchModal = ({
 
   const set = (values) => setDraft((old) => ({ ...old, ...values }));
 
-  const validation = library.validateDraft(draft);
+  const validation = library.validateDraft({ ...draft, searchText });
   const rrule = library.rruleFor({ hour: draft.hour, key: draft.key });
 
   const save = async () => {
@@ -194,6 +211,7 @@ const WatchModal = ({
 
   return (
     <Modal
+      closeIcon
       onClose={onClose}
       open={open}
       size="small"
@@ -213,6 +231,7 @@ const WatchModal = ({
         <WatchForm
           draft={draft}
           existing={existing}
+          onSearchTextChange={onSearchTextChange}
           searchText={searchText}
           set={set}
         />
