@@ -322,7 +322,7 @@ class TransferList extends Component {
                                       />
                                       <Icon
                                         className="transferlist-retrieve-strike"
-                                        color="red"
+                                        color="grey"
                                         name="ban"
                                         size="small"
                                       />

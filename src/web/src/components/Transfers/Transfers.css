@@ -72,15 +72,27 @@
 .transferlist-retrieve-struck > i.icon {
   grid-area: 1 / 1;
   margin: 0 !important;
+  /* grid items take a z-index without being positioned, so the order these are
+     painted in does not depend on the order they are written in */
+  z-index: 1;
 }
 
-/* Big enough to read as a mark across the icon rather than a speck on it. The
-   download glyph does not fill its own em box, so matching sizes would leave
-   the ban visibly smaller than the thing it crosses. */
+/* Behind the download glyph, and grey rather than red.
+
+   Behind, because the icon is what says which affordance is being refused, and
+   a mark painted over it obscures the only part that carries that meaning.
+   Grey, because this is not an error: a completed download whose file has been
+   moved on by something downstream is the ordinary end of its life here, and
+   red would report a routine state as a fault.
+
+   Bigger than the icon it crosses, because the download glyph does not fill its
+   own em box -- at matching sizes the mark reads as a speck on the icon rather
+   than a line through it. */
 .transferlist-retrieve-strike {
   font-size: 1.5em !important;
-  opacity: 0.85;
+  opacity: 0.55;
   text-shadow: unset !important;
+  z-index: 0;
 }
 
 .transferlist-filename {
