@@ -28,7 +28,13 @@ Two decisions from the Q&A that the rest of this document rests on:
    creation *is* the ignore mechanism, and the criteria are the granular
    control. Everything reported is recorded as reported, so you hear about
    each file once.
-2. **That record is keyed on the search's own UUID** — the one already in the
+2. **The feature is content-agnostic.** It adds recurrence and notification
+   and nothing else. It has no opinion about formats, quality or what a track
+   is; the criteria are whatever the existing controls express, and a watch
+   that is wrong about what it wants is a filter string to fix, not a feature
+   to extend. The lossless example that prompted this is one use of it, not
+   its subject.
+3. **The reported-files record is keyed on the search's own UUID** — the one already in the
    URL (`/searches/c4a7ece4-…`). Two watches for the same track are two
    independent memories, and the second will happily tell you about a file the
    first already mentioned. That is intended: a new watch is a fresh question.
@@ -77,7 +83,6 @@ Watch                  PK SearchId (FK Searches.Id, cascade)
   IncludeLocked        bool        "notify about locked tracks/folders"
   RequireFreeSlot      bool        mirrors "Hide Results with No Free Slots"
   Filter               text        the filter-box string, verbatim
-  Formats              text?       optional extension allowlist — see below
   CreatedAt/UpdatedAt  datetime
 
 WatchFile              PK Id; UNIQUE (SearchId, Username, Filename)
@@ -182,17 +187,13 @@ deliberately rather than accidentally fix:
    attributes fails it, *including for a real FLAC*. `islossy` is the
    complement, so an attribute-less file counts as lossy.
 
-Point 3 matters for the exact case this feature is for. Worse: **include terms
-are ANDed** (`include.filter(…).length !== include.length`), so the filter box
-cannot express "flac **or** aiff **or** wav". There is no way to write a format
-allowlist in the language as it stands.
-
-→ **Recommendation, needs a yes/no:** add one optional field to the watch, a
-**format allowlist** (checkboxes: FLAC / AIFF / WAV / MP3 / other), matched on
-the filename extension and ORed, ANDed with whatever the filter box says. One
-field, no new syntax, and it makes "tell me when this appears in any lossless
-format" expressible and robust against peers with no attributes. Without it,
-the feature's headline use case rests on a heuristic that silently drops files.
+These are properties of the language, inherited — not problems for the watch to
+solve. The same is true of its limits: include terms are ANDed
+(`include.filter(…).length !== include.length`), so the filter box cannot
+express "flac **or** aiff **or** wav", and a watch inherits that too. Widening
+the language is a change to the language, affecting everyone who uses the
+filter box and nobody who uses a watch, and it belongs in its own change if it
+is ever wanted. What matters here is only that a watch and the page agree.
 
 ## Notification
 
@@ -339,5 +340,9 @@ than accumulating rows.
   than when you read the mail. Tempting, and the runner already holds
   everything needed; left out because "download without me looking" deserves
   its own decision about scoring and disk.
+- **New criteria fields of any kind** — format allowlists, quality scoring,
+  duration windows. The watch persists the controls that exist and evaluates
+  them; anything it cannot express is a gap in the filter language, to be
+  closed there or not at all.
 - **Cross-watch digests**, folder-level notification, and anything that turns
   this into a subscription manager.
