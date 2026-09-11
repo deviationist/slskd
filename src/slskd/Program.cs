@@ -756,6 +756,12 @@ namespace slskd
                 services.AddSingleton<Migrator>(_ => new Migrator(databases: connectionStringDictionary));
             }
 
+            // one adapter per way out; MailService picks between them per send, so a change of adapter needs no restart
+            services.AddSingleton<slskd.Integrations.Mail.IMailAdapter, slskd.Integrations.Mail.SmtpMailAdapter>();
+            services.AddSingleton<slskd.Integrations.Mail.IMailAdapter, slskd.Integrations.Mail.BrevoMailAdapter>();
+            services.AddSingleton<slskd.Integrations.Mail.IMailAdapter, slskd.Integrations.Mail.SendmailMailAdapter>();
+            services.AddSingleton<slskd.Integrations.Mail.MailService>();
+
             services.AddSingleton<EventService>();
             services.AddSingleton<EventBus>();
 

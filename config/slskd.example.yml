@@ -325,6 +325,23 @@
 #     overwrite_existing: true
 #     connection_timeout: 5000
 #     retry_attempts: 3
+#   mail:
+#     enabled: false
+#     adapter: smtp # 'smtp', 'brevo', or 'sendmail'
+#     from: ~
+#     to: ~ # the default recipient; a sender may name its own
+#     base_url: ~ # how this application is reached from outside, for links in mail
+#     smtp:
+#       host: ~
+#       port: 587
+#       encryption: starttls # 'none', 'starttls', or 'tls'
+#       username: ~
+#       password: ~
+#       timeout: 30000
+#     brevo:
+#       api_key: ~
+#     sendmail:
+#       path: /usr/sbin/sendmail
 #   pushbullet:
 #     enabled: false
 #     access_token: ~

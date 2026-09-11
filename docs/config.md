@@ -1066,6 +1066,55 @@ throttling:
 
 # Integrations
 
+## Mail
+
+Outgoing mail, for anything in the application that has news worth sending.  Disabled by default.
+
+How mail leaves is the whole of the `adapter` decision, and a sender does not know or care which one is in use:
+
+| Adapter | How it sends | Worth knowing |
+| --------- | ------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `smtp` | Talks SMTP to a server | Works anywhere, including from a container. `none`, `starttls` or `tls`; authentication is attempted only when a username is configured, because a relay on a trusted network may want none and empty credentials are refused by servers that would otherwise have accepted the message. |
+| `brevo` | Brevo's transactional HTTP API | No SMTP conversation at all. Note that Brevo restricts API keys by source IP **by default**, and nothing here maintains that allowlist — a key that works today stops working when the address it was allowed for changes, and the failure is a 401 naming an address rather than anything about the message. |
+| `sendmail` | Pipes to a local binary | For an installation that already has working local mail. A containerised deployment almost certainly has no such binary, and this adapter fails at the first send rather than at startup. Plain text only. |
+
+`from` is required.  `to` is the address used when a sender does not name one of its own; without either, a send is
+refused rather than attempted.
+
+`base_url` is how this application is reached from *outside* — for example `https://slskd.example.com`.  It cannot be
+worked out from a request, because what an application is reached at from outside is a fact only the operator has.
+Without it, mail can name a thing but cannot link to it.
+
+Configuration that looks right can still not deliver — a credential, a host and a recipient are all plausible until
+one is tried.  `POST /api/v0/mail/test` sends a single message so that the failure arrives while somebody is looking
+at it, rather than the first time the application has something to say.  It answers **502** with whatever the adapter
+said, because a refused credential, a host that did not answer and a binary that is not installed each say so
+themselves and none of them are improved by paraphrasing.
+
+The SMTP password and the Brevo API key are secrets, and are redacted wherever options are displayed or served.
+
+#### **YAML**
+```yaml
+integrations:
+  mail:
+    enabled: false
+    adapter: smtp
+    from: ~
+    to: ~
+    base_url: ~
+    smtp:
+      host: ~
+      port: 587
+      encryption: starttls
+      username: ~
+      password: ~
+      timeout: 30000
+    brevo:
+      api_key: ~
+    sendmail:
+      path: /usr/sbin/sendmail
+```
+
 ## User-Defined
 
 User-defined integrations allow users to configure external applications to receive data from slskd as things happen internally.  slskd uses an internal [event bus](https://www.akamai.com/glossary/what-is-an-event-bus) over which event data is sent from application logic to whatever destination(s) users choose.
