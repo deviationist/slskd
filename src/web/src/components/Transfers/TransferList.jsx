@@ -9,6 +9,7 @@ import {
   Header,
   Icon,
   List,
+  Modal,
   Popup,
   Progress,
   Table,
@@ -54,6 +55,46 @@ const detailsPopperModifiers = [
   },
 ];
 
+/**
+ * Asks before a removal that would take a file off the disk with it.
+ *
+ * Raised only where there is a file to lose -- see `planRowRemoval`. It names
+ * the path that is about to be deleted rather than merely asking whether the
+ * operator is sure: the list re-fetches every second and a row can move under
+ * the pointer between aiming and clicking, so the one thing worth showing is
+ * which file this turned out to be about.
+ */
+const ConfirmRemovalModal = ({ busy, onCancel, onConfirm, plan }) => (
+  <Modal
+    actions={[
+      'Cancel',
+      {
+        content: plan.confirmLabel,
+        key: 'remove',
+        loading: busy,
+        negative: true,
+        onClick: onConfirm,
+      },
+    ]}
+    centered
+    content={
+      <Modal.Content>
+        <p>{plan.prompt}</p>
+        <p className="transferlist-remove-path">{plan.filename}</p>
+      </Modal.Content>
+    }
+    header={
+      <Header
+        content={plan.header}
+        icon="trash alternate"
+      />
+    }
+    onClose={onCancel}
+    open
+    size="small"
+  />
+);
+
 const getColor = (state) => {
   switch (state) {
     case 'InProgress':
@@ -93,7 +134,12 @@ class TransferList extends Component {
     super(props);
 
     this.state = {
+      // the row awaiting an answer to the confirmation, or null when none is
+      // being asked. it holds the file rather than a flag so the dialog can name
+      // the path it is about to delete
+      confirming: null,
       isFolded: false,
+      removing: null,
       retrieving: null,
       // ids whose file the server has already said is gone. something downstream
       // moves finished files out of the downloads directory, so a download whose
@@ -103,6 +149,12 @@ class TransferList extends Component {
       unavailable: new Set(),
     };
   }
+
+  componentWillUnmount() {
+    this.mounted = false;
+  }
+
+  mounted = true;
 
   handleRetrieve = async (file) => {
     const { username } = this.props;
@@ -129,6 +181,42 @@ class TransferList extends Component {
     }
   };
 
+  /**
+   * Removes one transfer, asking first where that would delete a file.
+   *
+   * The removal itself is the card's own -- the same call, the same clearing of
+   * the selection and the same summary toast the *Remove Selected* button
+   * produces, over a selection of one. A second way of removing a transfer that
+   * reported differently would be worse than none.
+   */
+  handleRemove = (file) => {
+    const plan = transfers.planRowRemoval({
+      deleteFileOnRemoval: this.props.deleteFileOnRemoval,
+      file,
+    });
+
+    if (plan.confirm) {
+      this.setState({ confirming: file });
+      return;
+    }
+
+    this.remove(file);
+  };
+
+  remove = async (file) => {
+    try {
+      this.setState({ confirming: null, removing: file.id });
+      await this.props.onRemoveRequested(file);
+    } finally {
+      // the row being removed can be the last one in its folder, and the list
+      // that held it is gone the moment the page next re-fetches. a removal
+      // that lands after that has nothing left to un-busy
+      if (this.mounted) {
+        this.setState({ removing: null });
+      }
+    }
+  };
+
   handleClick = (file) => {
     const { direction, state } = file;
 
@@ -149,10 +237,52 @@ class TransferList extends Component {
     this.setState((previousState) => ({ isFolded: !previousState.isFolded }));
   };
 
+  /**
+   * The row's own remove control, where the row has one.
+   *
+   * Which rows do, and what the control says it will do, are `planRowRemoval`'s
+   * to decide -- this renders the answer and nothing else.
+   */
+  renderRemove(file) {
+    const { deleteFileOnRemoval } = this.props;
+    const { removing } = this.state;
+    const plan = transfers.planRowRemoval({ deleteFileOnRemoval, file });
+
+    if (!plan.offered) {
+      return null;
+    }
+
+    const busy = removing === file.id;
+
+    return (
+      <Popup
+        content={plan.tooltip}
+        position="left center"
+        trigger={
+          <Icon
+            color="grey"
+            disabled={busy}
+            link
+            loading={busy}
+            name={busy ? 'spinner' : 'trash alternate'}
+            onClick={() => this.handleRemove(file)}
+            size="small"
+          />
+        }
+      />
+    );
+  }
+
   render() {
-    const { directoryName, files, onSelectionChange, retrievalEnabled } =
-      this.props;
-    const { isFolded, retrieving, unavailable } = this.state;
+    const {
+      deleteFileOnRemoval,
+      directoryName,
+      files,
+      onSelectionChange,
+      retrievalEnabled,
+    } = this.props;
+    const { confirming, isFolded, removing, retrieving, unavailable } =
+      this.state;
 
     return (
       <div>
@@ -206,6 +336,7 @@ class TransferList extends Component {
                         size="small"
                       />
                     </Table.HeaderCell>
+                    <Table.HeaderCell className="transferlist-remove" />
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
@@ -357,6 +488,12 @@ class TransferList extends Component {
                             wide="very"
                           />
                         </Table.Cell>
+                        {/* last, and behind the details icon: the one control
+                            here that destroys something does not sit against
+                            the one that fetches a file */}
+                        <Table.Cell className="transferlist-remove">
+                          {this.renderRemove(f)}
+                        </Table.Cell>
                       </Table.Row>
                     ))}
                 </Table.Body>
@@ -365,6 +502,17 @@ class TransferList extends Component {
           </List>
         ) : (
           ''
+        )}
+        {confirming && (
+          <ConfirmRemovalModal
+            busy={removing === confirming.id}
+            onCancel={() => this.setState({ confirming: null })}
+            onConfirm={() => this.remove(confirming)}
+            plan={transfers.planRowRemoval({
+              deleteFileOnRemoval,
+              file: confirming,
+            })}
+          />
         )}
       </div>
     );

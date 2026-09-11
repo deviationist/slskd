@@ -271,6 +271,21 @@ class TransferGroup extends Component {
     }
   };
 
+  /**
+   * Removes one transfer, at the request of its own row.
+   *
+   * Deliberately `removeAll` with a selection of one rather than a second
+   * removal path: the row gets the same request, the same clearing of any
+   * selection it was part of, and the same summary of what the server did with
+   * the file. Two ways of removing a transfer that reported differently would
+   * be worse than one.
+   */
+  handleRemove = async (file) => {
+    const { direction, user } = this.props;
+
+    await this.removeAll(direction, user.username, [file]);
+  };
+
   handleRetry = async (file) => {
     const { filename, size, username } = file;
 
@@ -405,6 +420,7 @@ class TransferGroup extends Component {
             !isFolded &&
             user.directories.map((directory) => (
               <TransferList
+                deleteFileOnRemoval={this.props.deleteFileOnRemoval}
                 direction={this.props.direction}
                 directoryName={directory.directory}
                 files={(directory.files || []).map((f) => ({
@@ -413,6 +429,7 @@ class TransferGroup extends Component {
                 }))}
                 key={directory.directory}
                 onPlaceInQueueRequested={this.handleFetchPlaceInQueue}
+                onRemoveRequested={this.handleRemove}
                 onRetryRequested={this.handleRetry}
                 onSelectionChange={this.handleSelectionChange}
                 retrievalEnabled={this.props.retrievalEnabled}
