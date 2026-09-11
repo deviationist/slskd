@@ -243,6 +243,27 @@ export const describeRetrieval = (count = 1) =>
     ? `Download these ${count} files to your browser, as one zip`
     : 'Download this file to your browser';
 
+/**
+ * Says why a completed download cannot be fetched, or undefined if it can.
+ *
+ * Two different facts, and they must not be told as one. A path the server has
+ * already refused is a file that has *gone*; a download with no recorded path
+ * is one this application never knew the location of, and whose file may well
+ * still be sitting on disk. Saying "missing" for the second would be a guess
+ * presented as a fact.
+ */
+export const describeUnretrievable = ({ file, gone = false }) => {
+  if (gone) {
+    return 'This file is no longer on disk';
+  }
+
+  if (!file.localFilename) {
+    return 'This download finished before slskd recorded where it saved files, so it cannot be fetched';
+  }
+
+  return undefined;
+};
+
 export const describeRetrievalError = (error) => {
   switch (error?.response?.status) {
     case 403:

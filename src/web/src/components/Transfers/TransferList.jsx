@@ -81,10 +81,16 @@ const isQueuedState = (state) => state.includes('Queued');
  * `localFilename` is null for downloads that finished before this application
  * began recording where it wrote them, and the server answers 404 for those.
  * A button that is always refused is worse than no button. */
+/* A row that got as far as producing a file. Whether that file can still be
+   handed back is a separate question -- see isRetrievable -- but this is the
+   set of rows the retrieval column has anything at all to say about. A
+   cancelled or errored transfer produced nothing, and its own state column
+   already says so. */
+const isFinishedDownload = (file) =>
+  file.direction === 'Download' && file.state === 'Completed, Succeeded';
+
 const isRetrievable = (file) =>
-  file.direction === 'Download' &&
-  file.state === 'Completed, Succeeded' &&
-  Boolean(file.localFilename);
+  isFinishedDownload(file) && Boolean(file.localFilename);
 
 const formatBytesTransferred = ({ size, transferred }) => {
   const [s, sExtension] = formatBytes(size, 1).split(' ');
@@ -290,17 +296,29 @@ class TransferList extends Component {
                         </Table.Cell>
                         {retrievalEnabled && (
                           <Table.Cell className="transferlist-retrieve">
-                            {isRetrievable(f) &&
-                              (unavailable.has(f.id) ? (
+                            {isFinishedDownload(f) &&
+                              (!isRetrievable(f) || unavailable.has(f.id) ? (
                                 <Popup
-                                  content="This file is no longer on disk"
+                                  content={transfers.describeUnretrievable({
+                                    file: f,
+                                    gone: unavailable.has(f.id),
+                                  })}
                                   position="left center"
                                   trigger={
-                                    <Icon
-                                      disabled
-                                      name="download"
+                                    <Icon.Group
+                                      className="transferlist-retrieve-struck"
                                       size="small"
-                                    />
+                                    >
+                                      <Icon
+                                        disabled
+                                        name="download"
+                                      />
+                                      <Icon
+                                        className="transferlist-retrieve-strike"
+                                        color="red"
+                                        name="ban"
+                                      />
+                                    </Icon.Group>
                                   }
                                 />
                               ) : (
