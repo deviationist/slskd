@@ -75,7 +75,7 @@ const WatchPanel = ({ searchId, searchText }) => {
 
   return (
     <Segment
-      className="search-detail-header-segment"
+      className="watch-panel-segment"
       raised
     >
       <div className="watch-panel">

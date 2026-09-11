@@ -126,11 +126,20 @@
   display: inline;
   margin-left: auto;
 }
+/* Its own segment rather than the detail header's: that one is a flex container
+   with a fixed 78px height, which makes anything inside it a flex item sized to
+   its content -- so a panel placed there neither fills the width nor fits two
+   lines of text. */
+.watch-panel-segment {
+  margin-top: 15px !important;
+}
+
 /* The watch panel: a summary that grows, beside actions that do not.
    The text stacks and wraps in the space it has; without a min-width of zero a
    flex item refuses to shrink below its content, which is what pushed the
    buttons onto their own line. */
 .watch-panel {
+  width: 100%;
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
