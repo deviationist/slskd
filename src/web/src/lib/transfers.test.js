@@ -454,3 +454,117 @@ describe('describeUnretrievable', () => {
     expect(transfers.describeUnretrievable({ file: recorded })).toBeUndefined();
   });
 });
+
+describe('isFinishedDownload / isRetrievable', () => {
+  const done = {
+    direction: 'Download',
+    localFilename: '/downloads/a.flac',
+    state: 'Completed, Succeeded',
+  };
+
+  it('recognises a download that produced a file', () => {
+    expect(transfers.isFinishedDownload(done)).toBe(true);
+    expect(transfers.isRetrievable(done)).toBe(true);
+  });
+
+  it('does not offer a download whose path was never recorded', () => {
+    const unrecorded = { ...done, localFilename: null };
+
+    // the column still has something to say about it, but it cannot be fetched
+    expect(transfers.isFinishedDownload(unrecorded)).toBe(true);
+    expect(transfers.isRetrievable(unrecorded)).toBe(false);
+  });
+
+  it('says nothing about a transfer that produced no file', () => {
+    const states = ['Completed, Cancelled', 'Completed, Errored', 'InProgress'];
+
+    for (const state of states) {
+      expect(transfers.isFinishedDownload({ ...done, state })).toBe(false);
+      expect(transfers.isRetrievable({ ...done, state })).toBe(false);
+    }
+  });
+
+  it('says nothing about an upload', () => {
+    expect(transfers.isFinishedDownload({ ...done, direction: 'Upload' })).toBe(
+      false,
+    );
+  });
+});
+
+describe('isFileGone', () => {
+  const present = { id: 'a', localFileExists: true };
+
+  it('believes the server when it says the file is gone', () => {
+    expect(
+      transfers.isFileGone({ file: { ...present, localFileExists: false } }),
+    ).toBe(true);
+  });
+
+  it('leaves a row alone while the server says the file is there', () => {
+    expect(transfers.isFileGone({ file: present })).toBe(false);
+  });
+
+  it('leaves a row alone when the server did not answer at all', () => {
+    // undefined is not false: a listing that carries no answer must not strike
+    // out every row it describes
+    expect(transfers.isFileGone({ file: { id: 'a' } })).toBe(false);
+  });
+
+  it('lets a refusal outrank a stale listing', () => {
+    // the listing is cached and may be half a minute behind; a refusal is proof
+    expect(
+      transfers.isFileGone({ file: present, refused: new Set(['a']) }),
+    ).toBe(true);
+  });
+});
+
+const finishedDownload = (id, extra = {}) => ({
+  direction: 'Download',
+  id,
+  localFilename: `/downloads/${id}.flac`,
+  state: 'Completed, Succeeded',
+  ...extra,
+});
+
+describe('chooseRetrieval', () => {
+  it('fetches a single file as a file, not an archive of one', () => {
+    const choice = transfers.chooseRetrieval([finishedDownload('a')]);
+
+    expect(choice.mode).toBe('file');
+    expect(choice.file.id).toBe('a');
+  });
+
+  it('archives more than one', () => {
+    const choice = transfers.chooseRetrieval([
+      finishedDownload('a'),
+      finishedDownload('b'),
+    ]);
+
+    expect(choice.mode).toBe('archive');
+    expect(choice.files.map((f) => f.id)).toEqual(['a', 'b']);
+  });
+
+  it('ignores rows that cannot be fetched when counting', () => {
+    // two selected, one of them unfetchable: that is one file, so no archive
+    const choice = transfers.chooseRetrieval([
+      finishedDownload('a'),
+      finishedDownload('b', { localFilename: null }),
+    ]);
+
+    expect(choice.mode).toBe('file');
+    expect(choice.file.id).toBe('a');
+  });
+
+  it('does nothing when nothing in the selection can be fetched', () => {
+    expect(
+      transfers.chooseRetrieval([
+        finishedDownload('a', { state: 'Completed, Errored' }),
+      ]).mode,
+    ).toBe('none');
+  });
+
+  it('does nothing with an empty selection', () => {
+    expect(transfers.chooseRetrieval().mode).toBe('none');
+    expect(transfers.chooseRetrieval([]).mode).toBe('none');
+  });
+});

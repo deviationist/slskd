@@ -230,6 +230,71 @@ export const retrieveFile = async ({ username, id, filename }) => {
  * unpacking it, and it is the part that says what to do next.
  */
 /**
+ * Whether a transfer got as far as producing a file.
+ *
+ * Whether that file can still be handed back is a separate question -- see
+ * `isRetrievable` -- but this is the set of rows the retrieval column has
+ * anything at all to say about. A cancelled or errored transfer produced
+ * nothing, and its own state column already says so.
+ * @param {object} file - The transfer.
+ * @returns {boolean} Whether it finished and produced a file.
+ */
+export const isFinishedDownload = (file) =>
+  file.direction === 'Download' && file.state === 'Completed, Succeeded';
+
+/**
+ * Whether the server could hand this transfer's file back.
+ *
+ * `localFilename` is null for downloads that finished before this application
+ * recorded where it wrote them; the server answers 404 for those, and a button
+ * that is always refused is worse than no button.
+ * @param {object} file - The transfer.
+ * @returns {boolean} Whether it can be fetched.
+ */
+export const isRetrievable = (file) =>
+  isFinishedDownload(file) && Boolean(file.localFilename);
+
+/**
+ * Whether this row's file is known to have gone.
+ *
+ * Two sources, and the order matters. `localFileExists` is the server's answer
+ * as of the last listing, which is cached and so may be up to half a minute
+ * behind the filesystem. A retrieval that has actually been refused is proof,
+ * and outranks it. Anything else -- including a server that did not answer at
+ * all -- leaves the row alone.
+ * @param {object} params
+ * @param {object} params.file - The transfer.
+ * @param {Set<string>} params.refused - Ids whose retrieval has been refused.
+ * @returns {boolean} Whether the file is known to be gone.
+ */
+export const isFileGone = ({ file, refused = new Set() }) =>
+  refused.has(file.id) || file.localFileExists === false;
+
+/**
+ * Decides how a selection should be fetched.
+ *
+ * One file is a file, not an archive of one: zipping it would make the operator
+ * unwrap something to get back exactly what they picked. Everything else is an
+ * archive, including a selection that is down to one file only because the rest
+ * of it has gone.
+ * @param {object[]} files - The selected transfers.
+ * @returns {{mode: 'none'|'file'|'archive', file?: object, files?: object[]}} What to do.
+ */
+export const chooseRetrieval = (files = []) => {
+  const retrievable = files.filter((file) => isRetrievable(file));
+
+  if (retrievable.length === 0) {
+    return { mode: 'none' };
+  }
+
+  if (retrievable.length === 1) {
+    return { file: retrievable[0], mode: 'file' };
+  }
+
+  return { files: retrievable, mode: 'archive' };
+};
+
+/**
  * Says what a retrieval will do, for the tooltip on every control that starts
  * one.
  *

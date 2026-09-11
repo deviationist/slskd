@@ -13,13 +13,6 @@ import {
   Popup,
 } from 'semantic-ui-react';
 
-/* A transfer with a file the server could hand back: a download that finished,
-   and whose path this application recorded at the time. */
-const isRetrievable = (file) =>
-  file.direction === 'Download' &&
-  file.state === 'Completed, Succeeded' &&
-  Boolean(file.localFilename);
-
 /**
  * Says which of the selected files are not there, and offers to archive the
  * rest.
@@ -103,21 +96,24 @@ class TransferGroup extends Component {
    * simply starts.
    */
   handleArchive = async (username, selected) => {
-    const retrievable = selected.filter((file) => isRetrievable(file));
+    const choice = transfers.chooseRetrieval(selected);
+
+    if (choice.mode === 'none') {
+      return;
+    }
 
     try {
       this.setState({ archiveBusy: true });
 
-      // one file is a file, not an archive. zipping it would make the operator
-      // unwrap something to get back exactly what they picked, and the single
-      // file path already says the right thing when it has gone
-      if (retrievable.length === 1) {
-        await this.retrieveOne(username, retrievable[0]);
+      // the single-file path says the right thing when its file has gone, so it
+      // needs no availability check of its own
+      if (choice.mode === 'file') {
+        await this.retrieveOne(username, choice.file);
         return;
       }
 
       const { available, missing } = await transfers.archiveAvailability({
-        ids: retrievable.map((f) => f.id),
+        ids: choice.files.map((f) => f.id),
         username,
       });
 
@@ -325,11 +321,13 @@ class TransferGroup extends Component {
     // the selection is not a reason to withhold the ones that do, and the
     // pre-flight is what reports the difference
     const anyRetrievable =
-      retrievalEnabled && selected.some((f) => isRetrievable(f));
+      retrievalEnabled && selected.some((f) => transfers.isRetrievable(f));
 
     // what a retrieval would actually take, which is not every selected row:
     // the tooltip has to promise the number of files the operator will get
-    const retrievableCount = selected.filter((f) => isRetrievable(f)).length;
+    const retrievableCount = selected.filter((f) =>
+      transfers.isRetrievable(f),
+    ).length;
 
     return (
       <Card.Content extra>
