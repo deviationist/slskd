@@ -34,6 +34,7 @@ using Microsoft.Extensions.Options;
 
 namespace slskd.Files.API
 {
+    using System;
     using System.ComponentModel.DataAnnotations;
     using System.IO;
     using System.Security;
@@ -210,7 +211,7 @@ namespace slskd.Files.API
 
                 return Ok(response);
             }
-            catch (SecurityException)
+            catch (Exception ex) when (ex is UnauthorizedException or SecurityException)
             {
                 Log.Warning("Directory listing of '{Directory}' forbidden", requestedDir);
                 return Forbid();
@@ -247,7 +248,7 @@ namespace slskd.Files.API
                     success => NoContent(),
                     failure => throw failure);
             }
-            catch (SecurityException)
+            catch (Exception ex) when (ex is UnauthorizedException or SecurityException)
             {
                 Log.Warning("Directory deletion of '{Directory}' forbidden", requestedDir);
                 return Forbid();
@@ -284,7 +285,7 @@ namespace slskd.Files.API
                     success => NoContent(),
                     failure => throw failure);
             }
-            catch (SecurityException)
+            catch (Exception ex) when (ex is UnauthorizedException or SecurityException)
             {
                 Log.Warning("File deletion of '{File}' forbidden", requestedFilename);
                 return Forbid();
