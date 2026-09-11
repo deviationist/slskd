@@ -215,6 +215,35 @@ export const validateDraft = (draft) => {
   return { ok: true };
 };
 
+/**
+ * Reads the files a notification reported.
+ *
+ * The record keeps at most a couple of hundred of them while the count is the
+ * true one, so a mail that reported 1471 files has 200 to show and a number to
+ * be honest about. Anything unreadable reads as empty rather than throwing: a
+ * log that cannot render one row should not take the other rows with it.
+ * @param {object} notification - The notification.
+ * @returns {{files: object[], shown: number, total: number, truncated: boolean}} What it reported.
+ */
+export const filesFrom = (notification) => {
+  let files = [];
+
+  try {
+    files = JSON.parse(notification?.filesJson ?? '[]') ?? [];
+  } catch {
+    files = [];
+  }
+
+  const total = notification?.fileCount ?? files.length;
+
+  return {
+    files,
+    shown: files.length,
+    total,
+    truncated: total > files.length,
+  };
+};
+
 export const getAll = async () => (await api.get('/watches')).data;
 
 export const get = async ({ id }) =>

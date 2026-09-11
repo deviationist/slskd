@@ -178,3 +178,34 @@ describe('validateDraft', () => {
     expect(result.reason).toMatch(/email/iu);
   });
 });
+
+describe('filesFrom', () => {
+  const two = JSON.stringify([
+    { filename: 'a.flac', size: 1, username: 'one' },
+    { filename: 'b.flac', size: 2, username: 'two' },
+  ]);
+
+  it('reads the files a notification recorded', () => {
+    const read = watches.filesFrom({ fileCount: 2, filesJson: two });
+
+    expect(read.files).toHaveLength(2);
+    expect(read.truncated).toBe(false);
+  });
+
+  it('is honest when the record holds fewer than were reported', () => {
+    // a mail that reported 1471 files records a couple of hundred; the log has
+    // to say so rather than implying the rest were never sent
+    const read = watches.filesFrom({ fileCount: 1_471, filesJson: two });
+
+    expect(read.shown).toBe(2);
+    expect(read.total).toBe(1_471);
+    expect(read.truncated).toBe(true);
+  });
+
+  it('reads nothing rather than throwing on a record it cannot parse', () => {
+    // one unreadable row must not take the rest of the log down with it
+    expect(watches.filesFrom({ filesJson: 'not json' }).files).toEqual([]);
+    expect(watches.filesFrom({}).files).toEqual([]);
+    expect(watches.filesFrom(undefined).files).toEqual([]);
+  });
+});

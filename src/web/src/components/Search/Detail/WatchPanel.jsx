@@ -1,3 +1,4 @@
+import { formatBytes } from '../../../lib/util';
 import * as library from '../../../lib/watches';
 import WatchModal from '../WatchModal';
 import React, { useEffect, useState } from 'react';
@@ -28,6 +29,7 @@ const WatchPanel = ({ searchId, searchText }) => {
   const [editing, setEditing] = useState(false);
   const [showingLog, setShowingLog] = useState(false);
   const [working, setWorking] = useState(false);
+  const [opened, setOpened] = useState(undefined);
 
   const load = async () => {
     try {
@@ -76,27 +78,34 @@ const WatchPanel = ({ searchId, searchText }) => {
       className="search-detail-header-segment"
       raised
     >
-      <div>
-        <Label
-          color={badge.color}
-          horizontal
+      <div className="watch-panel">
+        <div className="watch-panel-summary">
+          <div className="watch-panel-line">
+            <Label
+              color={badge.color}
+              horizontal
+            >
+              <Icon name={badge.icon} />
+              {badge.label}
+            </Label>
+            <span>
+              {library.describeRecurrence(watch.rrule)}
+              <span className="watch-panel-muted">{` · ${watch.timeZone}`}</span>
+            </span>
+          </div>
+          <div className="watch-panel-line watch-panel-muted">
+            <span>{`Next run ${library.describeNextRun({ watch })}`}</span>
+            {lastRun && (
+              <span>
+                {`Last run ${when(lastRun.startedAt)} · ${lastRun.newCount} new`}
+              </span>
+            )}
+          </div>
+        </div>
+        <Button.Group
+          className="watch-panel-actions"
+          size="small"
         >
-          <Icon name={badge.icon} />
-          {badge.label}
-        </Label>
-        <span style={{ marginLeft: '0.5em' }}>
-          {library.describeRecurrence(watch.rrule)} ({watch.timeZone})
-          {' — next run '}
-          {library.describeNextRun({ watch })}
-        </span>
-        {lastRun && (
-          <span style={{ marginLeft: '0.5em', opacity: 0.7 }}>
-            {`· last run ${when(lastRun.startedAt)}, ${lastRun.newCount} new`}
-          </span>
-        )}
-      </div>
-      <div style={{ marginTop: '0.75em' }}>
-        <Button.Group size="small">
           <Popup
             content={
               watch.enabled
@@ -186,6 +195,7 @@ const WatchPanel = ({ searchId, searchText }) => {
             <Table size="small">
               <Table.Header>
                 <Table.Row>
+                  <Table.HeaderCell />
                   <Table.HeaderCell>When</Table.HeaderCell>
                   <Table.HeaderCell>To</Table.HeaderCell>
                   <Table.HeaderCell>Files</Table.HeaderCell>
@@ -193,32 +203,90 @@ const WatchPanel = ({ searchId, searchText }) => {
                 </Table.Row>
               </Table.Header>
               <Table.Body>
-                {notifications.map((notification) => (
-                  <Table.Row key={notification.id}>
-                    <Table.Cell>{when(notification.sentAt)}</Table.Cell>
-                    <Table.Cell>{notification.recipient}</Table.Cell>
-                    <Table.Cell>{notification.fileCount}</Table.Cell>
-                    <Table.Cell>
-                      {notification.sent ? (
-                        <span>
+                {notifications.map((notification) => {
+                  const reported = library.filesFrom(notification);
+                  const expanded = opened === notification.id;
+
+                  return (
+                    <React.Fragment key={notification.id}>
+                      <Table.Row
+                        onClick={() =>
+                          setOpened(expanded ? undefined : notification.id)
+                        }
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <Table.Cell collapsing>
                           <Icon
-                            color="green"
-                            name="check"
+                            name={expanded ? 'chevron down' : 'chevron right'}
                           />
-                          {notification.adapter}
-                        </span>
-                      ) : (
-                        <span>
-                          <Icon
-                            color="red"
-                            name="exclamation triangle"
-                          />
-                          {notification.error}
-                        </span>
+                        </Table.Cell>
+                        <Table.Cell>{when(notification.sentAt)}</Table.Cell>
+                        <Table.Cell>{notification.recipient}</Table.Cell>
+                        <Table.Cell>{notification.fileCount}</Table.Cell>
+                        <Table.Cell>
+                          {notification.sent ? (
+                            <span>
+                              <Icon
+                                color="green"
+                                name="check"
+                              />
+                              {notification.adapter}
+                            </span>
+                          ) : (
+                            <span>
+                              <Icon
+                                color="red"
+                                name="exclamation triangle"
+                              />
+                              {notification.error}
+                            </span>
+                          )}
+                        </Table.Cell>
+                      </Table.Row>
+                      {expanded && (
+                        <Table.Row>
+                          <Table.Cell colSpan="5">
+                            {reported.files.length === 0 ? (
+                              <em>
+                                This message recorded no files. Older ones may
+                                predate the list being kept.
+                              </em>
+                            ) : (
+                              <>
+                                {reported.truncated && (
+                                  <div className="watch-panel-muted">
+                                    {`Showing ${reported.shown} of ${reported.total}; the rest were reported but not recorded.`}
+                                  </div>
+                                )}
+                                <Table
+                                  basic="very"
+                                  compact
+                                  size="small"
+                                >
+                                  <Table.Body>
+                                    {reported.files.map((file) => (
+                                      <Table.Row
+                                        key={`${file.username}/${file.filename}`}
+                                      >
+                                        <Table.Cell collapsing>
+                                          {file.username}
+                                        </Table.Cell>
+                                        <Table.Cell>{file.filename}</Table.Cell>
+                                        <Table.Cell collapsing>
+                                          {formatBytes(file.size)}
+                                        </Table.Cell>
+                                      </Table.Row>
+                                    ))}
+                                  </Table.Body>
+                                </Table>
+                              </>
+                            )}
+                          </Table.Cell>
+                        </Table.Row>
                       )}
-                    </Table.Cell>
-                  </Table.Row>
-                ))}
+                    </React.Fragment>
+                  );
+                })}
               </Table.Body>
             </Table>
           )}
