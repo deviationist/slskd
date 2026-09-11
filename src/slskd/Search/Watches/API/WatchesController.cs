@@ -118,6 +118,21 @@ public class WatchesController : ControllerBase
     private IOptionsSnapshot<Options> OptionsSnapshot { get; }
 
     /// <summary>
+    ///     Lists every watch.
+    /// </summary>
+    /// <remarks>
+    ///     Absolute route: the searches list needs to know which of its rows are watched, and asking per row would be
+    ///     one request per search on every render.
+    /// </remarks>
+    /// <returns></returns>
+    /// <response code="200">The request completed successfully.</response>
+    [HttpGet("/api/v{version:apiVersion}/watches")]
+    [Authorize(Policy = AuthPolicy.Any)]
+    [ProducesResponseType(typeof(List<Watch>), 200)]
+    public async Task<IActionResult> List()
+        => Ok(await Watches.ListAsync());
+
+    /// <summary>
     ///     Gets the watch on the specified search.
     /// </summary>
     /// <param name="id">The id of the search.</param>

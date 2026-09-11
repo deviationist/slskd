@@ -10,6 +10,7 @@ const SearchList = ({
   onRemove = () => {},
   onStop = () => {},
   searches = {},
+  watches = {},
 }) => {
   return (
     <Card
@@ -66,6 +67,7 @@ const SearchList = ({
                       onRemove={onRemove}
                       onStop={onStop}
                       search={search}
+                      watch={watches[search.id]}
                     />
                   ))}
               </Table.Body>

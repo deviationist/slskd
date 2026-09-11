@@ -1,0 +1,237 @@
+import api from './api';
+
+/**
+ * The recurrences a watch can be given.
+ *
+ * A fixed set rather than a rule builder: the shortest useful interval here is
+ * an hour, the realistic settings are "daily" and "every few hours", and the
+ * whole of RFC 5545 is a large amount of interface for a choice that small. The
+ * server* accepts any valid rule, so nothing here limits what a watch set
+ * through the API can do — this is only what the page offers.
+ */
+export const PRESETS = [
+  {
+    hour: false,
+    key: 'hourly',
+    label: 'Every hour',
+    rrule: 'FREQ=HOURLY;INTERVAL=1',
+  },
+  {
+    hour: false,
+    key: 'every6',
+    label: 'Every 6 hours',
+    rrule: 'FREQ=HOURLY;INTERVAL=6',
+  },
+  {
+    hour: false,
+    key: 'every12',
+    label: 'Every 12 hours',
+    rrule: 'FREQ=HOURLY;INTERVAL=12',
+  },
+  {
+    hour: true,
+    key: 'daily',
+    label: 'Once a day',
+    rrule: 'FREQ=DAILY;BYHOUR={h};BYMINUTE=0',
+  },
+  {
+    hour: true,
+    key: 'weekdays',
+    label: 'Weekdays',
+    rrule: 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR;BYHOUR={h};BYMINUTE=0',
+  },
+  {
+    hour: true,
+    key: 'weekly',
+    label: 'Once a week, on Monday',
+    rrule: 'FREQ=WEEKLY;BYDAY=MO;BYHOUR={h};BYMINUTE=0',
+  },
+];
+
+export const DEFAULT_PRESET = 'daily';
+export const DEFAULT_HOUR = 3;
+
+const preset = (key) => PRESETS.find((p) => p.key === key);
+
+/**
+ * Builds the rule for a chosen preset and hour.
+ * @param {object} params
+ * @param {string} params.key - The preset key.
+ * @param {number} params.hour - The hour of day, for presets that use one.
+ * @returns {string|undefined} The rule, or undefined if the preset is unknown.
+ */
+export const rruleFor = ({ key, hour = DEFAULT_HOUR }) => {
+  const found = preset(key);
+
+  if (!found) {
+    return undefined;
+  }
+
+  return found.rrule.replace('{h}', String(hour));
+};
+
+/**
+ * Reads a rule back into the preset that would have produced it.
+ *
+ * Needed because a watch stores a rule, not a choice: editing one has to show
+ * the control it came from. A rule set through the API that no preset produces
+ * reads back as undefined, and the interface says so rather than silently
+ * offering to overwrite it with something else.
+ * @param {string} rrule - The rule.
+ * @returns {{key: string, hour: number}|undefined} The preset and hour, or undefined.
+ */
+export const presetFor = (rrule) => {
+  if (!rrule) {
+    return undefined;
+  }
+
+  for (const candidate of PRESETS) {
+    if (!candidate.hour) {
+      if (candidate.rrule === rrule) {
+        return { hour: DEFAULT_HOUR, key: candidate.key };
+      }
+
+      continue;
+    }
+
+    for (let hour = 0; hour < 24; hour++) {
+      if (candidate.rrule.replace('{h}', String(hour)) === rrule) {
+        return { hour, key: candidate.key };
+      }
+    }
+  }
+
+  return undefined;
+};
+
+/**
+ * Says what a recurrence does, in a sentence.
+ * @param {string} rrule - The rule.
+ * @returns {string} The description.
+ */
+export const describeRecurrence = (rrule) => {
+  const found = presetFor(rrule);
+
+  if (!found) {
+    // a rule the presets cannot express is still a rule the server will run;
+    // showing it is more honest than pretending it is one of ours
+    return rrule ? `Custom: ${rrule}` : 'No schedule';
+  }
+
+  const { hour, key } = found;
+  const label = preset(key).label;
+
+  return preset(key).hour
+    ? `${label}, at ${String(hour).padStart(2, '0')}:00`
+    : label;
+};
+
+/**
+ * Says when a watch next runs, relative to now.
+ * @param {object} params
+ * @param {object} params.watch - The watch.
+ * @param {Date} params.now - The current moment.
+ * @returns {string} The description.
+ */
+export const describeNextRun = ({ watch, now = new Date() }) => {
+  if (!watch?.enabled) {
+    return 'Paused';
+  }
+
+  if (!watch.nextRunAt) {
+    return 'Not scheduled';
+  }
+
+  const minutes = Math.round((new Date(watch.nextRunAt) - now) / 60_000);
+
+  // a watch that is due but has not run yet is not late in any sense worth
+  // reporting: it runs on the next tick, or when the server comes back
+  if (minutes <= 0) {
+    return 'Due now';
+  }
+
+  if (minutes < 60) {
+    return `in ${minutes} min`;
+  }
+
+  const hours = Math.round(minutes / 60);
+
+  if (hours < 48) {
+    return `in ${hours} h`;
+  }
+
+  return `in ${Math.round(hours / 24)} days`;
+};
+
+/**
+ * Says how a watched row should read.
+ * @param {object} params
+ * @param {object} params.watch - The watch, if there is one.
+ * @param {object[]} params.notifications - Its notifications, newest first, if known.
+ * @returns {{color: string, label: string, icon: string}|undefined} How to badge it.
+ */
+export const watchBadge = ({ watch, notifications = [] }) => {
+  if (!watch) {
+    return undefined;
+  }
+
+  // a failing notification outranks everything else this badge could say: a
+  // watch whose mail has been bouncing looks exactly like one that has found
+  // nothing, and that is the confusion worth spending the badge on
+  if (notifications.length > 0 && notifications[0].sent === false) {
+    return {
+      color: 'red',
+      icon: 'exclamation triangle',
+      label: 'Mail failing',
+    };
+  }
+
+  if (!watch.enabled) {
+    return { color: 'grey', icon: 'pause', label: 'Paused' };
+  }
+
+  return { color: 'blue', icon: 'clock outline', label: 'Watching' };
+};
+
+/**
+ * Whether a draft can be saved.
+ * @param {object} draft - The draft.
+ * @returns {{ok: boolean, reason?: string}} Whether it can, and why not.
+ */
+export const validateDraft = (draft) => {
+  if (!rruleFor({ hour: draft?.hour, key: draft?.key })) {
+    return { ok: false, reason: 'Choose how often this search should run' };
+  }
+
+  // an address is optional -- blank means the configured default -- but a
+  // blank-looking address that is not blank is a typo, and a watch that cannot
+  // deliver is one that reports nothing and says nothing
+  const email = (draft.notifyEmail ?? '').trim();
+
+  if (email.length > 0 && !/^[^\s@]+@[^\s@][^\s.@]*\.[^\s@]+$/u.test(email)) {
+    return { ok: false, reason: 'That does not look like an email address' };
+  }
+
+  return { ok: true };
+};
+
+export const getAll = async () => (await api.get('/watches')).data;
+
+export const get = async ({ id }) =>
+  (await api.get(`/searches/${encodeURIComponent(id)}/watch`)).data;
+
+export const put = async ({ id, watch }) =>
+  (await api.put(`/searches/${encodeURIComponent(id)}/watch`, watch)).data;
+
+export const remove = async ({ id }) =>
+  api.delete(`/searches/${encodeURIComponent(id)}/watch`);
+
+export const run = async ({ id }) =>
+  (await api.post(`/searches/${encodeURIComponent(id)}/watch/run`)).data;
+
+export const getRuns = async ({ id }) =>
+  (await api.get(`/searches/${encodeURIComponent(id)}/watch/runs`)).data;
+
+export const getNotifications = async ({ id }) =>
+  (await api.get(`/searches/${encodeURIComponent(id)}/watch/notifications`))
+    .data;

@@ -1,12 +1,14 @@
+import * as watchLibrary from '../../../lib/watches';
 import SearchStatusIcon from '../SearchStatusIcon';
 import SearchActionIcon from './SearchActionIcon';
 import React, { useState } from 'react';
 import { Link, useRouteMatch } from 'react-router-dom';
-import { Icon, Table } from 'semantic-ui-react';
+import { Icon, Label, Popup, Table } from 'semantic-ui-react';
 
-const SearchListRow = ({ onRemove, onStop, search }) => {
+const SearchListRow = ({ onRemove, onStop, search, watch = undefined }) => {
   const [working, setWorking] = useState(false);
   const match = useRouteMatch();
+  const badge = watchLibrary.watchBadge({ watch });
 
   const invoke = async (function_) => {
     setWorking(true);
@@ -30,6 +32,23 @@ const SearchListRow = ({ onRemove, onStop, search }) => {
       </Table.Cell>
       <Table.Cell>
         <Link to={`${match.url}/${search.id}`}>{search.searchText}</Link>
+        {badge && (
+          <Popup
+            content={`${watchLibrary.describeRecurrence(watch.rrule)} — next run ${watchLibrary.describeNextRun({ watch })}`}
+            position="right center"
+            trigger={
+              <Label
+                color={badge.color}
+                horizontal
+                size="tiny"
+                style={{ marginLeft: '0.5em' }}
+              >
+                <Icon name={badge.icon} />
+                {badge.label}
+              </Label>
+            }
+          />
+        )}
       </Table.Cell>
       <Table.Cell>{search.fileCount}</Table.Cell>
       <Table.Cell>
