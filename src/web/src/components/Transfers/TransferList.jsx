@@ -305,7 +305,7 @@ class TransferList extends Component {
                                 />
                               ) : (
                                 <Popup
-                                  content="Download this file to your browser"
+                                  content={transfers.describeRetrieval()}
                                   position="left center"
                                   trigger={
                                     <Icon

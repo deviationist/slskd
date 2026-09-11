@@ -229,6 +229,20 @@ export const retrieveFile = async ({ username, id, filename }) => {
  * would print '[object Blob]'. The status is the part that is readable without
  * unpacking it, and it is the part that says what to do next.
  */
+/**
+ * Says what a retrieval will do, for the tooltip on every control that starts
+ * one.
+ *
+ * Shared, and deliberately so: "download" already means a Soulseek transfer
+ * everywhere else in this application, and the one word doing two jobs is
+ * exactly what needs explaining. The row icon and the button over a selection
+ * must not drift into describing the same act differently.
+ */
+export const describeRetrieval = (count = 1) =>
+  count > 1
+    ? `Download these ${count} files to your browser, as one zip`
+    : 'Download this file to your browser';
+
 export const describeRetrievalError = (error) => {
   switch (error?.response?.status) {
     case 403:

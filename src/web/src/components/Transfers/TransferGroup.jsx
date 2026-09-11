@@ -3,7 +3,15 @@ import { getFileName } from '../../lib/util';
 import TransferList from './TransferList';
 import React, { Component } from 'react';
 import { toast } from 'react-toastify';
-import { Button, Card, Header, Icon, List, Modal } from 'semantic-ui-react';
+import {
+  Button,
+  Card,
+  Header,
+  Icon,
+  List,
+  Modal,
+  Popup,
+} from 'semantic-ui-react';
 
 /* A transfer with a file the server could hand back: a download that finished,
    and whose path this application recorded at the time. */
@@ -319,6 +327,10 @@ class TransferGroup extends Component {
     const anyRetrievable =
       retrievalEnabled && selected.some((f) => isRetrievable(f));
 
+    // what a retrieval would actually take, which is not every selected row:
+    // the tooltip has to promise the number of files the operator will get
+    const retrievableCount = selected.filter((f) => isRetrievable(f)).length;
+
     return (
       <Card.Content extra>
         <Button.Group>
@@ -350,13 +362,19 @@ class TransferGroup extends Component {
           {(allRetryable || anyCancellable || allRemovable) &&
             anyRetrievable && <Button.Or />}
           {anyRetrievable && (
-            <Button
-              color="blue"
-              content={`Download${all}`}
-              disabled={archiveBusy}
-              icon="download"
-              loading={archiveBusy}
-              onClick={() => this.handleArchive(user.username, selected)}
+            <Popup
+              content={transfers.describeRetrieval(retrievableCount)}
+              position="top center"
+              trigger={
+                <Button
+                  color="blue"
+                  content={`Download${all}`}
+                  disabled={archiveBusy}
+                  icon="download"
+                  loading={archiveBusy}
+                  onClick={() => this.handleArchive(user.username, selected)}
+                />
+              }
             />
           )}
         </Button.Group>

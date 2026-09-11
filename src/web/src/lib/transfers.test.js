@@ -406,3 +406,19 @@ describe('describeArchiveError', () => {
     );
   });
 });
+
+describe('describeRetrieval', () => {
+  it('names the browser as the destination, to distinguish it from a Soulseek download', () => {
+    expect(transfers.describeRetrieval()).toBe('Download this file to your browser');
+  });
+
+  it('says how many files, and that they arrive as one zip', () => {
+    expect(transfers.describeRetrieval(3)).toBe(
+      'Download these 3 files to your browser, as one zip',
+    );
+  });
+
+  it('describes a single file as a file, matching what the request will do', () => {
+    expect(transfers.describeRetrieval(1)).toBe('Download this file to your browser');
+  });
+});
