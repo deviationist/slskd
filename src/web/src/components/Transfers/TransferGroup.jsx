@@ -1,4 +1,5 @@
 import * as transfers from '../../lib/transfers';
+import { getFileName } from '../../lib/util';
 import TransferList from './TransferList';
 import React, { Component } from 'react';
 import { toast } from 'react-toastify';
@@ -94,13 +95,21 @@ class TransferGroup extends Component {
    * simply starts.
    */
   handleArchive = async (username, selected) => {
-    const ids = selected.filter((file) => isRetrievable(file)).map((f) => f.id);
+    const retrievable = selected.filter((file) => isRetrievable(file));
 
     try {
       this.setState({ archiveBusy: true });
 
+      // one file is a file, not an archive. zipping it would make the operator
+      // unwrap something to get back exactly what they picked, and the single
+      // file path already says the right thing when it has gone
+      if (retrievable.length === 1) {
+        await this.retrieveOne(username, retrievable[0]);
+        return;
+      }
+
       const { available, missing } = await transfers.archiveAvailability({
-        ids,
+        ids: retrievable.map((f) => f.id),
         username,
       });
 
@@ -127,6 +136,14 @@ class TransferGroup extends Component {
     try {
       this.setState({ archiveBusy: true });
 
+      // the same rule after the modal as before it: dropping the missing ones
+      // can leave a single file, and that is a file rather than an archive of one
+      if (available.length === 1) {
+        await this.retrieveOne(username, available[0]);
+        this.setState({ archive: null });
+        return;
+      }
+
       await transfers.retrieveArchive({
         ids: available.map((a) => a.id),
         username,
@@ -138,6 +155,25 @@ class TransferGroup extends Component {
       toast.error(transfers.describeArchiveError(error));
     } finally {
       this.setState({ archiveBusy: false });
+    }
+  };
+
+  /**
+   * Fetches one file, by the same route its own row's button uses.
+   *
+   * Errors are described with the single-file vocabulary rather than the
+   * archive's, because that is what the operator is actually getting.
+   */
+  retrieveOne = async (username, file) => {
+    try {
+      await transfers.retrieveFile({
+        filename: getFileName(file.filename),
+        id: file.id,
+        username,
+      });
+    } catch (error) {
+      console.error(error);
+      toast.error(transfers.describeRetrievalError(error));
     }
   };
 
