@@ -87,12 +87,14 @@ namespace slskd.Files.API
         /// <param name="recursive">An optional value indicating whether to recursively list subdirectories and files.</param>
         /// <returns></returns>
         /// <response code="200">The request completed successfully.</response>
+        /// <response code="400">The specified subdirectory name is not a valid base 64 encoded path.</response>
         /// <response code="401">Authentication failed.</response>
         /// <response code="403">Access to the specified subdirectory was denied.</response>
         /// <response code="404">The specified subdirectory does not exist.</response>
         [HttpGet("downloads/directories/{base64SubdirectoryName}")]
         [Authorize(Policy = AuthPolicy.Any)]
         [ProducesResponseType(typeof(FilesystemDirectory), 200)]
+        [ProducesResponseType(400)]
         [ProducesResponseType(401)]
         [ProducesResponseType(403)]
         [ProducesResponseType(404)]
@@ -105,12 +107,14 @@ namespace slskd.Files.API
         /// <param name="base64SubdirectoryName">The relative, base 64 encoded, name of the subdirectory to delete.</param>
         /// <returns></returns>
         /// <response code="204">The request completed successfully.</response>
+        /// <response code="400">The specified subdirectory name is not a valid base 64 encoded path.</response>
         /// <response code="401">Authentication failed.</response>
         /// <response code="403">Access to the specified subdirectory was denied.</response>
         /// <response code="404">The specified subdirectory does not exist.</response>
         [HttpDelete("downloads/directories/{base64SubdirectoryName}")]
         [Authorize(Policy = AuthPolicy.Any)]
         [ProducesResponseType(204)]
+        [ProducesResponseType(400)]
         public Task<IActionResult> DeleteDownloadSubdirectoryAsync([FromRoute] string base64SubdirectoryName)
             => DeleteSubdirectoryAsync(rootDirectory: OptionsSnapshot.Value.Directories.Downloads, base64SubdirectoryName);
 
@@ -120,12 +124,14 @@ namespace slskd.Files.API
         /// <param name="base64FileName">The relative, base 64 encoded, name of the file to delete.</param>
         /// <returns></returns>
         /// <response code="204">The request completed successfully.</response>
+        /// <response code="400">The specified file name is not a valid base 64 encoded path.</response>
         /// <response code="401">Authentication failed.</response>
         /// <response code="403">Access to the specified subdirectory was denied.</response>
         /// <response code="404">The specified subdirectory does not exist.</response>
         [HttpDelete("downloads/files/{base64FileName}")]
         [Authorize(Policy = AuthPolicy.Any)]
         [ProducesResponseType(204)]
+        [ProducesResponseType(400)]
         public Task<IActionResult> DeleteDownloadFileAsync([FromRoute] string base64FileName)
             => DeleteFileAsync(rootDirectory: OptionsSnapshot.Value.Directories.Downloads, base64FileName);
 
@@ -149,12 +155,14 @@ namespace slskd.Files.API
         /// <param name="recursive">An optional value indicating whether to recursively list subdirectories and files.</param>
         /// <returns></returns>
         /// <response code="200">The request completed successfully.</response>
+        /// <response code="400">The specified subdirectory name is not a valid base 64 encoded path.</response>
         /// <response code="401">Authentication failed.</response>
         /// <response code="403">Access to the specified subdirectory was denied.</response>
         /// <response code="404">The specified subdirectory does not exist.</response>
         [HttpGet("incomplete/directories/{base64SubdirectoryName}")]
         [Authorize(Policy = AuthPolicy.Any)]
         [ProducesResponseType(typeof(FilesystemDirectory), 200)]
+        [ProducesResponseType(400)]
         public Task<IActionResult> GetIncompleteSubdirectoryContentsAsync([FromRoute, Required] string base64SubdirectoryName, [FromQuery] bool recursive = false)
             => ListDirectoryAsync(rootDirectory: OptionsSnapshot.Value.Directories.Incomplete, base64SubdirectoryName, recursive);
 
@@ -164,12 +172,14 @@ namespace slskd.Files.API
         /// <param name="base64SubdirectoryName">The relative, base 64 encoded, name of the subdirectory to delete.</param>
         /// <returns></returns>
         /// <response code="204">The request completed successfully.</response>
+        /// <response code="400">The specified subdirectory name is not a valid base 64 encoded path.</response>
         /// <response code="401">Authentication failed.</response>
         /// <response code="403">Access to the specified subdirectory was denied.</response>
         /// <response code="404">The specified subdirectory does not exist.</response>
         [HttpDelete("incomplete/directories/{base64SubdirectoryName}")]
         [Authorize(Policy = AuthPolicy.Any)]
         [ProducesResponseType(204)]
+        [ProducesResponseType(400)]
         public Task<IActionResult> DeleteIncompleteSubdirectoryAsync([FromRoute] string base64SubdirectoryName)
             => DeleteSubdirectoryAsync(rootDirectory: OptionsSnapshot.Value.Directories.Incomplete, base64SubdirectoryName);
 
@@ -179,23 +189,66 @@ namespace slskd.Files.API
         /// <param name="base64FileName">The relative, base 64 encoded, name of the file to delete.</param>
         /// <returns></returns>
         /// <response code="204">The request completed successfully.</response>
+        /// <response code="400">The specified file name is not a valid base 64 encoded path.</response>
         /// <response code="401">Authentication failed.</response>
         /// <response code="403">Access to the specified subdirectory was denied.</response>
         /// <response code="404">The specified subdirectory does not exist.</response>
         [HttpDelete("incomplete/files/{base64FileName}")]
         [Authorize(Policy = AuthPolicy.Any)]
         [ProducesResponseType(204)]
+        [ProducesResponseType(400)]
         public Task<IActionResult> DeleteIncompleteFileAsync([FromRoute] string base64FileName)
             => DeleteFileAsync(rootDirectory: OptionsSnapshot.Value.Directories.Incomplete, base64FileName);
 
+        /// <summary>
+        ///     Decodes the specified base 64 encoded, relative <paramref name="base64Path"/> and resolves it against the
+        ///     specified <paramref name="rootDirectory"/>.
+        /// </summary>
+        /// <remarks>
+        ///     A caller-supplied value that can't be decoded, or that decodes to something that can't be resolved to a path,
+        ///     is a bad request rather than a server error; both cases return false instead of throwing.
+        /// </remarks>
+        /// <param name="rootDirectory">The fully qualified directory against which to resolve the decoded path.</param>
+        /// <param name="base64Path">The relative, base 64 encoded path to decode.</param>
+        /// <param name="trimLeadingSeparators">
+        ///     A value indicating whether leading directory separators should be trimmed from the decoded path before it is
+        ///     resolved. Note that this determines whether a decoded path that is rooted escapes the root directory.
+        /// </param>
+        /// <param name="resolvedPath">The resolved, fully qualified path.</param>
+        /// <returns>A value indicating whether the specified path was decoded and resolved successfully.</returns>
+        private static bool TryResolvePath(string rootDirectory, string base64Path, bool trimLeadingSeparators, out string resolvedPath)
+        {
+            try
+            {
+                var decoded = base64Path
+                    .FromBase64()
+                    .Replace('\\', Path.DirectorySeparatorChar)
+                    .Replace('/', Path.DirectorySeparatorChar);
+
+                if (trimLeadingSeparators)
+                {
+                    decoded = decoded.TrimStart(Path.DirectorySeparatorChar);
+                }
+
+                resolvedPath = Path.GetFullPath(Path.Combine(rootDirectory, decoded));
+                return true;
+            }
+            catch (Exception ex) when (ex is FormatException or ArgumentException)
+            {
+                // FormatException: the value isn't valid base 64.
+                // ArgumentException: it decoded, but to something Path can't work with (a null character, for example).
+                resolvedPath = null;
+                return false;
+            }
+        }
+
         private async Task<IActionResult> ListDirectoryAsync(string rootDirectory, string base64SubdirectoryName = null, bool recursive = false)
         {
-            var requestedDir = (base64SubdirectoryName ?? string.Empty)
-                .FromBase64()
-                .Replace('\\', Path.DirectorySeparatorChar)
-                .Replace('/', Path.DirectorySeparatorChar);
-
-            requestedDir = Path.GetFullPath(Path.Combine(rootDirectory, requestedDir));
+            if (!TryResolvePath(rootDirectory, base64SubdirectoryName ?? string.Empty, trimLeadingSeparators: false, out var requestedDir))
+            {
+                Log.Debug("Directory listing requested with a malformed subdirectory name '{Name}'", base64SubdirectoryName);
+                return BadRequest("The specified subdirectory name is not a valid base 64 encoded path");
+            }
 
             Log.Debug("Listing directory '{Directory}'", requestedDir);
 
@@ -230,13 +283,11 @@ namespace slskd.Files.API
                 return Forbid();
             }
 
-            var requestedDir = base64SubdirectoryName
-                .FromBase64()
-                .Replace('\\', Path.DirectorySeparatorChar)
-                .Replace('/', Path.DirectorySeparatorChar)
-                .TrimStart(Path.DirectorySeparatorChar);
-
-            requestedDir = Path.GetFullPath(Path.Combine(rootDirectory, requestedDir));
+            if (!TryResolvePath(rootDirectory, base64SubdirectoryName, trimLeadingSeparators: true, out var requestedDir))
+            {
+                Log.Information("Directory deletion requested with a malformed subdirectory name '{Name}'", base64SubdirectoryName);
+                return BadRequest("The specified subdirectory name is not a valid base 64 encoded path");
+            }
 
             Log.Information("Deleting directory '{Directory}'", requestedDir);
 
@@ -267,13 +318,11 @@ namespace slskd.Files.API
                 return Forbid();
             }
 
-            var requestedFilename = base64FileName
-                .FromBase64()
-                .Replace('\\', Path.DirectorySeparatorChar)
-                .Replace('/', Path.DirectorySeparatorChar)
-                .TrimStart(Path.DirectorySeparatorChar);
-
-            requestedFilename = Path.GetFullPath(Path.Combine(rootDirectory, requestedFilename));
+            if (!TryResolvePath(rootDirectory, base64FileName, trimLeadingSeparators: true, out var requestedFilename))
+            {
+                Log.Information("File deletion requested with a malformed file name '{Name}'", base64FileName);
+                return BadRequest("The specified file name is not a valid base 64 encoded path");
+            }
 
             Log.Information("Deleting file '{File}'", requestedFilename);
 

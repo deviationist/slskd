@@ -17,6 +17,17 @@ namespace slskd.Tests.Unit.Files.API
 
     public class FilesControllerTests
     {
+        /// <summary>
+        ///     A value that isn't valid base 64, and so can't be decoded at all.
+        /// </summary>
+        private const string MalformedBase64 = "!!!not base 64!!!";
+
+        /// <summary>
+        ///     Valid base 64 that decodes to a string containing a null character. The decode succeeds, but the result
+        ///     can't be resolved to a path.
+        /// </summary>
+        private const string Base64ContainingNullCharacter = "AA==";
+
         public FilesControllerTests()
         {
             Downloads = Path.Combine(Path.GetTempPath(), $"slskd.test.{Guid.NewGuid()}", "downloads");
@@ -142,6 +153,94 @@ namespace slskd.Tests.Unit.Files.API
             Assert.IsType<ForbidResult>(result);
         }
 
+        [Theory]
+        [InlineData(MalformedBase64)]
+        [InlineData(Base64ContainingNullCharacter)]
+        public async Task GetDownloadSubdirectoryContentsAsync_Returns_BadRequest_Given_Undecodable_Name(string name)
+        {
+            var result = await Controller.GetDownloadSubdirectoryContentsAsync(name);
+
+            AssertBadRequest(result);
+
+            FileServiceMock.Verify(
+                f => f.ListContentsAsync(It.IsAny<string>(), It.IsAny<EnumerationOptions>()),
+                Times.Never);
+        }
+
+        [Theory]
+        [InlineData(MalformedBase64)]
+        [InlineData(Base64ContainingNullCharacter)]
+        public async Task GetIncompleteSubdirectoryContentsAsync_Returns_BadRequest_Given_Undecodable_Name(string name)
+        {
+            var result = await Controller.GetIncompleteSubdirectoryContentsAsync(name);
+
+            AssertBadRequest(result);
+        }
+
+        [Theory]
+        [InlineData(MalformedBase64)]
+        [InlineData(Base64ContainingNullCharacter)]
+        public async Task DeleteDownloadSubdirectoryAsync_Returns_BadRequest_Given_Undecodable_Name(string name)
+        {
+            var result = await Controller.DeleteDownloadSubdirectoryAsync(name);
+
+            AssertBadRequest(result);
+
+            FileServiceMock.Verify(f => f.DeleteDirectoriesAsync(It.IsAny<string[]>()), Times.Never);
+        }
+
+        [Theory]
+        [InlineData(MalformedBase64)]
+        [InlineData(Base64ContainingNullCharacter)]
+        public async Task DeleteIncompleteSubdirectoryAsync_Returns_BadRequest_Given_Undecodable_Name(string name)
+        {
+            var result = await Controller.DeleteIncompleteSubdirectoryAsync(name);
+
+            AssertBadRequest(result);
+        }
+
+        [Theory]
+        [InlineData(MalformedBase64)]
+        [InlineData(Base64ContainingNullCharacter)]
+        public async Task DeleteDownloadFileAsync_Returns_BadRequest_Given_Undecodable_Name(string name)
+        {
+            var result = await Controller.DeleteDownloadFileAsync(name);
+
+            AssertBadRequest(result);
+
+            FileServiceMock.Verify(f => f.DeleteFilesAsync(It.IsAny<string[]>()), Times.Never);
+        }
+
+        [Theory]
+        [InlineData(MalformedBase64)]
+        [InlineData(Base64ContainingNullCharacter)]
+        public async Task DeleteIncompleteFileAsync_Returns_BadRequest_Given_Undecodable_Name(string name)
+        {
+            var result = await Controller.DeleteIncompleteFileAsync(name);
+
+            AssertBadRequest(result);
+        }
+
+        [Fact]
+        public async Task DeleteDownloadFileAsync_Returns_Forbidden_Given_Undecodable_Name_And_RemoteFileManagement_Disabled()
+        {
+            // remote file management is checked before the name is decoded, and that ordering is deliberate:
+            // a disabled feature shouldn't report anything about the request it was handed.
+            OptionsSnapshotMock.Setup(o => o.Value).Returns(new Options
+            {
+                RemoteFileManagement = false,
+                Directories = new Options.DirectoriesOptions
+                {
+                    Downloads = Downloads,
+                    Incomplete = Incomplete,
+                },
+            });
+
+            var result = await Controller.DeleteDownloadFileAsync(MalformedBase64);
+
+            Assert.IsType<ForbidResult>(result);
+        }
+
         [Fact]
         public async Task GetDownloadSubdirectoryContentsAsync_Returns_NotFound_Given_Missing_Directory()
         {
@@ -154,8 +253,47 @@ namespace slskd.Tests.Unit.Files.API
             Assert.IsType<NotFoundResult>(result);
         }
 
+        [Fact]
+        public async Task GetDownloadSubdirectoryContentsAsync_Resolves_The_Decoded_Name_Against_The_Downloads_Directory()
+        {
+            FileServiceMock
+                .Setup(f => f.ListContentsAsync(It.IsAny<string>(), It.IsAny<EnumerationOptions>()))
+                .ReturnsAsync(new FilesystemDirectory());
+
+            var result = await Controller.GetDownloadSubdirectoryContentsAsync("foo/bar".ToBase64());
+
+            Assert.IsType<OkObjectResult>(result);
+
+            FileServiceMock.Verify(
+                f => f.ListContentsAsync(
+                    Path.GetFullPath(Path.Combine(Downloads, "foo", "bar")),
+                    It.IsAny<EnumerationOptions>()),
+                Times.Once);
+        }
+
+        [Fact]
+        public async Task DeleteDownloadFileAsync_Resolves_The_Decoded_Name_Against_The_Downloads_Directory()
+        {
+            var expected = Path.GetFullPath(Path.Combine(Downloads, "foo", "bar.mp3"));
+
+            FileServiceMock
+                .Setup(f => f.DeleteFilesAsync(It.IsAny<string[]>()))
+                .ReturnsAsync((string[] files) => files.ToDictionary(f => f, _ => (OneOf<bool, Exception>)true));
+
+            var result = await Controller.DeleteDownloadFileAsync("/foo/bar.mp3".ToBase64());
+
+            Assert.IsType<NoContentResult>(result);
+
+            FileServiceMock.Verify(f => f.DeleteFilesAsync(new[] { expected }), Times.Once);
+        }
+
         private static Dictionary<string, OneOf<bool, Exception>> Failures(string[] paths, Exception exception)
             => paths.ToDictionary(p => p, _ => (OneOf<bool, Exception>)exception);
 
+        private static void AssertBadRequest(IActionResult result)
+        {
+            var badRequest = Assert.IsType<BadRequestObjectResult>(result);
+            Assert.Equal(400, badRequest.StatusCode);
+        }
     }
 }
