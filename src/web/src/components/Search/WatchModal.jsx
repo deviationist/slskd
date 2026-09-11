@@ -3,7 +3,6 @@ import React, { useState } from 'react';
 import {
   Button,
   Checkbox,
-  Dropdown,
   Form,
   Icon,
   Input,
@@ -11,21 +10,11 @@ import {
   Modal,
 } from 'semantic-ui-react';
 
-const hourOptions = Array.from({ length: 24 }, (_, hour) => ({
-  key: hour,
-  text: `${String(hour).padStart(2, '0')}:00`,
-  value: hour,
-}));
+const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 
 const PRESETS_BY_KEY = Object.fromEntries(
   library.PRESETS.map((preset) => [preset.key, preset]),
 );
-
-const presetOptions = library.PRESETS.map((preset) => ({
-  key: preset.key,
-  text: preset.label,
-  value: preset.key,
-}));
 
 /**
  * The fields of a watch.
@@ -53,25 +42,41 @@ export const WatchForm = ({ draft, existing, searchText, set }) => {
         value={searchText ?? ''}
       />
       <Form.Group widths="equal">
-        <Form.Field
-          control={Dropdown}
-          fluid
-          label="How often"
-          onChange={(_event, { value }) => set({ key: value })}
-          options={presetOptions}
-          selection
-          value={draft.key}
-        />
+        <Form.Field>
+          <label htmlFor="watch-recurrence">How often</label>
+          <select
+            id="watch-recurrence"
+            onChange={(event) => set({ key: event.target.value })}
+            value={draft.key}
+          >
+            {library.PRESETS.map((preset) => (
+              <option
+                key={preset.key}
+                value={preset.key}
+              >
+                {preset.label}
+              </option>
+            ))}
+          </select>
+        </Form.Field>
         {takesHour && (
-          <Form.Field
-            control={Dropdown}
-            fluid
-            label="At"
-            onChange={(_event, { value }) => set({ hour: value })}
-            options={hourOptions}
-            selection
-            value={draft.hour}
-          />
+          <Form.Field>
+            <label htmlFor="watch-hour">At</label>
+            <select
+              id="watch-hour"
+              onChange={(event) => set({ hour: Number(event.target.value) })}
+              value={draft.hour}
+            >
+              {HOURS.map((hour) => (
+                <option
+                  key={hour}
+                  value={hour}
+                >
+                  {`${String(hour).padStart(2, '0')}:00`}
+                </option>
+              ))}
+            </select>
+          </Form.Field>
         )}
       </Form.Group>
       <Form.Field
