@@ -2463,6 +2463,12 @@ namespace slskd
             public PushbulletOptions Pushbullet { get; init; } = new PushbulletOptions();
 
             /// <summary>
+            ///     Gets outgoing mail options.
+            /// </summary>
+            [Validate]
+            public MailOptions Mail { get; init; } = new MailOptions();
+
+            /// <summary>
             ///     VPN options.
             /// </summary>
             public class VpnOptions : IValidatableObject
@@ -2930,6 +2936,229 @@ namespace slskd
                     }
 
                     return results;
+                }
+            }
+
+            /// <summary>
+            ///     Outgoing mail options.
+            /// </summary>
+            /// <remarks>
+            ///     The adapter is the whole decision about how mail leaves this application; a consumer composes a
+            ///     message and does not know or care which one is in use.
+            /// </remarks>
+            public class MailOptions : IValidatableObject
+            {
+                /// <summary>
+                ///     The adapters mail can be sent through.
+                /// </summary>
+                public static readonly string[] Adapters = ["smtp", "brevo", "sendmail"];
+
+                /// <summary>
+                ///     Gets a value indicating whether outgoing mail is enabled.
+                /// </summary>
+                [Argument(default, "mail")]
+                [EnvironmentVariable("MAIL")]
+                [Description("enable outgoing mail")]
+                public bool Enabled { get; init; } = false;
+
+                /// <summary>
+                ///     Gets the adapter through which mail is sent.
+                /// </summary>
+                [Argument(default, "mail-adapter")]
+                [EnvironmentVariable("MAIL_ADAPTER")]
+                [Description("the adapter to send mail through; smtp, brevo, or sendmail")]
+                public string Adapter { get; init; } = "smtp";
+
+                /// <summary>
+                ///     Gets the address mail is sent from.
+                /// </summary>
+                [Argument(default, "mail-from")]
+                [EnvironmentVariable("MAIL_FROM")]
+                [Description("the address mail is sent from")]
+                public string From { get; init; }
+
+                /// <summary>
+                ///     Gets the address mail is sent to when a sender does not name one.
+                /// </summary>
+                [Argument(default, "mail-to")]
+                [EnvironmentVariable("MAIL_TO")]
+                [Description("the address mail is sent to when a sender does not name one")]
+                public string To { get; init; }
+
+                /// <summary>
+                ///     Gets the publicly reachable base url of this application, for links in mail.
+                /// </summary>
+                /// <remarks>
+                ///     This application cannot work this out for itself; what it is reached at from outside is a fact
+                ///     only the operator has. Without it mail can name a thing but not link to it.
+                /// </remarks>
+                [Argument(default, "mail-base-url")]
+                [EnvironmentVariable("MAIL_BASE_URL")]
+                [Description("the publicly reachable base url of this application, for links in mail")]
+                public string BaseUrl { get; init; }
+
+                /// <summary>
+                ///     Gets SMTP options.
+                /// </summary>
+                [Validate]
+                public SmtpOptions Smtp { get; init; } = new SmtpOptions();
+
+                /// <summary>
+                ///     Gets Brevo options.
+                /// </summary>
+                [Validate]
+                public BrevoOptions Brevo { get; init; } = new BrevoOptions();
+
+                /// <summary>
+                ///     Gets sendmail options.
+                /// </summary>
+                [Validate]
+                public SendmailOptions Sendmail { get; init; } = new SendmailOptions();
+
+                public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+                {
+                    var results = new List<ValidationResult>();
+
+                    if (!Enabled)
+                    {
+                        return results;
+                    }
+
+                    if (!Adapters.Contains(Adapter, StringComparer.OrdinalIgnoreCase))
+                    {
+                        results.Add(new ValidationResult($"The Mail field Adapter must be one of {string.Join(", ", Adapters)}"));
+                    }
+
+                    if (string.IsNullOrWhiteSpace(From))
+                    {
+                        results.Add(new ValidationResult("The Mail field From is required when mail is enabled"));
+                    }
+
+                    // each adapter is checked only when it is the one in use; an operator who has filled in SMTP
+                    // details and then switched to Brevo should not be told their SMTP configuration is wrong
+                    if (Adapter.Equals("smtp", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (string.IsNullOrWhiteSpace(Smtp.Host))
+                        {
+                            results.Add(new ValidationResult("The Smtp field Host is required when the smtp adapter is in use"));
+                        }
+
+                        if (!SmtpOptions.Encryptions.Contains(Smtp.Encryption, StringComparer.OrdinalIgnoreCase))
+                        {
+                            results.Add(new ValidationResult($"The Smtp field Encryption must be one of {string.Join(", ", SmtpOptions.Encryptions)}"));
+                        }
+                    }
+
+                    if (Adapter.Equals("brevo", StringComparison.OrdinalIgnoreCase) && string.IsNullOrWhiteSpace(Brevo.ApiKey))
+                    {
+                        results.Add(new ValidationResult("The Brevo field ApiKey is required when the brevo adapter is in use"));
+                    }
+
+                    if (Adapter.Equals("sendmail", StringComparison.OrdinalIgnoreCase) && string.IsNullOrWhiteSpace(Sendmail.Path))
+                    {
+                        results.Add(new ValidationResult("The Sendmail field Path is required when the sendmail adapter is in use"));
+                    }
+
+                    return results;
+                }
+
+                /// <summary>
+                ///     SMTP options.
+                /// </summary>
+                public class SmtpOptions
+                {
+                    /// <summary>
+                    ///     The encryption modes an SMTP connection can use.
+                    /// </summary>
+                    public static readonly string[] Encryptions = ["none", "starttls", "tls"];
+
+                    /// <summary>
+                    ///     Gets the SMTP server hostname.
+                    /// </summary>
+                    [Argument(default, "smtp-host")]
+                    [EnvironmentVariable("SMTP_HOST")]
+                    [Description("SMTP server hostname")]
+                    public string Host { get; init; }
+
+                    /// <summary>
+                    ///     Gets the SMTP server port.
+                    /// </summary>
+                    [Argument(default, "smtp-port")]
+                    [EnvironmentVariable("SMTP_PORT")]
+                    [Description("SMTP server port")]
+                    [Range(1, 65535)]
+                    public int Port { get; init; } = 587;
+
+                    /// <summary>
+                    ///     Gets the encryption to use; none, starttls, or tls.
+                    /// </summary>
+                    [Argument(default, "smtp-encryption")]
+                    [EnvironmentVariable("SMTP_ENCRYPTION")]
+                    [Description("SMTP encryption; none, starttls, or tls")]
+                    public string Encryption { get; init; } = "starttls";
+
+                    /// <summary>
+                    ///     Gets the username with which to authenticate, if any.
+                    /// </summary>
+                    [Argument(default, "smtp-username")]
+                    [EnvironmentVariable("SMTP_USERNAME")]
+                    [Description("SMTP username")]
+                    public string Username { get; init; }
+
+                    /// <summary>
+                    ///     Gets the password with which to authenticate, if any.
+                    /// </summary>
+                    [Argument(default, "smtp-password")]
+                    [EnvironmentVariable("SMTP_PASSWORD")]
+                    [Description("SMTP password")]
+                    [Secret]
+                    public string Password { get; init; }
+
+                    /// <summary>
+                    ///     Gets the timeout for the send, in milliseconds.
+                    /// </summary>
+                    [Argument(default, "smtp-timeout")]
+                    [EnvironmentVariable("SMTP_TIMEOUT")]
+                    [Description("SMTP timeout, in milliseconds")]
+                    [Range(1000, int.MaxValue)]
+                    public int Timeout { get; init; } = 30000;
+                }
+
+                /// <summary>
+                ///     Brevo options.
+                /// </summary>
+                public class BrevoOptions
+                {
+                    /// <summary>
+                    ///     Gets the Brevo API key.
+                    /// </summary>
+                    /// <remarks>
+                    ///     Brevo restricts API keys by source IP by default, and nothing here maintains that allowlist.
+                    ///     A key that works today will stop working when the address it was allowed for changes.
+                    /// </remarks>
+                    [Argument(default, "brevo-api-key")]
+                    [EnvironmentVariable("BREVO_API_KEY")]
+                    [Description("Brevo API key")]
+                    [Secret]
+                    public string ApiKey { get; init; }
+                }
+
+                /// <summary>
+                ///     Sendmail options.
+                /// </summary>
+                public class SendmailOptions
+                {
+                    /// <summary>
+                    ///     Gets the path to the sendmail-compatible binary.
+                    /// </summary>
+                    /// <remarks>
+                    ///     Note that a containerised deployment is unlikely to have one; this adapter is for an install
+                    ///     that already has working local mail.
+                    /// </remarks>
+                    [Argument(default, "sendmail-path")]
+                    [EnvironmentVariable("SENDMAIL_PATH")]
+                    [Description("path to a sendmail-compatible binary")]
+                    public string Path { get; init; } = "/usr/sbin/sendmail";
                 }
             }
         }
