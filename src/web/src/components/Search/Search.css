@@ -174,33 +174,34 @@
   flex: 0 0 auto;
 }
 
-/* The destructive action is a sibling of the group rather than its last button:
-   it no longer shares an edge with 'Emails', and on a narrow screen it can take
-   a row of its own instead of being squeezed against the others. */
+/* The actions may shrink: `0 0 auto` refuses to go below its own content, so on
+   a narrow screen they overflowed the panel rather than wrapping inside it. */
 .watch-panel-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 0.5em;
-  /* may shrink: `0 0 auto` refuses to go below its content, so on a narrow
-     screen the buttons overflowed the panel rather than wrapping inside it */
   flex: 0 1 auto;
   min-width: 0;
   max-width: 100%;
 }
 
-.watch-panel-actions > .ui.buttons {
-  max-width: 100%;
-}
-
-/* below this the actions take a row of their own under the summary, and the
-   destructive one takes a row under those */
+/* Below this the actions take a row under the summary, and the destructive one
+   takes a row under those -- joined to the group at every wider size, which is
+   where it belongs. Wrapping is enabled only here: left on, a merely narrow
+   panel would break the group at some arbitrary button. */
 @media (max-width: 550px) {
   .watch-panel-actions {
     flex-basis: 100%;
+    flex-wrap: wrap;
   }
 
   .watch-panel-stop {
     flex-basis: 100%;
+    margin-top: 0.5em !important;
+    border-radius: 0.28571429rem !important;
+  }
+
+  /* the button before it is now the end of the first row, and a group only
+     rounds the edge of its last child */
+  .watch-panel-actions > .button:nth-last-child(2) {
+    border-top-right-radius: 0.28571429rem !important;
+    border-bottom-right-radius: 0.28571429rem !important;
   }
 }
