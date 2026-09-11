@@ -252,7 +252,13 @@ const Searches = ({ server } = {}) => {
     history.replace(match.url.replace(`/${searchId}`, ''));
   }
 
-  inputRef?.current?.inputRef?.current.focus();
+  // not while a modal is open. this runs on *every* render, and the hub pushes
+  // search updates continuously -- so an open modal had focus pulled out from
+  // under it several times a second, which sent typing to the field behind it
+  // and closed any menu the moment it was opened
+  if (!watchDraft) {
+    inputRef?.current?.inputRef?.current?.focus();
+  }
 
   return (
     <>

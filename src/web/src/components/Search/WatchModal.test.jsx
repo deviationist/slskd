@@ -83,15 +83,14 @@ describe('WatchForm', () => {
     }
   });
 
-  it('uses native selects, whose menus belong to the browser', () => {
-    // a Semantic Dropdown here closed when the pointer entered its own menu.
-    // this is the only dropdown in the application inside a modal, and rather
-    // than chase that interaction the menu is the browser's, where nothing in
-    // the page can close it
+  it('renders both menus with every option in them', () => {
+    // these looked broken -- opening one and moving the pointer closed it --
+    // but the cause was the searches page stealing focus back on every render
+    // while the modal was open, which closed a native select just as readily
     const html = render();
 
-    expect(countOf(html, /<select/gu)).toBe(2);
-    expect(countOf(html, /<option/gu)).toBe(watches.PRESETS.length + 24);
+    expect(countOf(html, /role="listbox"/gu)).toBe(2);
+    expect(countOf(html, /role="option"/gu)).toBe(watches.PRESETS.length + 24);
   });
 
   it('offers to skip what is already found only when creating', () => {
