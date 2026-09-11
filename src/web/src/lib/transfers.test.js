@@ -153,6 +153,15 @@ describe('summariseDeletions', () => {
       /could not be removed/,
     );
   });
+
+  // a row's own remove control is this same call with a selection of one, so a
+  // failure there is reported here or nowhere
+  it('reports a batch of one, which is what a single row removes', () => {
+    expect(transfers.summariseDeletions([failed])).toMatchObject({
+      kind: 'error',
+      message: '1 of 1 could not be removed: Network Error',
+    });
+  });
 });
 
 const file = (requestedAt) => ({ filename: requestedAt, requestedAt });
@@ -566,5 +575,186 @@ describe('chooseRetrieval', () => {
   it('does nothing with an empty selection', () => {
     expect(transfers.chooseRetrieval().mode).toBe('none');
     expect(transfers.chooseRetrieval([]).mode).toBe('none');
+  });
+});
+
+const removableDownload = (extra = {}) => ({
+  direction: 'Download',
+  id: 'a',
+  localFilename: '/downloads/complete/a.flac',
+  state: 'Completed, Succeeded',
+  ...extra,
+});
+
+describe('removalDeletesFile', () => {
+  it('is true only where the server has a path it can delete', () => {
+    expect(
+      transfers.removalDeletesFile({
+        deleteFileOnRemoval: true,
+        file: removableDownload(),
+      }),
+    ).toBe(true);
+  });
+
+  it('is false with the option off, whatever the row looks like', () => {
+    expect(
+      transfers.removalDeletesFile({
+        deleteFileOnRemoval: false,
+        file: removableDownload(),
+      }),
+    ).toBe(false);
+  });
+
+  it('treats a configuration it does not know yet as one that deletes', () => {
+    // options arrive over the hub, so this is the state of the first moments
+    // the page is on screen. not-yet-known is not the same as not-deleting, and
+    // reading it as the latter would drop the confirmation in the one window
+    // where nothing can show it is unnecessary
+    expect(transfers.removalDeletesFile({ file: removableDownload() })).toBe(
+      true,
+    );
+  });
+
+  it('is false for an upload, which the option does not govern', () => {
+    expect(
+      transfers.removalDeletesFile({
+        deleteFileOnRemoval: true,
+        file: removableDownload({ direction: 'Upload' }),
+      }),
+    ).toBe(false);
+  });
+
+  it('is false where no path was ever recorded', () => {
+    // a download that finished before the column existed, or that never wrote
+    // anything: there is nothing for the removal to reach
+    expect(
+      transfers.removalDeletesFile({
+        deleteFileOnRemoval: true,
+        file: removableDownload({ localFilename: null }),
+      }),
+    ).toBe(false);
+  });
+});
+
+describe('planRowRemoval', () => {
+  it('offers the action on exactly the rows the selection button takes', () => {
+    const states = [
+      'Requested',
+      'Queued',
+      'Queued, Remotely',
+      'Queued, Locally',
+      'Initializing',
+      'InProgress',
+      'Completed, Succeeded',
+      'Completed, Cancelled',
+      'Completed, TimedOut',
+      'Completed, Errored',
+      'Completed, Rejected',
+    ];
+
+    for (const state of states) {
+      expect(
+        transfers.planRowRemoval({
+          deleteFileOnRemoval: false,
+          file: removableDownload({ state }),
+        }).offered,
+      ).toBe(transfers.isStateRemovable(state));
+    }
+  });
+
+  it('never offers it over a transfer that is still running', () => {
+    // the safety this control leans on hardest: one click can remove a record,
+    // and can never abort a transfer in flight
+    expect(
+      transfers.planRowRemoval({
+        deleteFileOnRemoval: false,
+        file: removableDownload({ state: 'InProgress' }),
+      }).offered,
+    ).toBe(false);
+  });
+
+  it('asks nothing when the removal deletes nothing', () => {
+    expect(
+      transfers.planRowRemoval({
+        deleteFileOnRemoval: false,
+        file: removableDownload(),
+      }),
+    ).toMatchObject({
+      confirm: false,
+      deletesFile: false,
+      offered: true,
+      tooltip: 'Remove this transfer',
+    });
+  });
+
+  it('asks first when the removal deletes a file, and says so', () => {
+    const plan = transfers.planRowRemoval({
+      deleteFileOnRemoval: true,
+      file: removableDownload(),
+    });
+
+    expect(plan.confirm).toBe(true);
+    expect(plan.deletesFile).toBe(true);
+    expect(plan.prompt).toContain('cannot be undone');
+    expect(plan.tooltip).toContain('delete');
+  });
+
+  it('names the path it will delete, not the name the row shows', () => {
+    // the one thing that identifies the file, and what makes a row that shifted
+    // under the pointer visible before anything is destroyed
+    expect(
+      transfers.planRowRemoval({
+        deleteFileOnRemoval: true,
+        file: removableDownload({ filename: 'remote\\share\\a.flac' }),
+      }).filename,
+    ).toBe('/downloads/complete/a.flac');
+  });
+
+  it('does not ask over an upload, whose removal takes no file', () => {
+    expect(
+      transfers.planRowRemoval({
+        deleteFileOnRemoval: true,
+        file: removableDownload({ direction: 'Upload' }),
+      }),
+    ).toMatchObject({ confirm: false, deletesFile: false, offered: true });
+  });
+
+  it('does not ask when there is no recorded path to delete', () => {
+    expect(
+      transfers.planRowRemoval({
+        deleteFileOnRemoval: true,
+        file: removableDownload({ localFilename: null }),
+      }).confirm,
+    ).toBe(false);
+  });
+
+  it('asks even where the last listing said the file had gone', () => {
+    // that answer is cached and may be behind the filesystem. a stale 'gone'
+    // costs the file this dialog exists to protect; a stale 'there' costs a
+    // dialog nobody needed
+    expect(
+      transfers.planRowRemoval({
+        deleteFileOnRemoval: true,
+        file: removableDownload({ localFileExists: false }),
+      }).confirm,
+    ).toBe(true);
+  });
+
+  it('survives a row it cannot read', () => {
+    expect(transfers.planRowRemoval({}).offered).toBe(false);
+    expect(transfers.planRowRemoval({ file: {} }).confirm).toBe(false);
+  });
+
+  it('offers the same rows whether or not files are being deleted', () => {
+    // what can be removed is one rule; what that removal costs is another. a
+    // row must not appear and disappear as the option is turned over
+    for (const deleteFileOnRemoval of [true, false, undefined]) {
+      expect(
+        transfers.planRowRemoval({
+          deleteFileOnRemoval,
+          file: removableDownload(),
+        }).offered,
+      ).toBe(true);
+    }
   });
 });

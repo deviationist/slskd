@@ -104,6 +104,14 @@ const Transfers = ({ direction, server }) => {
   // something that would not work
   const retrievalEnabled = options?.remoteFileRetrieval === true;
 
+  // whether a removal takes the downloaded file with it. read from the download
+  // options whichever direction is being shown -- the option governs downloads
+  // only, which is `planRowRemoval`'s to know rather than something to encode
+  // in the lookup. passed on as it is found, undefined included: options arrive
+  // over the hub, and a configuration that is not yet known is not the same as
+  // one that deletes nothing -- see `removalDeletesFile`
+  const deleteFileOnRemoval = options?.transfers?.download?.deleteFileOnRemoval;
+
   const sorted = useMemo(
     () => transfersLibrary.sortTransfers(transfers, sort),
     [sort, transfers],
@@ -238,6 +246,7 @@ const Transfers = ({ direction, server }) => {
           <TransferGroup
             cancel={cancel}
             cancelAll={cancelAll}
+            deleteFileOnRemoval={deleteFileOnRemoval}
             direction={direction}
             key={user.username}
             remove={remove}

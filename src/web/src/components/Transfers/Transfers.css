@@ -53,6 +53,24 @@
   min-width: 5px;
 }
 
+/* Last in the row, with the details icon between it and the retrieval one: the
+   only control here that destroys something does not share an edge with the one
+   that fetches a file. */
+.transferlist-remove {
+  width: 5px;
+  min-width: 5px;
+}
+
+/* The path a confirmed removal will delete. Set apart from the sentence above
+   it because it is the part worth reading -- and wrapping anywhere, since a
+   download path is one long unbroken run often enough to widen the dialog past
+   the window. */
+.transferlist-remove-path {
+  font-family: monospace;
+  font-weight: bold;
+  overflow-wrap: anywhere;
+}
+
 /* A download icon with a stroke through it: the same affordance, visibly
    struck out, rather than a blank cell that leaves an operator wondering why
    this row has no button when the one above it does. */

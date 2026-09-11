@@ -478,6 +478,84 @@ export const isStateCancellable = (state) =>
 export const isStateRemovable = (state) => state.includes('Completed');
 
 /**
+ * Whether removing this transfer would take a file off the disk with it.
+ *
+ * Three things have to hold, and the third is the one easy to miss:
+ * `localFilename` is where this application recorded writing the bytes, and it
+ * is the only path a removal can reach. A download that has none -- one that
+ * finished before that column existed, or that never wrote anything -- leaves
+ * the removal with nothing to delete, which is exactly what
+ * `summariseDeletions` says about it afterwards.
+ *
+ * `localFileExists` is deliberately **not** consulted. It is the server's
+ * answer as of the last listing and can be a little behind the filesystem, and
+ * the two ways of being wrong here are not equal: a stale `true` costs a
+ * dialog nobody needed, a stale `false` costs the file this dialog exists to
+ * protect.
+ *
+ * The option is read as `!== false` rather than as a truth for the same
+ * reason. It arrives over the application hub, so it is *undefined* for the
+ * first moments this page is on screen -- and treating not-yet-known as
+ * not-deleting would drop the confirmation in the one window where nothing can
+ * show it is unnecessary.
+ * @param {object} params
+ * @param {object} params.file - The transfer.
+ * @param {boolean} [params.deleteFileOnRemoval] - Whether the server deletes files on removal; undefined where that is not yet known.
+ * @returns {boolean} Whether a removal would delete a file.
+ */
+export const removalDeletesFile = ({ file, deleteFileOnRemoval }) =>
+  deleteFileOnRemoval !== false &&
+  file?.direction === 'Download' &&
+  Boolean(file?.localFilename);
+
+/**
+ * What a row's own remove control offers, and what it must ask first.
+ *
+ * Which rows offer it is `isStateRemovable` and nothing else -- the same rule
+ * the selection's *Remove* button applies, deliberately rather than a second
+ * one that could drift from it. That rule is also half the safety argument:
+ * only a `Completed` transfer is removable, so this control can never abort a
+ * transfer that is still running, however badly it is aimed.
+ *
+ * The other half is the confirmation, and it is asked for **only** when the
+ * removal would delete a file. A removal that deletes nothing destroys nothing
+ * -- the row is a record of something already finished, and the transfer can
+ * be enqueued again -- and a dialog raised over that would be dismissed
+ * unread, which is precisely how the one that matters gets clicked through.
+ * @param {object} params
+ * @param {object} params.file - The transfer.
+ * @param {boolean} [params.deleteFileOnRemoval] - Whether the server deletes files on removal; undefined where that is not yet known.
+ * @returns {{offered: boolean, deletesFile: boolean, confirm: boolean, tooltip: string, header?: string, prompt?: string, filename?: string, confirmLabel?: string}} What the row offers.
+ */
+export const planRowRemoval = ({ file, deleteFileOnRemoval }) => {
+  const offered = Boolean(file?.state && isStateRemovable(file.state));
+
+  if (!removalDeletesFile({ deleteFileOnRemoval, file })) {
+    return {
+      confirm: false,
+      deletesFile: false,
+      offered,
+      tooltip: 'Remove this transfer',
+    };
+  }
+
+  return {
+    confirm: true,
+    confirmLabel: 'Remove and delete',
+    deletesFile: true,
+    // the path the server will delete, not the remote name the row shows. it is
+    // the one thing that says which file this is about, and it is what makes a
+    // row that shifted under the pointer visible before anything is destroyed
+    filename: file.localFilename,
+    header: 'Delete this file?',
+    offered,
+    prompt:
+      'Removing this download also deletes the file it wrote. This cannot be undone.',
+    tooltip: 'Remove this transfer, and delete the file it downloaded',
+  };
+};
+
+/**
  * The orders the transfer list can be shown in.
  *
  * Two, and they are inverses: the question the page cannot answer without this
