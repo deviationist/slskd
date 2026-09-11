@@ -179,6 +179,15 @@ The file served is identified by the **id of the download**; its path is resolve
 is accepted from the caller.  That resolved path is checked for containment within the 'Incomplete' and 'Downloads' directories before it is opened, symbolic
 links included, so a file elsewhere on the system cannot be served even if one were somehow recorded.
 
+Selecting several transfers and choosing 'Download Selected' fetches them as one streamed zip archive.  The archive is stored rather than compressed (audio does
+not compress) and nothing is staged on disk.  Before it starts, the server is asked which of the selected files are still present, and any that are not are
+named in a confirmation dialog; a file that goes missing after that is skipped and listed in a `MISSING.txt` written at the end of the archive.
+
+The archive is fetched by navigating to it, so that the browser streams it to disk rather than holding it in the memory of a tab — and a navigation cannot carry
+an authorization header.  It is therefore authorized by a **single-use ticket** instead: 256 random bits, valid for 60 seconds, bound to the exact username and
+set of ids it was issued for, and issued only to an authenticated caller.  The ticket travels in the query string, so a reverse proxy's access log will record
+it; that is why it is spent on first use and lives only a minute.  slskd itself does not log it.
+
 Note that this is a grant to *every* caller the API accepts: anyone who can authenticate can read any file a download produced.
 
 | Command-Line              | Environment Variable          | Description                                                                    |

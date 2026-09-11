@@ -98,6 +98,7 @@ namespace slskd.Tests.Unit.Transfers.API.Controllers
             transferService: TransferService,
             userService: new Mock<IUserService>().Object,
             fileService: FileServiceMock.Object,
+            downloadTicketService: new DownloadTicketService(),
             optionsSnapshot: OptionsSnapshotMock.Object);
 
         private void GivenDownload(Guid id, string localFilename, Soulseek.TransferStates state = Soulseek.TransferStates.Completed | Soulseek.TransferStates.Succeeded, long bytesTransferred = 1024)
