@@ -292,6 +292,21 @@ last notified) so the list can badge without N+1 requests.
   and it is also the only place a failing adapter becomes visible.
 - **`lib/watches.js`** alongside `lib/searches.js`.
 
+**Every decision this UI makes belongs in `lib/watches.js`, not in a component.**
+Learned the hard way on the retrieval work: this project has *no component-test
+setup at all* — every web test runs against `lib/` — so a rule written inside a
+component cannot be tested, and two components needing the same rule end up
+writing it twice, which is how one rule quietly becomes two. The watch UI has
+several such rules, and each is a pure function with tests:
+
+- is this watch due, and what does "next run" read as
+- does this recurrence pass the floor, and what is the sentence describing it
+- does this row show as watched, paused, or failing
+- is what the modal currently holds a valid watch
+
+The components then only render. `rrule.toText()` is a *display* helper on this
+side of the line; the server remains the only thing that decides a run is due.
+
 ## Tests
 
 - **Filter parity** — the shared vector corpus, run from both sides. The point
@@ -306,6 +321,11 @@ last notified) so the list can badge without N+1 requests.
 - **Adapters** — against a fake SMTP server and a stubbed HTTP handler;
   assert `[Secret]` fields never appear in the serialised options.
 - **Migration** — idempotent across repeated startup, on a populated DB.
+- **Web** — the pure functions above, in `lib/watches.test.js`. Note the house
+  style for a test worth having: run it against the *unfixed* code and watch it
+  fail. Several suites written this week passed either way until that was
+  checked, and one of them was passing because it bypassed the very wiring that
+  was broken.
 
 ## Phasing
 
