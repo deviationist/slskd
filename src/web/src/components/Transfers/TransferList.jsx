@@ -100,6 +100,12 @@ class TransferList extends Component {
     this.state = {
       isFolded: false,
       retrieving: null,
+      // ids whose file the server has already said is gone. something downstream
+      // moves finished files out of the downloads directory, so a download whose
+      // file has left is the normal end of its life rather than an error worth
+      // retrying -- and a button that has been refused once should stop offering
+      // itself
+      unavailable: new Set(),
     };
   }
 
@@ -117,6 +123,12 @@ class TransferList extends Component {
     } catch (error) {
       console.error(error);
       toast.error(transfers.describeRetrievalError(error));
+
+      if (transfers.isRetrievalPermanentlyGone(error)) {
+        this.setState((previousState) => ({
+          unavailable: new Set(previousState.unavailable).add(file.id),
+        }));
+      }
     } finally {
       this.setState({ retrieving: null });
     }
@@ -145,7 +157,7 @@ class TransferList extends Component {
   render() {
     const { directoryName, files, onSelectionChange, retrievalEnabled } =
       this.props;
-    const { isFolded, retrieving } = this.state;
+    const { isFolded, retrieving, unavailable } = this.state;
 
     return (
       <div>
@@ -278,27 +290,40 @@ class TransferList extends Component {
                         </Table.Cell>
                         {retrievalEnabled && (
                           <Table.Cell className="transferlist-retrieve">
-                            {isRetrievable(f) && (
-                              <Popup
-                                content="Download this file to your browser"
-                                position="left center"
-                                trigger={
-                                  <Icon
-                                    color="grey"
-                                    disabled={retrieving === f.id}
-                                    link
-                                    loading={retrieving === f.id}
-                                    name={
-                                      retrieving === f.id
-                                        ? 'spinner'
-                                        : 'download'
-                                    }
-                                    onClick={() => this.handleRetrieve(f)}
-                                    size="small"
-                                  />
-                                }
-                              />
-                            )}
+                            {isRetrievable(f) &&
+                              (unavailable.has(f.id) ? (
+                                <Popup
+                                  content="This file is no longer on disk"
+                                  position="left center"
+                                  trigger={
+                                    <Icon
+                                      disabled
+                                      name="download"
+                                      size="small"
+                                    />
+                                  }
+                                />
+                              ) : (
+                                <Popup
+                                  content="Download this file to your browser"
+                                  position="left center"
+                                  trigger={
+                                    <Icon
+                                      color="grey"
+                                      disabled={retrieving === f.id}
+                                      link
+                                      loading={retrieving === f.id}
+                                      name={
+                                        retrieving === f.id
+                                          ? 'spinner'
+                                          : 'download'
+                                      }
+                                      onClick={() => this.handleRetrieve(f)}
+                                      size="small"
+                                    />
+                                  }
+                                />
+                              ))}
                           </Table.Cell>
                         )}
                         <Table.Cell className="transferlist-detail">
