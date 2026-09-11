@@ -54,7 +54,10 @@ namespace slskd
         /// <returns></returns>
         public static IApplicationBuilder UseHTMLInjection(this IApplicationBuilder builder, string html, IEnumerable<string> excludedRoutes)
         {
-            return builder.UseMiddleware<HTMLInjectionMiddleware>(html);
+            // excludedRoutes has to be passed. omitted, UseMiddleware resolves the constructor's IEnumerable<string>
+            // from the container instead, which yields an empty collection rather than an error -- so every route the
+            // caller asked to exclude was quietly included, and the parameter did nothing at all.
+            return builder.UseMiddleware<HTMLInjectionMiddleware>(html, excludedRoutes);
         }
     }
 
@@ -99,6 +102,7 @@ namespace slskd
 
             if (!isExcludedRoute && isGET && isInjectableType)
             {
+
                 var originalStream = context.Response.Body;
 
                 // swap the response body out with a memory stream so we can manipulate it later
@@ -108,7 +112,12 @@ namespace slskd
 
                 await Next.Invoke(context);
 
-                if (context.Response.StatusCode == 200)
+                // check the response content type. what was *asked* for does not decide this; the server may return
+                // something else entirely, and a request for text/html is how a browser asks for any navigation --
+                // including one that downloads a file.
+                var isInjectableResponseType = injectableTypes.Any(injectableType => context.Response.Headers.ContentType.Contains(injectableType));
+
+                if (context.Response.StatusCode == 200 && isInjectableResponseType)
                 {
                     // something downstream responded with a 200, meaning there's data in the body
                     // we need to read it, so we can reset then play it back with the modified HTML
@@ -126,18 +135,12 @@ namespace slskd
                         context.Response.Headers.Add(header);
                     }
 
-                    // check the response content type to make sure it's still injectable. the server might return something other
-                    // than what was requested. if it's no longer injectable, don't inject.
-                    var isInjectableResponseType = injectableTypes.Any(injectableType => context.Response.Headers.ContentType.Contains(injectableType));
-                    if (!isInjectableResponseType)
-                    {
-                        await context.Response.WriteAsync(body);
-                    }
-                    else
-                    {
-                        await context.Response.WriteAsync(body + HTML);
-                    }
+                    await context.Response.WriteAsync(body + HTML);
                 }
+
+                // anything else is replayed byte for byte. reading a response into a string and writing it back
+                // replaces every byte that is not valid UTF-8 with U+FFFD, which corrupts a binary body and inflates
+                // it by roughly 80% -- silently, with a 200 and a plausible-looking file at the other end.
 
                 // rewind the stream we injected to the beginning, then replay the data to the
                 // original stream

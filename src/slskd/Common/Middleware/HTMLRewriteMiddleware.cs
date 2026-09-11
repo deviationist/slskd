@@ -99,6 +99,7 @@ namespace slskd
 
             if (!isApiRoute && isGET && isRewriteableType)
             {
+
                 var originalStream = context.Response.Body;
 
                 // swap the response body out with a memory stream so we can manipulate it later
@@ -108,7 +109,12 @@ namespace slskd
 
                 await Next.Invoke(context);
 
-                if (context.Response.StatusCode == 200)
+                // the response's own type decides this, not the type that was asked for: a browser asks for
+                // text/html on any navigation, including one that downloads a file, and reading a binary body into
+                // a string replaces every byte that is not valid UTF-8 with U+FFFD
+                var isRewriteableResponseType = injectableTypes.Any(injectableType => context.Response.Headers.ContentType.Contains(injectableType));
+
+                if (context.Response.StatusCode == 200 && isRewriteableResponseType)
                 {
                     // something downstream responded with a 200, meaning there's data in the body
                     // we need to read it, so we can reset then play it back with the modified HTML
