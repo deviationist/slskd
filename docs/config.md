@@ -167,6 +167,29 @@ to delete is disabled by default.  Deletions can be enabled by enabling the remo
 remote_file_management: false
 ```
 
+## Remote File Retrieval
+
+The file produced by a completed download can be downloaded a second time, from the server to the browser, using the download button on the Downloads page.
+This is disabled by default, and is enabled by enabling the remote file retrieval option.
+
+This is a **separate** option from remote file management, and neither implies the other.  Reading a file out of the server is not the same grant as deleting
+one, and an operator may reasonably want either without the other, so each is its own decision.  Both default to disabled.
+
+The file served is identified by the **id of the download**; its path is resolved by the server from the path recorded when the file was written, and no path
+is accepted from the caller.  That resolved path is checked for containment within the 'Incomplete' and 'Downloads' directories before it is opened, symbolic
+links included, so a file elsewhere on the system cannot be served even if one were somehow recorded.
+
+Note that this is a grant to *every* caller the API accepts: anyone who can authenticate can read any file a download produced.
+
+| Command-Line              | Environment Variable          | Description                                                                    |
+| ------------------------- | ----------------------------- | ------------------------------------------------------------------------------ |
+| `--remote-file-retrieval` | `SLSKD_REMOTE_FILE_RETRIEVAL` | Determines whether downloaded files may be retrieved (downloaded) over the API |
+
+#### **YAML**
+```yaml
+remote_file_retrieval: false
+```
+
 # Shares
 
 ## Directories
