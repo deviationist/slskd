@@ -259,3 +259,28 @@ describe('parseFiltersFromString', () => {
     });
   });
 });
+
+describe('search.validateSearchText', () => {
+  it('accepts a phrase', () => {
+    expect(search.validateSearchText('aphex twin').ok).toBe(true);
+  });
+
+  it('refuses nothing at all', () => {
+    expect(search.validateSearchText('').ok).toBe(false);
+    expect(search.validateSearchText(undefined).ok).toBe(false);
+    expect(search.validateSearchText(null).ok).toBe(false);
+  });
+
+  it('refuses whitespace, as the server does', () => {
+    expect(search.validateSearchText('   ').ok).toBe(false);
+    expect(search.validateSearchText('\t\n').ok).toBe(false);
+  });
+
+  it('refuses in the server own words, so the three buttons agree', () => {
+    // the plus and magnifier learn this from the server; the watch button never
+    // reaches it, and three different refusals for one rule is worse than one
+    expect(search.validateSearchText('').reason).toBe(
+      'The field SearchText can not be null, empty, or consist of only whitespace',
+    );
+  });
+});
