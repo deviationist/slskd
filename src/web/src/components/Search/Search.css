@@ -112,7 +112,10 @@
 
 .search-detail-header-segment {
   margin-top: 15px !important;
-  height: 78px !important;
+  /* a minimum rather than a fixed height: the header holds the search phrase,
+     which is as long as somebody typed, and a phrase that wraps to a second
+     line is clipped by a box that cannot grow */
+  min-height: 78px !important;
   padding-top: 20px !important;
   display: flex;
 }
