@@ -185,11 +185,8 @@ namespace slskd.Files
                 throw new ArgumentException("Deletion of application-controlled directory roots is not supported");
             }
 
-            // important! we must fully expand the given paths with GetFullPath() to resolve a given relative directory, like '..'
-            bool IsAllowed(string path) => AllowedDirectories.Any(allowed => path.StartsWith(allowed + Path.DirectorySeparatorChar) || path == allowed);
-
             // if any of the resolved directory paths aren't rooted in one of the allowed directories, forbid the entire request
-            if (!directories.All(directory => IsAllowed(directory)))
+            if (!directories.All(directory => IsContainedInAllowedDirectory(directory)))
             {
                 throw new UnauthorizedException("Only application-controlled directories can be deleted");
             }
@@ -254,11 +251,8 @@ namespace slskd.Files
                 throw new ArgumentException("Paths containing traversal segments are not allowed", nameof(files));
             }
 
-            // important! we must fully expand the given paths with GetFullPath() to resolve a given relative directory, like '..'
-            bool IsAllowed(string path) => AllowedDirectories.Any(allowed => path.StartsWith(allowed + Path.DirectorySeparatorChar) || path == allowed);
-
             // if any of the resolved file paths aren't rooted in one of the allowed directories, forbid the entire request
-            if (!files.All(file => IsAllowed(file)))
+            if (!files.All(file => IsContainedInAllowedDirectory(file)))
             {
                 throw new UnauthorizedException("Only files in application-controlled directories can be deleted");
             }
@@ -315,8 +309,7 @@ namespace slskd.Files
                 throw new ArgumentException("Paths containing traversal segments are not allowed", nameof(directory));
             }
 
-            // important! we must fully expand the path with GetFullPath() to resolve a given relative directory, like '..'
-            if (!AllowedDirectories.Any(allowed => directory.StartsWith(allowed + Path.DirectorySeparatorChar) || directory == allowed))
+            if (!IsContainedInAllowedDirectory(directory))
             {
                 throw new UnauthorizedException($"Only application-controlled directories can be listed");
             }
@@ -437,6 +430,101 @@ namespace slskd.Files
         }
 
         /// <summary>
+        ///     Opens the file with the specified fully qualified <paramref name="filename"/> for reading, returning a
+        ///     <see cref="Stream"/> from which the contents of the file can be read.
+        /// </summary>
+        /// <remarks>
+        ///     <para>
+        ///         The file must be contained within one of the application-controlled directories, both as specified and
+        ///         after any symbolic links have been resolved; a link that resides within an allowed directory but which
+        ///         points outside of one is rejected, because opening it would follow it.
+        ///     </para>
+        ///     <para>
+        ///         Containment is determined before the filesystem is touched, so a file outside of the allowed directories
+        ///         is never opened, and its existence is never disclosed.
+        ///     </para>
+        ///     <para>
+        ///         The returned Stream is seekable, and the file is opened in a way that allows other processes to continue
+        ///         to read, write, and delete it, so that a file which is still being downloaded can be read.
+        ///     </para>
+        /// </remarks>
+        /// <param name="filename">The fully qualified filename of the file to open.</param>
+        /// <returns>A Stream from which the contents of the file can be read.</returns>
+        /// <exception cref="ArgumentException">Thrown if the specified filename is null, contains only whitespace, is relative, or contains traversal segments.</exception>
+        /// <exception cref="UnauthorizedException">Thrown if the specified file, or the target of the specified link, is not contained within an application-controlled directory.</exception>
+        /// <exception cref="NotFoundException">Thrown if the specified file does not exist.</exception>
+        /// <exception cref="IOException">Thrown if the file can't be opened for some reason.</exception>
+        public virtual Stream OpenFile(string filename)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(filename, nameof(filename));
+
+            if (Path.GetFullPath(filename) != filename)
+            {
+                throw new ArgumentException("Only absolute paths may be specified", nameof(filename));
+            }
+
+            if (FileSafety.ContainsTraversalSegments(filename))
+            {
+                Log.Warning("Suspicious attempt to open a file with a filename containing unsafe path segments (one or more of path traversal characters '.' and '..'). Requested file: {File}", filename);
+                throw new ArgumentException("Filenames containing traversal segments are not allowed", nameof(filename));
+            }
+
+            // check containment *before* touching the filesystem. this is what guarantees that a file outside of the
+            // allowed directories is never opened, and that a caller can't use the difference between 'forbidden' and
+            // 'not found' to probe for the existence of files elsewhere on the system
+            if (!IsContainedInAllowedDirectory(filename))
+            {
+                throw new UnauthorizedException("Only files in application-controlled directories can be opened");
+            }
+
+            // resolve symlinks to their final target. a link can live within an allowed directory while pointing
+            // anywhere at all, and opening the link would follow it, so the target must be contained as well
+            var info = ResolveFileInfo(filename);
+
+            if (!IsContainedInAllowedDirectory(info.FullName))
+            {
+                Log.Warning("Suspicious attempt to open a file which resolves to a location outside of the application-controlled directories. Requested file: {File}, resolved to: {Resolved}", filename, info.FullName);
+                throw new UnauthorizedException("Only files in application-controlled directories can be opened");
+            }
+
+            if (!info.Exists)
+            {
+                throw new NotFoundException($"The file '{filename}' does not exist");
+            }
+
+            var streamOptions = new FileStreamOptions
+            {
+                Access = FileAccess.Read,
+                BufferSize = 4096, // framework default
+                Mode = FileMode.Open,
+
+                // allow the application (and anything else) to continue to write to or delete the file while it is being
+                // read; an in-progress download must not be locked by a read of the partial file
+                Share = FileShare.ReadWrite | FileShare.Delete,
+                Options = FileOptions.Asynchronous | FileOptions.SequentialScan,
+            };
+
+            try
+            {
+                return new FileStream(info.FullName, streamOptions);
+            }
+            catch (Exception ex) when (ex is UnauthorizedAccessException || ex is SecurityException)
+            {
+                throw new UnauthorizedException($"Access to the file '{filename}' was denied: {ex.Message}", ex);
+            }
+            catch (FileNotFoundException)
+            {
+                throw new NotFoundException($"The file '{filename}' does not exist");
+            }
+            catch (Exception ex)
+            {
+                // the operation above can throw quite a few exceptions, all granular variations of
+                // IOException. to make handling downstream easier, wrap them all up and re-throw.
+                throw new IOException($"Failed to open file {Path.GetFileName(filename)}: {ex.Message}", ex);
+            }
+        }
+
+        /// <summary>
         ///     Moves the specified fully qualified, localized, <paramref name="sourceFilename"/> to the specified fully qualified, localized,
         ///     <paramref name="destinationDirectory"/>.
         /// </summary>
@@ -533,5 +621,18 @@ namespace slskd.Files
                 throw new IOException($"Failed to move file {Path.GetFileName(sourceFilename)}: {ex.Message}", ex);
             }
         }
+
+        /// <summary>
+        ///     Returns a value indicating whether the specified <paramref name="path"/> is one of, or is contained within one
+        ///     of, the application-controlled directories.
+        /// </summary>
+        /// <remarks>
+        ///     Important! The specified path must already have been fully expanded with <see cref="Path.GetFullPath(string)"/>
+        ///     in order to resolve any relative segments, like '..'.
+        /// </remarks>
+        /// <param name="path">The fully qualified path to check.</param>
+        /// <returns>A value indicating whether the path is contained within an application-controlled directory.</returns>
+        private bool IsContainedInAllowedDirectory(string path)
+            => AllowedDirectories.Any(allowed => path == allowed || path.StartsWith(allowed + Path.DirectorySeparatorChar, StringComparison.Ordinal));
     }
 }

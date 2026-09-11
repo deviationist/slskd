@@ -1,16 +1,99 @@
+import * as transfers from '../../lib/transfers';
 import { formatBytes, formatBytesAsUnit, getFileName } from '../../lib/util';
 import TransferDetails from './TransferDetails';
 import React, { Component } from 'react';
+import { toast } from 'react-toastify';
 import {
   Button,
   Checkbox,
   Header,
   Icon,
   List,
+  Modal,
   Popup,
   Progress,
   Table,
 } from 'semantic-ui-react';
+
+/* Distance the popup keeps from the edge of the window, in px. */
+const VIEWPORT_MARGIN = 8;
+
+/* Semantic UI React turns Popper's preventOverflow modifier on only when an
+   `offset` prop is given, so by default a popup is drawn wherever its
+   placement puts it -- including off the edge of the window, where the part
+   that did not fit is simply not reachable. This one is a nineteen-row table
+   anchored to a row that can sit anywhere in a long list, so it overflows
+   often.
+
+   Turning preventOverflow back on lets it slide along both axes into the space
+   that exists, and the fallback placements let it move to another side of the
+   icon entirely when neither left nor right has room. `tether: false` is what
+   allows the slide to detach the popup from the icon; without it the popup
+   stays glued to the row and overflows anyway.
+
+   Only base placements are listed: Semantic maps `left-start` and its
+   siblings to no class at all, which would leave the popup without an arrow.
+   Sliding costs the arrow its alignment with the icon -- Semantic draws it as
+   a :before at a fixed spot rather than through Popper's arrow modifier --
+   which is the lesser of the two problems. */
+const detailsPopperModifiers = [
+  {
+    name: 'flip',
+    options: {
+      fallbackPlacements: ['right', 'top', 'bottom'],
+      padding: VIEWPORT_MARGIN,
+    },
+  },
+  {
+    enabled: true,
+    name: 'preventOverflow',
+    options: {
+      altAxis: true,
+      padding: VIEWPORT_MARGIN,
+      tether: false,
+    },
+  },
+];
+
+/**
+ * Asks before a removal that would take a file off the disk with it.
+ *
+ * Raised only where there is a file to lose -- see `planRowRemoval`. It names
+ * the path that is about to be deleted rather than merely asking whether the
+ * operator is sure: the list re-fetches every second and a row can move under
+ * the pointer between aiming and clicking, so the one thing worth showing is
+ * which file this turned out to be about.
+ */
+const ConfirmRemovalModal = ({ busy, onCancel, onConfirm, plan }) => (
+  <Modal
+    actions={[
+      'Cancel',
+      {
+        content: plan.confirmLabel,
+        key: 'remove',
+        loading: busy,
+        negative: true,
+        onClick: onConfirm,
+      },
+    ]}
+    centered
+    content={
+      <Modal.Content>
+        <p>{plan.prompt}</p>
+        <p className="transferlist-remove-path">{plan.filename}</p>
+      </Modal.Content>
+    }
+    header={
+      <Header
+        content={plan.header}
+        icon="trash alternate"
+      />
+    }
+    onClose={onCancel}
+    open
+    size="small"
+  />
+);
 
 const getColor = (state) => {
   switch (state) {
@@ -33,6 +116,12 @@ const getColor = (state) => {
 const isRetryableState = (state) => getColor(state).color === 'red';
 const isQueuedState = (state) => state.includes('Queued');
 
+/* Whether this row has a file the server can hand back.
+ *
+ * Three things have to hold, and the last is the one that is easy to forget:
+ * `localFilename` is null for downloads that finished before this application
+ * began recording where it wrote them, and the server answers 404 for those.
+ * A button that is always refused is worse than no button. */
 const formatBytesTransferred = ({ size, transferred }) => {
   const [s, sExtension] = formatBytes(size, 1).split(' ');
   const t = formatBytesAsUnit(transferred, sExtension, 1);
@@ -45,9 +134,88 @@ class TransferList extends Component {
     super(props);
 
     this.state = {
+      // the row awaiting an answer to the confirmation, or null when none is
+      // being asked. it holds the file rather than a flag so the dialog can name
+      // the path it is about to delete
+      confirming: null,
       isFolded: false,
+      removing: null,
+      retrieving: null,
+      // ids whose file the server has already said is gone. something downstream
+      // moves finished files out of the downloads directory, so a download whose
+      // file has left is the normal end of its life rather than an error worth
+      // retrying -- and a button that has been refused once should stop offering
+      // itself
+      unavailable: new Set(),
     };
   }
+
+  componentWillUnmount() {
+    this.mounted = false;
+  }
+
+  mounted = true;
+
+  handleRetrieve = async (file) => {
+    const { username } = this.props;
+
+    try {
+      this.setState({ retrieving: file.id });
+
+      await transfers.retrieveFile({
+        filename: getFileName(file.filename),
+        id: file.id,
+        username,
+      });
+    } catch (error) {
+      console.error(error);
+      toast.error(transfers.describeRetrievalError(error));
+
+      if (transfers.isRetrievalPermanentlyGone(error)) {
+        this.setState((previousState) => ({
+          unavailable: new Set(previousState.unavailable).add(file.id),
+        }));
+      }
+    } finally {
+      this.setState({ retrieving: null });
+    }
+  };
+
+  /**
+   * Removes one transfer, asking first where that would delete a file.
+   *
+   * The removal itself is the card's own -- the same call, the same clearing of
+   * the selection and the same summary toast the *Remove Selected* button
+   * produces, over a selection of one. A second way of removing a transfer that
+   * reported differently would be worse than none.
+   */
+  handleRemove = (file) => {
+    const plan = transfers.planRowRemoval({
+      deleteFileOnRemoval: this.props.deleteFileOnRemoval,
+      file,
+    });
+
+    if (plan.confirm) {
+      this.setState({ confirming: file });
+      return;
+    }
+
+    this.remove(file);
+  };
+
+  remove = async (file) => {
+    try {
+      this.setState({ confirming: null, removing: file.id });
+      await this.props.onRemoveRequested(file);
+    } finally {
+      // the row being removed can be the last one in its folder, and the list
+      // that held it is gone the moment the page next re-fetches. a removal
+      // that lands after that has nothing left to un-busy
+      if (this.mounted) {
+        this.setState({ removing: null });
+      }
+    }
+  };
 
   handleClick = (file) => {
     const { direction, state } = file;
@@ -69,9 +237,52 @@ class TransferList extends Component {
     this.setState((previousState) => ({ isFolded: !previousState.isFolded }));
   };
 
+  /**
+   * The row's own remove control, where the row has one.
+   *
+   * Which rows do, and what the control says it will do, are `planRowRemoval`'s
+   * to decide -- this renders the answer and nothing else.
+   */
+  renderRemove(file) {
+    const { deleteFileOnRemoval } = this.props;
+    const { removing } = this.state;
+    const plan = transfers.planRowRemoval({ deleteFileOnRemoval, file });
+
+    if (!plan.offered) {
+      return null;
+    }
+
+    const busy = removing === file.id;
+
+    return (
+      <Popup
+        content={plan.tooltip}
+        position="left center"
+        trigger={
+          <Icon
+            color="grey"
+            disabled={busy}
+            link
+            loading={busy}
+            name={busy ? 'spinner' : 'trash alternate'}
+            onClick={() => this.handleRemove(file)}
+            size="small"
+          />
+        }
+      />
+    );
+  }
+
   render() {
-    const { directoryName, files, onSelectionChange } = this.props;
-    const { isFolded } = this.state;
+    const {
+      deleteFileOnRemoval,
+      directoryName,
+      files,
+      onSelectionChange,
+      retrievalEnabled,
+    } = this.props;
+    const { confirming, isFolded, removing, retrieving, unavailable } =
+      this.state;
 
     return (
       <div>
@@ -116,12 +327,16 @@ class TransferList extends Component {
                     <Table.HeaderCell className="transferlist-size">
                       Size
                     </Table.HeaderCell>
+                    {retrievalEnabled && (
+                      <Table.HeaderCell className="transferlist-retrieve" />
+                    )}
                     <Table.HeaderCell className="transferlist-detail">
                       <Icon
                         name="info circle"
                         size="small"
                       />
                     </Table.HeaderCell>
+                    <Table.HeaderCell className="transferlist-remove" />
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
@@ -199,12 +414,69 @@ class TransferList extends Component {
                             </span>
                           </div>
                         </Table.Cell>
+                        {retrievalEnabled && (
+                          <Table.Cell className="transferlist-retrieve">
+                            {transfers.isFinishedDownload(f) &&
+                              (!transfers.isRetrievable(f) ||
+                              transfers.isFileGone({
+                                file: f,
+                                refused: unavailable,
+                              }) ? (
+                                <Popup
+                                  content={transfers.describeUnretrievable({
+                                    file: f,
+                                    gone: transfers.isFileGone({
+                                      file: f,
+                                      refused: unavailable,
+                                    }),
+                                  })}
+                                  position="left center"
+                                  trigger={
+                                    <span className="transferlist-retrieve-struck">
+                                      <Icon
+                                        disabled
+                                        name="download"
+                                        size="small"
+                                      />
+                                      <Icon
+                                        className="transferlist-retrieve-strike"
+                                        color="grey"
+                                        name="ban"
+                                        size="small"
+                                      />
+                                    </span>
+                                  }
+                                />
+                              ) : (
+                                <Popup
+                                  content={transfers.describeRetrieval()}
+                                  position="left center"
+                                  trigger={
+                                    <Icon
+                                      color="grey"
+                                      disabled={retrieving === f.id}
+                                      link
+                                      loading={retrieving === f.id}
+                                      name={
+                                        retrieving === f.id
+                                          ? 'spinner'
+                                          : 'download'
+                                      }
+                                      onClick={() => this.handleRetrieve(f)}
+                                      size="small"
+                                    />
+                                  }
+                                />
+                              ))}
+                          </Table.Cell>
+                        )}
                         <Table.Cell className="transferlist-detail">
                           <Popup
+                            className="transfer-details-popup"
                             content={<TransferDetails file={f} />}
                             on="click"
+                            popperModifiers={detailsPopperModifiers}
                             position="left center"
-                            style={{ maxWidth: '600px' }}
                             trigger={
                               <Icon
                                 color="grey"
@@ -216,6 +488,12 @@ class TransferList extends Component {
                             wide="very"
                           />
                         </Table.Cell>
+                        {/* last, and behind the details icon: the one control
+                            here that destroys something does not sit against
+                            the one that fetches a file */}
+                        <Table.Cell className="transferlist-remove">
+                          {this.renderRemove(f)}
+                        </Table.Cell>
                       </Table.Row>
                     ))}
                 </Table.Body>
@@ -224,6 +502,17 @@ class TransferList extends Component {
           </List>
         ) : (
           ''
+        )}
+        {confirming && (
+          <ConfirmRemovalModal
+            busy={removing === confirming.id}
+            onCancel={() => this.setState({ confirming: null })}
+            onConfirm={() => this.remove(confirming)}
+            plan={transfers.planRowRemoval({
+              deleteFileOnRemoval,
+              file: confirming,
+            })}
+          />
         )}
       </div>
     );

@@ -2,6 +2,7 @@
 # headless: false
 # remote_configuration: false
 # remote_file_management: false
+# remote_file_retrieval: false
 # instance_name: default
 # flags:
 #   no_logo: false
@@ -55,6 +56,7 @@
 #   upload:
 #     slots: 20
 #     speed_limit: 1000 # in kibibytes
+#     default_sort: newest # 'newest' or 'oldest'
 #     limits:
 #       queued:
 #         files: 500
@@ -70,6 +72,7 @@
 #   download:
 #     slots: 500
 #     speed_limit: 1000
+#     default_sort: newest # 'newest' or 'oldest'
 #     retry:
 #       partial: resume # 'overwrite' or 'resume'
 #       attempts: 3

@@ -167,6 +167,38 @@ to delete is disabled by default.  Deletions can be enabled by enabling the remo
 remote_file_management: false
 ```
 
+## Remote File Retrieval
+
+The file produced by a completed download can be downloaded a second time, from the server to the browser, using the download button on the Downloads page.
+This is disabled by default, and is enabled by enabling the remote file retrieval option.
+
+This is a **separate** option from remote file management, and neither implies the other.  Reading a file out of the server is not the same grant as deleting
+one, and an operator may reasonably want either without the other, so each is its own decision.  Both default to disabled.
+
+The file served is identified by the **id of the download**; its path is resolved by the server from the path recorded when the file was written, and no path
+is accepted from the caller.  That resolved path is checked for containment within the 'Incomplete' and 'Downloads' directories before it is opened, symbolic
+links included, so a file elsewhere on the system cannot be served even if one were somehow recorded.
+
+Selecting several transfers and choosing 'Download Selected' fetches them as one streamed zip archive.  The archive is stored rather than compressed (audio does
+not compress) and nothing is staged on disk.  Before it starts, the server is asked which of the selected files are still present, and any that are not are
+named in a confirmation dialog; a file that goes missing after that is skipped and listed in a `MISSING.txt` written at the end of the archive.
+
+The archive is fetched by navigating to it, so that the browser streams it to disk rather than holding it in the memory of a tab — and a navigation cannot carry
+an authorization header.  It is therefore authorized by a **single-use ticket** instead: 256 random bits, valid for 60 seconds, bound to the exact username and
+set of ids it was issued for, and issued only to an authenticated caller.  The ticket travels in the query string, so a reverse proxy's access log will record
+it; that is why it is spent on first use and lives only a minute.  slskd itself does not log it.
+
+Note that this is a grant to *every* caller the API accepts: anyone who can authenticate can read any file a download produced.
+
+| Command-Line              | Environment Variable          | Description                                                                    |
+| ------------------------- | ----------------------------- | ------------------------------------------------------------------------------ |
+| `--remote-file-retrieval` | `SLSKD_REMOTE_FILE_RETRIEVAL` | Determines whether downloaded files may be retrieved (downloaded) over the API |
+
+#### **YAML**
+```yaml
+remote_file_retrieval: false
+```
+
 # Shares
 
 ## Directories
@@ -348,6 +380,28 @@ transfers:
     speed_limit: 1000
 ```
 
+## Default Sort Order
+
+The Downloads and Uploads pages can list transfers newest-first or oldest-first, and each page has its own default. `newest` puts the most recently requested user and folder at the top, which is where a transfer just enqueued appears; `oldest` reproduces the order the API returns.
+
+This is presentation only; it changes nothing about the transfers themselves.
+
+It is a *default*, not a setting the web UI obeys. The sort control on each page overrides it for the browser it was used in, and that browser then keeps its own choice rather than following changes made here. A browser that has never used the control follows this value, and follows it live -- options reach the UI over the application hub, so a change takes effect without a reload.
+
+| Command-Line              | Environment Variable          | Description                                                |
+| ------------------------- | ----------------------------- | ---------------------------------------------------------- |
+| `--upload-default-sort`   | `SLSKD_UPLOAD_DEFAULT_SORT`   | The order in which the web UI lists uploads by default     |
+| `--download-default-sort` | `SLSKD_DOWNLOAD_DEFAULT_SORT` | The order in which the web UI lists downloads by default   |
+
+#### **YAML**
+```yaml
+transfers:
+  upload:
+    default_sort: newest # 'newest' or 'oldest'
+  download:
+    default_sort: newest
+```
+
 ## Retry Behavior
 
 Failed downloads can be retried automatically up to the configured number of attempts.  If an attempt fails initially, the application delays the second attempt by the configured delay, and an exponential backoff is used to compute the delay for all subsequent events, up to the configured maximum delay.
@@ -384,6 +438,48 @@ transfers:
     destination:
       permissions:
         mode: 644 # chmod syntax, e.g. 644, 777.  has no effect on Windows
+```
+
+## Deleting Files on Removal
+
+Removing a download removes the record of it and does not touch the file on disk.  With this option enabled, removing a download deletes its file as well.
+There is no second button and no per-request flag: this option is the whole of the decision, made once by the operator rather than per removal.  Cancelling a
+transfer is unaffected -- cancelling is not removing, and the option is named for the removal.
+
+Only a file slskd recorded writing is deleted, at the path recorded for the transfer: the finished file if the download completed, or the partial in the
+'Incomplete' directory if it did not.  Partials are otherwise removed only by [data retention](#data-retention), so a download abandoned half way leaves its
+bytes behind until that timer catches them.
+
+A file that is already gone is a success, not a failure: what was asked for is that it not be there, and it is not.  A download that never started is the same
+-- the path is recorded immediately before the download begins, so a transfer with no recorded path that transferred no bytes never wrote one anywhere.  Only a
+file that is present, should go, and will not is reported as a failure.
+
+A download that finished before slskd began recording where the bytes land has no recorded path, and its file may still be on disk under a name that was never
+written down.  Those remove their record and leave the disk alone rather than deleting a path derived after the fact, and say so rather than reporting a
+success that was never checked.
+
+Removing a download that is still running cancels it first and waits, briefly, for it to stop before touching either the record or the file.  Removal skips
+transfers that have not reached a terminal state, and unlinking a file that is still being written to is either allowed and confusing or refused outright,
+depending on the platform.
+
+The directories the deletion empties are removed with it, innermost first, stopping at the first directory that still holds something and at the 'Incomplete'
+and 'Downloads' roots.  A download arrives inside the folder the peer named, sometimes nested several deep, so removing a single level would move the empty
+structure outwards rather than clear it.
+
+This is deliberately its own option rather than a use of [Remote File Management](#remote-file-management), which grants deletion of any file under the
+'Incomplete' and 'Downloads' directories.  This grants deletion of one file, belonging to a transfer being removed, at a path slskd itself recorded -- strictly
+narrower, so requiring the wider grant to obtain it would mean enabling more than was asked for.  Deletion is still performed by the same file service and
+subject to the same containment checks.
+
+| Command-Line                 | Environment Variable             | Description                                                |
+| ---------------------------- | -------------------------------- | ---------------------------------------------------------- |
+| `--delete-file-on-removal`   | `SLSKD_DELETE_FILE_ON_REMOVAL`   | Allow the file to be deleted when a download is removed    |
+
+#### **YAML**
+```yaml
+transfers:
+  download:
+    delete_file_on_removal: false
 ```
 
 ## Global Upload Limits

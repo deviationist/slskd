@@ -1,7 +1,76 @@
 import * as transfers from '../../lib/transfers';
+import { getFileName } from '../../lib/util';
 import TransferList from './TransferList';
 import React, { Component } from 'react';
-import { Button, Card, Icon } from 'semantic-ui-react';
+import { toast } from 'react-toastify';
+import {
+  Button,
+  Card,
+  Header,
+  Icon,
+  List,
+  Modal,
+  Popup,
+} from 'semantic-ui-react';
+
+/**
+ * Says which of the selected files are not there, and offers to archive the
+ * rest.
+ *
+ * Shown only when something is missing. An archive of everything that was
+ * picked needs no confirmation -- there is nothing to tell the operator, and a
+ * dialog that only ever says "yes, all of it is here" trains them to dismiss it
+ * without reading. Where *nothing* is left there is nothing to continue with,
+ * so the dialog says so and offers only the way out.
+ */
+const MissingFilesModal = ({
+  available,
+  busy,
+  missing,
+  onCancel,
+  onConfirm,
+}) => (
+  <Modal
+    actions={[
+      available.length > 0 ? 'Cancel' : 'Close',
+      ...(available.length > 0
+        ? [
+            {
+              content: `Download the other ${available.length}`,
+              key: 'continue',
+              loading: busy,
+              onClick: onConfirm,
+              positive: true,
+            },
+          ]
+        : []),
+    ]}
+    centered
+    content={
+      <Modal.Content>
+        <p>
+          {available.length > 0
+            ? `${missing.length} of the ${missing.length + available.length} selected files are no longer on disk and cannot be included:`
+            : 'None of the selected files are still on disk:'}
+        </p>
+        <List bulleted>
+          {missing.map((m) => (
+            <List.Item key={m.id}>{m.filename}</List.Item>
+          ))}
+        </List>
+      </Modal.Content>
+    }
+    header={
+      <Header
+        content="Some files are missing"
+        icon="exclamation triangle"
+      />
+    }
+    onClose={onCancel}
+    open
+    size="small"
+  />
+);
 
 class TransferGroup extends Component {
   constructor(props) {
@@ -10,8 +79,107 @@ class TransferGroup extends Component {
     this.state = {
       isFolded: false,
       selections: new Set(),
+      // what the pre-flight found, once it has found something worth asking
+      // about. null means nothing is pending -- the modal is open exactly when
+      // this is not null
+      archive: null,
+      archiveBusy: false,
     };
   }
+
+  /**
+   * Archives the selected files, asking first if any of them have gone.
+   *
+   * The check comes first because the archive is *streamed*: once it has begun
+   * there is no longer any way to say that half of what was picked was not
+   * there. Where everything is present there is nothing to ask about, and it
+   * simply starts.
+   */
+  handleArchive = async (username, selected) => {
+    const choice = transfers.chooseRetrieval(selected);
+
+    if (choice.mode === 'none') {
+      return;
+    }
+
+    try {
+      this.setState({ archiveBusy: true });
+
+      // the single-file path says the right thing when its file has gone, so it
+      // needs no availability check of its own
+      if (choice.mode === 'file') {
+        await this.retrieveOne(username, choice.file);
+        return;
+      }
+
+      const { available, missing } = await transfers.archiveAvailability({
+        ids: choice.files.map((f) => f.id),
+        username,
+      });
+
+      if (missing.length === 0) {
+        await transfers.retrieveArchive({
+          ids: available.map((a) => a.id),
+          username,
+        });
+        return;
+      }
+
+      this.setState({ archive: { available, missing, username } });
+    } catch (error) {
+      console.error(error);
+      toast.error(transfers.describeArchiveError(error));
+    } finally {
+      this.setState({ archiveBusy: false });
+    }
+  };
+
+  handleArchiveConfirmed = async () => {
+    const { available, username } = this.state.archive;
+
+    try {
+      this.setState({ archiveBusy: true });
+
+      // the same rule after the modal as before it: dropping the missing ones
+      // can leave a single file, and that is a file rather than an archive of one
+      if (available.length === 1) {
+        await this.retrieveOne(username, available[0]);
+        this.setState({ archive: null });
+        return;
+      }
+
+      await transfers.retrieveArchive({
+        ids: available.map((a) => a.id),
+        username,
+      });
+
+      this.setState({ archive: null });
+    } catch (error) {
+      console.error(error);
+      toast.error(transfers.describeArchiveError(error));
+    } finally {
+      this.setState({ archiveBusy: false });
+    }
+  };
+
+  /**
+   * Fetches one file, by the same route its own row's button uses.
+   *
+   * Errors are described with the single-file vocabulary rather than the
+   * archive's, because that is what the operator is actually getting.
+   */
+  retrieveOne = async (username, file) => {
+    try {
+      await transfers.retrieveFile({
+        filename: getFileName(file.filename),
+        id: file.id,
+        username,
+      });
+    } catch (error) {
+      console.error(error);
+      toast.error(transfers.describeRetrievalError(error));
+    }
+  };
 
   handleSelectionChange = (directoryName, file, selected) => {
     const { selections } = this.state;
@@ -72,14 +240,50 @@ class TransferGroup extends Component {
     );
   };
 
+  /**
+   * Removes the selected transfers.
+   *
+   * Whether the files go with them is not this button's decision: the server
+   * takes its files with a removal or it does not, according to
+   * `transfers.download.delete_file_on_removal`, and answers with what it did.
+   * A removal that deleted nothing answers 204 and there is nothing to report;
+   * one that deleted something answers with the outcome per file.
+   */
   removeAll = async (direction, username, selected) => {
-    await Promise.all(
+    const results = await Promise.all(
       selected.map((file) =>
         transfers
           .cancel({ direction, id: file.id, remove: true, username })
-          .then(() => this.removeFileSelection(file)),
+          .then((response) => {
+            this.removeFileSelection(file);
+            return { data: response?.data, ok: true };
+          })
+          // one file's failure must not abandon the rest of the batch, and it
+          // has to be reported rather than logged into the void
+          .catch((error) => ({ error, ok: false })),
       ),
     );
+
+    const summary = transfers.summariseDeletions(results);
+
+    if (summary) {
+      toast[summary.kind](summary.message);
+    }
+  };
+
+  /**
+   * Removes one transfer, at the request of its own row.
+   *
+   * Deliberately `removeAll` with a selection of one rather than a second
+   * removal path: the row gets the same request, the same clearing of any
+   * selection it was part of, and the same summary of what the server did with
+   * the file. Two ways of removing a transfer that reported differently would
+   * be worse than one.
+   */
+  handleRemove = async (file) => {
+    const { direction, user } = this.props;
+
+    await this.removeAll(direction, user.username, [file]);
   };
 
   handleRetry = async (file) => {
@@ -106,11 +310,17 @@ class TransferGroup extends Component {
     this.setState((previousState) => ({ isFolded: !previousState.isFolded }));
   };
 
-  render() {
-    const { direction, user } = this.props;
-    const { isFolded } = this.state;
+  /**
+   * The actions offered for whatever is currently selected.
+   *
+   * Its own method rather than part of `render`: every button here is
+   * conditional on the states in the selection, and the whole lot in one
+   * function is more branching than is worth reading in one go.
+   */
+  renderSelectionActions(selected) {
+    const { direction, retrievalEnabled, user } = this.props;
+    const { archiveBusy } = this.state;
 
-    const selected = this.getSelectedFiles();
     const all = selected.length > 1 ? ' Selected' : '';
 
     const allRetryable =
@@ -122,6 +332,74 @@ class TransferGroup extends Component {
     const allRemovable =
       selected.filter((f) => transfers.isStateRemovable(f.state)).length ===
       selected.length;
+    // offered as soon as *something* in the selection has a file. the rest of
+    // the selection is not a reason to withhold the ones that do, and the
+    // pre-flight is what reports the difference
+    const anyRetrievable =
+      retrievalEnabled && selected.some((f) => transfers.isRetrievable(f));
+
+    // what a retrieval would actually take, which is not every selected row:
+    // the tooltip has to promise the number of files the operator will get
+    const retrievableCount = selected.filter((f) =>
+      transfers.isRetrievable(f),
+    ).length;
+
+    return (
+      <Card.Content extra>
+        <Button.Group>
+          {allRetryable && (
+            <Button
+              color="green"
+              content={`Retry${all}`}
+              icon="redo"
+              onClick={() => this.retryAll(selected)}
+            />
+          )}
+          {allRetryable && anyCancellable && <Button.Or />}
+          {anyCancellable && (
+            <Button
+              color="red"
+              content={`Cancel${all}`}
+              icon="x"
+              onClick={() => this.cancelAll(direction, user.username, selected)}
+            />
+          )}
+          {(allRetryable || anyCancellable) && allRemovable && <Button.Or />}
+          {allRemovable && (
+            <Button
+              content={`Remove${all}`}
+              icon="trash alternate"
+              onClick={() => this.removeAll(direction, user.username, selected)}
+            />
+          )}
+          {(allRetryable || anyCancellable || allRemovable) &&
+            anyRetrievable && <Button.Or />}
+          {anyRetrievable && (
+            <Popup
+              content={transfers.describeRetrieval(retrievableCount)}
+              position="top center"
+              trigger={
+                <Button
+                  color="blue"
+                  content={`Download${all}`}
+                  disabled={archiveBusy}
+                  icon="download"
+                  loading={archiveBusy}
+                  onClick={() => this.handleArchive(user.username, selected)}
+                />
+              }
+            />
+          )}
+        </Button.Group>
+      </Card.Content>
+    );
+  }
+
+  render() {
+    const { user } = this.props;
+    const { archive, archiveBusy, isFolded } = this.state;
+
+    const selected = this.getSelectedFiles();
 
     return (
       <Card
@@ -142,6 +420,7 @@ class TransferGroup extends Component {
             !isFolded &&
             user.directories.map((directory) => (
               <TransferList
+                deleteFileOnRemoval={this.props.deleteFileOnRemoval}
                 direction={this.props.direction}
                 directoryName={directory.directory}
                 files={(directory.files || []).map((f) => ({
@@ -150,48 +429,23 @@ class TransferGroup extends Component {
                 }))}
                 key={directory.directory}
                 onPlaceInQueueRequested={this.handleFetchPlaceInQueue}
+                onRemoveRequested={this.handleRemove}
                 onRetryRequested={this.handleRetry}
                 onSelectionChange={this.handleSelectionChange}
+                retrievalEnabled={this.props.retrievalEnabled}
                 username={user.username}
               />
             ))}
         </Card.Content>
-        {selected && selected.length > 0 && (
-          <Card.Content extra>
-            <Button.Group>
-              {allRetryable && (
-                <Button
-                  color="green"
-                  content={`Retry${all}`}
-                  icon="redo"
-                  onClick={() => this.retryAll(selected)}
-                />
-              )}
-              {allRetryable && anyCancellable && <Button.Or />}
-              {anyCancellable && (
-                <Button
-                  color="red"
-                  content={`Cancel${all}`}
-                  icon="x"
-                  onClick={() =>
-                    this.cancelAll(direction, user.username, selected)
-                  }
-                />
-              )}
-              {(allRetryable || anyCancellable) && allRemovable && (
-                <Button.Or />
-              )}
-              {allRemovable && (
-                <Button
-                  content={`Remove${all}`}
-                  icon="trash alternate"
-                  onClick={() =>
-                    this.removeAll(direction, user.username, selected)
-                  }
-                />
-              )}
-            </Button.Group>
-          </Card.Content>
+        {selected.length > 0 && this.renderSelectionActions(selected)}
+        {archive && (
+          <MissingFilesModal
+            available={archive.available}
+            busy={archiveBusy}
+            missing={archive.missing}
+            onCancel={() => this.setState({ archive: null })}
+            onConfirm={this.handleArchiveConfirmed}
+          />
         )}
       </Card>
     );

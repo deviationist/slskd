@@ -48,6 +48,71 @@
   min-width: 5px;
 }
 
+.transferlist-retrieve {
+  width: 5px;
+  min-width: 5px;
+}
+
+/* Last in the row, with the details icon between it and the retrieval one: the
+   only control here that destroys something does not share an edge with the one
+   that fetches a file. */
+.transferlist-remove {
+  width: 5px;
+  min-width: 5px;
+}
+
+/* The path a confirmed removal will delete. Set apart from the sentence above
+   it because it is the part worth reading -- and wrapping anywhere, since a
+   download path is one long unbroken run often enough to widen the dialog past
+   the window. */
+.transferlist-remove-path {
+  font-family: monospace;
+  font-weight: bold;
+  overflow-wrap: anywhere;
+}
+
+/* A download icon with a stroke through it: the same affordance, visibly
+   struck out, rather than a blank cell that leaves an operator wondering why
+   this row has no button when the one above it does. */
+/* The two glyphs are stacked in one grid cell rather than in Semantic's own
+   Icon.Group, which centres an overlay on the *group box* -- and gives its
+   first child a trailing margin-right (`@distanceFromText`) that the box
+   includes. The overlay therefore lands half a gap to the right of the icon it
+   is meant to cross. One cell, both items centred in it, margins zeroed: the
+   stacking no longer depends on how Semantic sizes the group. */
+.transferlist-retrieve-struck {
+  display: inline-grid;
+  place-items: center;
+  cursor: default;
+  line-height: 1;
+}
+
+.transferlist-retrieve-struck > i.icon {
+  grid-area: 1 / 1;
+  margin: 0 !important;
+  /* grid items take a z-index without being positioned, so the order these are
+     painted in does not depend on the order they are written in */
+  z-index: 1;
+}
+
+/* Behind the download glyph, and grey rather than red.
+
+   Behind, because the icon is what says which affordance is being refused, and
+   a mark painted over it obscures the only part that carries that meaning.
+   Grey, because this is not an error: a completed download whose file has been
+   moved on by something downstream is the ordinary end of its life here, and
+   red would report a routine state as a fault.
+
+   Bigger than the icon it crosses, because the download glyph does not fill its
+   own em box -- at matching sizes the mark reads as a speck on the icon rather
+   than a line through it. */
+.transferlist-retrieve-strike {
+  font-size: 1.5em !important;
+  opacity: 0.55;
+  text-shadow: unset !important;
+  z-index: 0;
+}
+
 .transferlist-filename {
   word-wrap: break-word !important;
 }
@@ -55,4 +120,40 @@
 .transfers-header-buttons {
   display: inline;
   margin-left: auto;
+}
+
+/* Sits between the direction icon and the action buttons. It takes no
+   margin-left:auto of its own -- the buttons keep theirs, and stay hard right
+   whether this is shown or not. */
+.transfers-header-sort {
+  display: inline;
+}
+
+/* The details popup is portalled to the end of <body>, so nothing but the
+   window bounds its size. Cap both axes against the viewport -- the width here
+   and the height on the content below -- so a popup that cannot fit scrolls
+   instead of running off the screen with its tail unreachable.
+
+   The scroll container is the content, not .ui.popup itself: the popup's arrow
+   is a :before drawn outside its own box, and overflow on the popup would clip
+   it away. The width still has to be capped on the popup, which is the element
+   the max-width applies to. */
+.ui.popup.transfer-details-popup {
+  max-width: min(600px, calc(100vw - 2rem)) !important;
+}
+
+.transfer-details {
+  max-height: calc(100vh - 6rem);
+  overflow-y: auto;
+}
+
+/* A filename is one long unbroken run often enough that without this the
+   table's min-content width exceeds the cap above and the popup is wide again.
+   The field names take the opposite rule so they never wrap mid-word. */
+.transfer-details td {
+  overflow-wrap: anywhere;
+}
+
+.transfer-details td:first-child {
+  white-space: nowrap;
 }

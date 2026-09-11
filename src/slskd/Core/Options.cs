@@ -193,6 +193,14 @@ namespace slskd
         public bool RemoteFileManagement { get; init; } = false;
 
         /// <summary>
+        ///     Gets a value indicating whether remote retrieval of files is allowed.
+        /// </summary>
+        [Argument(default, "remote-file-retrieval")]
+        [EnvironmentVariable("REMOTE_FILE_RETRIEVAL")]
+        [Description("allow remote retrieval (downloading to the browser) of files")]
+        public bool RemoteFileRetrieval { get; init; } = false;
+
+        /// <summary>
         ///     Gets the unique name for this instance.
         /// </summary>
         [Argument('i', "instance-name")]
@@ -949,6 +957,21 @@ namespace slskd
                 public int SpeedLimit { get; init; } = int.MaxValue;
 
                 /// <summary>
+                ///     Gets the order in which the web UI lists uploads by default.
+                /// </summary>
+                /// <remarks>
+                ///     Presentation only; it changes nothing about the transfers themselves.
+                ///     It is a default rather than a setting: a browser in which the operator
+                ///     has picked an order keeps that order, and only one that has not picked
+                ///     follows this.
+                /// </remarks>
+                [Argument(default, "upload-default-sort")]
+                [EnvironmentVariable("UPLOAD_DEFAULT_SORT")]
+                [Description("the order in which the web UI lists uploads by default")]
+                [Enum(typeof(TransferSortOrder))]
+                public string DefaultSort { get; init; } = TransferSortOrder.Newest.ToString().ToLowerInvariant();
+
+                /// <summary>
                 ///     Gets global limits.
                 /// </summary>
                 [Validate]
@@ -978,6 +1001,37 @@ namespace slskd
                 [Description("the total download speed limit")]
                 [Range(1, int.MaxValue)]
                 public int SpeedLimit { get; init; } = int.MaxValue;
+
+                /// <summary>
+                ///     Gets a value indicating whether the file associated with a download may be
+                ///     deleted from disk when the download is removed.
+                /// </summary>
+                /// <remarks>
+                ///     Deliberately its own option rather than a use of remote file management, which
+                ///     grants deletion of any file under the Downloads and Incomplete directories. This
+                ///     grants deletion of one file, belonging to a transfer being removed, at a path
+                ///     this application recorded writing -- strictly narrower, so requiring the wider
+                ///     grant to obtain it would mean enabling more than the operator asked for.
+                /// </remarks>
+                [Argument(default, "delete-file-on-removal")]
+                [EnvironmentVariable("DELETE_FILE_ON_REMOVAL")]
+                [Description("allow the file to be deleted when a download is removed")]
+                public bool DeleteFileOnRemoval { get; init; } = false;
+
+                /// <summary>
+                ///     Gets the order in which the web UI lists downloads by default.
+                /// </summary>
+                /// <remarks>
+                ///     Presentation only; it changes nothing about the transfers themselves.
+                ///     It is a default rather than a setting: a browser in which the operator
+                ///     has picked an order keeps that order, and only one that has not picked
+                ///     follows this.
+                /// </remarks>
+                [Argument(default, "download-default-sort")]
+                [EnvironmentVariable("DOWNLOAD_DEFAULT_SORT")]
+                [Description("the order in which the web UI lists downloads by default")]
+                [Enum(typeof(TransferSortOrder))]
+                public string DefaultSort { get; init; } = TransferSortOrder.Newest.ToString().ToLowerInvariant();
 
                 /// <summary>
                 ///     Gets download retry options.

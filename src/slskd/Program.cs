@@ -800,6 +800,8 @@ namespace slskd
             services.AddSingleton<IUploadService, UploadService>();
             services.AddSingleton<IBatchService, BatchService>();
             services.AddSingleton<FileService>();
+            services.AddSingleton<DownloadTicketService>();
+            services.AddSingleton<DownloadFileAvailability>();
 
             services.AddSingleton<IRelayService, RelayService>();
 
