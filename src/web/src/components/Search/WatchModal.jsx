@@ -17,11 +17,119 @@ const hourOptions = Array.from({ length: 24 }, (_, hour) => ({
   value: hour,
 }));
 
+const PRESETS_BY_KEY = Object.fromEntries(
+  library.PRESETS.map((preset) => [preset.key, preset]),
+);
+
 const presetOptions = library.PRESETS.map((preset) => ({
   key: preset.key,
   text: preset.label,
   value: preset.key,
 }));
+
+/**
+ * The fields of a watch.
+ *
+ * Exported, and separate from the modal around it, so that it can be rendered
+ * in a test. Semantic's Modal renders through a portal and produces nothing at
+ * all server-side, so a test of the whole modal asserts nothing -- which is how
+ * a version of this shipped with every field silently dropped.
+ * @param {object} params
+ * @param {object} params.draft - The draft being edited.
+ * @param {Function} params.set - Applies changes to the draft.
+ * @param {object} params.existing - The watch being edited, if any.
+ * @param {string} params.searchText - The search this watch is for.
+ * @returns {object} The form.
+ */
+export const WatchForm = ({ draft, existing, searchText, set }) => {
+  const takesHour = PRESETS_BY_KEY[draft.key]?.hour;
+
+  return (
+    <Form>
+      <Form.Field
+        control={Input}
+        disabled
+        label="Search"
+        value={searchText ?? ''}
+      />
+      <Form.Group widths="equal">
+        <Form.Field
+          control={Dropdown}
+          fluid
+          label="How often"
+          onChange={(_event, { value }) => set({ key: value })}
+          options={presetOptions}
+          selection
+          value={draft.key}
+        />
+        {takesHour && (
+          <Form.Field
+            control={Dropdown}
+            fluid
+            label="At"
+            onChange={(_event, { value }) => set({ hour: value })}
+            options={hourOptions}
+            selection
+            value={draft.hour}
+          />
+        )}
+      </Form.Group>
+      <Form.Field
+        control={Input}
+        label="Only report files matching"
+        onChange={(_event, { value }) => set({ filter: value })}
+        placeholder="islossless minbitdepth:24 -bootleg"
+        value={draft.filter}
+      />
+      <Form.Field>
+        <small>
+          The same filter the results page uses. Note that an attribute no peer
+          reported counts as zero, so a minimum excludes a file whose value is
+          unknown.
+        </small>
+      </Form.Field>
+      <Form.Field
+        control={Input}
+        label="Email"
+        onChange={(_event, { value }) => set({ notifyEmail: value })}
+        placeholder="leave blank to use the configured address"
+        value={draft.notifyEmail}
+      />
+      <Form.Field>
+        <Checkbox
+          checked={draft.includeLocked}
+          label="Report locked files and folders too"
+          onChange={() => set({ includeLocked: !draft.includeLocked })}
+          toggle
+        />
+      </Form.Field>
+      <Form.Field>
+        <Checkbox
+          checked={draft.requireFreeSlot}
+          label="Only report peers with a free upload slot"
+          onChange={() => set({ requireFreeSlot: !draft.requireFreeSlot })}
+          toggle
+        />
+      </Form.Field>
+      {!existing && (
+        <Form.Field>
+          <Checkbox
+            checked={draft.seed}
+            label="Don't tell me what this search has already found"
+            onChange={() => set({ seed: !draft.seed })}
+            toggle
+          />
+          <div>
+            <small>
+              Records what is here now without reporting it, so the first email
+              is the first genuinely new thing.
+            </small>
+          </div>
+        </Form.Field>
+      )}
+    </Form>
+  );
+};
 
 /**
  * Creates or edits a watch.
@@ -57,7 +165,6 @@ const WatchModal = ({
 
   const validation = library.validateDraft(draft);
   const rrule = library.rruleFor({ hour: draft.hour, key: draft.key });
-  const takesHour = library.PRESETS.find((p) => p.key === draft.key)?.hour;
 
   const save = async () => {
     setSaving(true);
@@ -98,87 +205,12 @@ const WatchModal = ({
           }
           not been reported before.
         </p>
-        <Form>
-          <Form.Field label="Search">
-            <Input
-              disabled
-              value={searchText ?? ''}
-            />
-          </Form.Field>
-          <Form.Group widths="equal">
-            <Form.Field label="How often">
-              <Dropdown
-                fluid
-                onChange={(_event, { value }) => set({ key: value })}
-                options={presetOptions}
-                selection
-                value={draft.key}
-              />
-            </Form.Field>
-            {takesHour && (
-              <Form.Field label="At">
-                <Dropdown
-                  fluid
-                  onChange={(_event, { value }) => set({ hour: value })}
-                  options={hourOptions}
-                  selection
-                  value={draft.hour}
-                />
-              </Form.Field>
-            )}
-          </Form.Group>
-          <Form.Field label="Only report files matching">
-            <Input
-              onChange={(_event, { value }) => set({ filter: value })}
-              placeholder="islossless minbitdepth:24 -bootleg"
-              value={draft.filter}
-            />
-            <small>
-              The same filter the results page uses. Note that an attribute no
-              peer reported counts as zero, so a minimum excludes a file whose
-              value is unknown.
-            </small>
-          </Form.Field>
-          <Form.Field label="Email">
-            <Input
-              onChange={(_event, { value }) => set({ notifyEmail: value })}
-              placeholder="leave blank to use the configured address"
-              value={draft.notifyEmail}
-            />
-          </Form.Field>
-          <Form.Field>
-            <Checkbox
-              checked={draft.includeLocked}
-              label="Report locked files and folders too"
-              onChange={() => set({ includeLocked: !draft.includeLocked })}
-              toggle
-            />
-          </Form.Field>
-          <Form.Field>
-            <Checkbox
-              checked={draft.requireFreeSlot}
-              label="Only report peers with a free upload slot"
-              onChange={() => set({ requireFreeSlot: !draft.requireFreeSlot })}
-              toggle
-            />
-          </Form.Field>
-          {!existing && (
-            <Form.Field>
-              <Checkbox
-                checked={draft.seed}
-                label="Don't tell me what this search has already found"
-                onChange={() => set({ seed: !draft.seed })}
-                toggle
-              />
-              <div>
-                <small>
-                  Records what is here now without reporting it, so the first
-                  email is the first genuinely new thing.
-                </small>
-              </div>
-            </Form.Field>
-          )}
-        </Form>
+        <WatchForm
+          draft={draft}
+          existing={existing}
+          searchText={searchText}
+          set={set}
+        />
         {validation.ok ? (
           <Message info>
             <Icon name="calendar outline" />
