@@ -180,6 +180,18 @@ public class Transfer
     /// </summary>
     public bool Removed { get; set; }
 
+    /// <summary>
+    ///     Gets or sets a value indicating whether the file this download produced is still on disk, or null where
+    ///     the question does not apply or was not asked.
+    /// </summary>
+    /// <remarks>
+    ///     Not persisted, and not derivable from anything that is: the record keeps the path it wrote whether or not
+    ///     anything is still there. Filled in when a list is served, so a row that cannot be fetched can say so
+    ///     before anyone clicks it.
+    /// </remarks>
+    [NotMapped]
+    public bool? LocalFileExists { get; set; }
+
     [NotMapped]
     public long BytesRemaining => Size - BytesTransferred;
     [NotMapped]

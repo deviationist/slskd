@@ -81,10 +81,25 @@ const isQueuedState = (state) => state.includes('Queued');
  * `localFilename` is null for downloads that finished before this application
  * began recording where it wrote them, and the server answers 404 for those.
  * A button that is always refused is worse than no button. */
+/* A row that got as far as producing a file. Whether that file can still be
+   handed back is a separate question -- see isRetrievable -- but this is the
+   set of rows the retrieval column has anything at all to say about. A
+   cancelled or errored transfer produced nothing, and its own state column
+   already says so. */
+const isFinishedDownload = (file) =>
+  file.direction === 'Download' && file.state === 'Completed, Succeeded';
+
 const isRetrievable = (file) =>
-  file.direction === 'Download' &&
-  file.state === 'Completed, Succeeded' &&
-  Boolean(file.localFilename);
+  isFinishedDownload(file) && Boolean(file.localFilename);
+
+/* Whether this row's file is known to have gone.
+ *
+ * Two sources, and the order matters. The list carries the server's answer,
+ * which is cached and so may be up to half a minute behind the filesystem; a
+ * retrieval that has actually been refused is proof, and outranks it. Anything
+ * else -- including a server that did not answer -- leaves the row alone. */
+const isGone = (file, refused) =>
+  refused.has(file.id) || file.localFileExists === false;
 
 const formatBytesTransferred = ({ size, transferred }) => {
   const [s, sExtension] = formatBytes(size, 1).split(' ');
@@ -290,22 +305,33 @@ class TransferList extends Component {
                         </Table.Cell>
                         {retrievalEnabled && (
                           <Table.Cell className="transferlist-retrieve">
-                            {isRetrievable(f) &&
-                              (unavailable.has(f.id) ? (
+                            {isFinishedDownload(f) &&
+                              (!isRetrievable(f) || isGone(f, unavailable) ? (
                                 <Popup
-                                  content="This file is no longer on disk"
+                                  content={transfers.describeUnretrievable({
+                                    file: f,
+                                    gone: isGone(f, unavailable),
+                                  })}
                                   position="left center"
                                   trigger={
-                                    <Icon
-                                      disabled
-                                      name="download"
-                                      size="small"
-                                    />
+                                    <span className="transferlist-retrieve-struck">
+                                      <Icon
+                                        disabled
+                                        name="download"
+                                        size="small"
+                                      />
+                                      <Icon
+                                        className="transferlist-retrieve-strike"
+                                        color="grey"
+                                        name="ban"
+                                        size="small"
+                                      />
+                                    </span>
                                   }
                                 />
                               ) : (
                                 <Popup
-                                  content="Download this file to your browser"
+                                  content={transfers.describeRetrieval()}
                                   position="left center"
                                   trigger={
                                     <Icon

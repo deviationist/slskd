@@ -53,6 +53,48 @@
   min-width: 5px;
 }
 
+/* A download icon with a stroke through it: the same affordance, visibly
+   struck out, rather than a blank cell that leaves an operator wondering why
+   this row has no button when the one above it does. */
+/* The two glyphs are stacked in one grid cell rather than in Semantic's own
+   Icon.Group, which centres an overlay on the *group box* -- and gives its
+   first child a trailing margin-right (`@distanceFromText`) that the box
+   includes. The overlay therefore lands half a gap to the right of the icon it
+   is meant to cross. One cell, both items centred in it, margins zeroed: the
+   stacking no longer depends on how Semantic sizes the group. */
+.transferlist-retrieve-struck {
+  display: inline-grid;
+  place-items: center;
+  cursor: default;
+  line-height: 1;
+}
+
+.transferlist-retrieve-struck > i.icon {
+  grid-area: 1 / 1;
+  margin: 0 !important;
+  /* grid items take a z-index without being positioned, so the order these are
+     painted in does not depend on the order they are written in */
+  z-index: 1;
+}
+
+/* Behind the download glyph, and grey rather than red.
+
+   Behind, because the icon is what says which affordance is being refused, and
+   a mark painted over it obscures the only part that carries that meaning.
+   Grey, because this is not an error: a completed download whose file has been
+   moved on by something downstream is the ordinary end of its life here, and
+   red would report a routine state as a fault.
+
+   Bigger than the icon it crosses, because the download glyph does not fill its
+   own em box -- at matching sizes the mark reads as a speck on the icon rather
+   than a line through it. */
+.transferlist-retrieve-strike {
+  font-size: 1.5em !important;
+  opacity: 0.55;
+  text-shadow: unset !important;
+  z-index: 0;
+}
+
 .transferlist-filename {
   word-wrap: break-word !important;
 }

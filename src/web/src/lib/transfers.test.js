@@ -406,3 +406,51 @@ describe('describeArchiveError', () => {
     );
   });
 });
+
+describe('describeRetrieval', () => {
+  it('names the browser as the destination, to distinguish it from a Soulseek download', () => {
+    expect(transfers.describeRetrieval()).toBe(
+      'Download this file to your browser',
+    );
+  });
+
+  it('says how many files, and that they arrive as one zip', () => {
+    expect(transfers.describeRetrieval(3)).toBe(
+      'Download these 3 files to your browser, as one zip',
+    );
+  });
+
+  it('describes a single file as a file, matching what the request will do', () => {
+    expect(transfers.describeRetrieval(1)).toBe(
+      'Download this file to your browser',
+    );
+  });
+});
+
+describe('describeUnretrievable', () => {
+  const recorded = { localFilename: '/downloads/complete/a.flac' };
+  const unrecorded = { localFilename: null };
+
+  it('says a file the server has refused is gone', () => {
+    expect(
+      transfers.describeUnretrievable({ file: recorded, gone: true }),
+    ).toBe('This file is no longer on disk');
+  });
+
+  it('does not claim a file is missing merely because its path was never recorded', () => {
+    const described = transfers.describeUnretrievable({ file: unrecorded });
+
+    expect(described).not.toContain('no longer');
+    expect(described).toContain('recorded where it saved files');
+  });
+
+  it('describes a refusal as gone even where no path was recorded, because that is the stronger fact', () => {
+    expect(
+      transfers.describeUnretrievable({ file: unrecorded, gone: true }),
+    ).toBe('This file is no longer on disk');
+  });
+
+  it('says nothing about a row that can still be fetched', () => {
+    expect(transfers.describeUnretrievable({ file: recorded })).toBeUndefined();
+  });
+});

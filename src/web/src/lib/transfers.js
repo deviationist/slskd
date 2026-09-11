@@ -229,6 +229,41 @@ export const retrieveFile = async ({ username, id, filename }) => {
  * would print '[object Blob]'. The status is the part that is readable without
  * unpacking it, and it is the part that says what to do next.
  */
+/**
+ * Says what a retrieval will do, for the tooltip on every control that starts
+ * one.
+ *
+ * Shared, and deliberately so: "download" already means a Soulseek transfer
+ * everywhere else in this application, and the one word doing two jobs is
+ * exactly what needs explaining. The row icon and the button over a selection
+ * must not drift into describing the same act differently.
+ */
+export const describeRetrieval = (count = 1) =>
+  count > 1
+    ? `Download these ${count} files to your browser, as one zip`
+    : 'Download this file to your browser';
+
+/**
+ * Says why a completed download cannot be fetched, or undefined if it can.
+ *
+ * Two different facts, and they must not be told as one. A path the server has
+ * already refused is a file that has *gone*; a download with no recorded path
+ * is one this application never knew the location of, and whose file may well
+ * still be sitting on disk. Saying "missing" for the second would be a guess
+ * presented as a fact.
+ */
+export const describeUnretrievable = ({ file, gone = false }) => {
+  if (gone) {
+    return 'This file is no longer on disk';
+  }
+
+  if (!file.localFilename) {
+    return 'This download finished before slskd recorded where it saved files, so it cannot be fetched';
+  }
+
+  return undefined;
+};
+
 export const describeRetrievalError = (error) => {
   switch (error?.response?.status) {
     case 403:

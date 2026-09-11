@@ -70,17 +70,20 @@ namespace slskd.Transfers.API
         /// <param name="transferService"></param>
         /// <param name="fileService"></param>
         /// <param name="downloadTicketService"></param>
+        /// <param name="downloadFileAvailability"></param>
         public TransfersController(
             TransferService transferService,
             IUserService userService,
             FileService fileService,
             DownloadTicketService downloadTicketService,
+            DownloadFileAvailability downloadFileAvailability,
             IOptionsSnapshot<Options> optionsSnapshot)
         {
             Transfers = transferService;
             Users = userService;
             Files = fileService;
             Tickets = downloadTicketService;
+            FileAvailability = downloadFileAvailability;
             OptionsSnapshot = optionsSnapshot;
         }
 
@@ -105,6 +108,7 @@ namespace slskd.Transfers.API
         private IUserService Users { get; }
         private FileService Files { get; }
         private DownloadTicketService Tickets { get; }
+        private DownloadFileAvailability FileAvailability { get; }
         private IOptionsSnapshot<Options> OptionsSnapshot { get; }
         private ILogger Log { get; set; } = Serilog.Log.ForContext<TransfersController>();
 
@@ -706,6 +710,17 @@ namespace slskd.Transfers.API
 
             var downloads = Transfers.Downloads.List(includeRemoved: includeRemoved);
 
+            // say whether each finished download's file is still there, rather than leaving the UI to find out by
+            // being refused. the answer is cached; see DownloadFileAvailability for why it is not a stat per row per
+            // poll, and why it is a stat rather than an open
+            foreach (var download in downloads)
+            {
+                if (download.State.HasFlag(TransferStates.Completed) && download.State.HasFlag(TransferStates.Succeeded))
+                {
+                    download.LocalFileExists = FileAvailability.Exists(download.LocalFilename);
+                }
+            }
+
             var response = downloads.GroupBy(t => t.Username).Select(grouping => new UserResponse()
             {
                 Username = grouping.Key,
@@ -927,6 +942,11 @@ namespace slskd.Transfers.API
             catch (NotFoundException)
             {
                 Log.Debug("The file recorded for download {Id} no longer exists at '{File}'", guid, filename);
+
+                // the list may have said this file was there moments ago. it has just been proven wrong, and a cached
+                // answer that outlives the proof by half a minute would keep offering a button that cannot work
+                FileAvailability.Forget(filename);
+
                 return NotFound();
             }
         }
@@ -1142,7 +1162,28 @@ namespace slskd.Transfers.API
 
             try
             {
-                using var archive = new ZipArchive(Response.Body, ZipArchiveMode.Create, leaveOpen: true);
+                // ZipArchive cannot write an archive to this response without synchronous writes, and Kestrel
+                // disallows those on the response body by default. The bookkeeping parts of the format -- each entry's
+                // data descriptor, written when the entry stream is disposed, and the central directory, written when
+                // the archive is -- go out through Stream.Write, and neither DirectToArchiveWriterStream nor the entry
+                // stream returned by OpenAsync implements DisposeAsync, so `await using` falls back to the synchronous
+                // path. Verified against the framework directly on .NET 10.0.12, not inferred.
+                //
+                // The consequence of not doing this is worse than a failed request: the file *contents* stream fine,
+                // so the browser saves every byte of every file and then the request dies before the central directory
+                // is written. What lands on disk is a plausible-looking archive with nothing at the end to say what is
+                // in it, which macOS reports as "Error 79 - Inappropriate file type or format".
+                //
+                // Scoped to this request, and only the format's bookkeeping actually travels this way -- the file
+                // contents are copied with CopyToAsync and stay asynchronous.
+                var bodyControl = HttpContext.Features.Get<IHttpBodyControlFeature>();
+
+                if (bodyControl is not null)
+                {
+                    bodyControl.AllowSynchronousIO = true;
+                }
+
+                await using var archive = await ZipArchive.CreateAsync(Response.Body, ZipArchiveMode.Create, leaveOpen: true, entryNameEncoding: null, HttpContext.RequestAborted);
 
                 for (var i = 0; i < downloads.Count; i++)
                 {
@@ -1159,7 +1200,7 @@ namespace slskd.Transfers.API
                     {
                         var entry = archive.CreateEntry(entryNames[i], CompressionLevel.NoCompression);
 
-                        await using var target = entry.Open();
+                        await using var target = await entry.OpenAsync(HttpContext.RequestAborted);
                         await source.CopyToAsync(target, HttpContext.RequestAborted);
                     }
                 }
@@ -1170,7 +1211,7 @@ namespace slskd.Transfers.API
                 {
                     var entry = archive.CreateEntry(ArchiveNaming.MissingEntryName, CompressionLevel.NoCompression);
 
-                    await using var target = entry.Open();
+                    await using var target = await entry.OpenAsync(HttpContext.RequestAborted);
                     await using var writer = new StreamWriter(target);
 
                     await writer.WriteLineAsync($"{skipped.Count} of the {downloads.Count} selected file(s) could not be added to this archive.");
