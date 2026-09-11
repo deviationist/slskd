@@ -11,6 +11,10 @@ WORKDIR /slskd
 COPY bin bin/.
 COPY src/web src/web/.
 
+# the filter vectors, which the web tests read. they are shared with the server's own suite and so live outside both
+# implementations; this stage runs those tests, and without them the suite fails to run at all
+COPY tests/fixtures tests/fixtures/.
+
 RUN sh ./bin/build --web-only --version $VERSION
 
 # build, test, and publish application binaries

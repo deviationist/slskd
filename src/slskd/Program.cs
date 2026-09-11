@@ -629,6 +629,10 @@ namespace slskd
                 //       and are thus never instantiated.  force a reference here so they are created.
                 _ = app.Services.GetService<ScriptService>();
                 _ = app.Services.GetService<WebhookService>();
+
+                // resolved here for its side effect: the watch service subscribes to the clock when it is
+                // constructed, and nothing else would construct it until the first request arrived at its API
+                _ = app.Services.GetService<slskd.Search.Watches.WatchService>();
                 _ = app.Services.GetService<VPNService>();
                 _ = app.Services.GetService<TelemetryService>();
 
@@ -761,6 +765,8 @@ namespace slskd
             services.AddSingleton<slskd.Integrations.Mail.IMailAdapter, slskd.Integrations.Mail.BrevoMailAdapter>();
             services.AddSingleton<slskd.Integrations.Mail.IMailAdapter, slskd.Integrations.Mail.SendmailMailAdapter>();
             services.AddSingleton<slskd.Integrations.Mail.MailService>();
+
+            services.AddSingleton<slskd.Search.Watches.WatchService>();
 
             services.AddSingleton<EventService>();
             services.AddSingleton<EventBus>();

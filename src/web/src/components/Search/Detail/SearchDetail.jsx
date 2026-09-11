@@ -9,6 +9,7 @@ import LoaderSegment from '../../Shared/LoaderSegment';
 import Switch from '../../Shared/Switch';
 import Response from '../Response';
 import SearchDetailHeader from './SearchDetailHeader';
+import WatchPanel from './WatchPanel';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Button, Checkbox, Dropdown, Input, Segment } from 'semantic-ui-react';
 
@@ -175,6 +176,10 @@ const SearchDetail = ({
           )
         }
       >
+        <WatchPanel
+          searchId={search.id}
+          searchText={search.searchText}
+        />
         {loaded && (
           <Segment
             className="search-options"

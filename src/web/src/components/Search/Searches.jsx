@@ -1,15 +1,17 @@
 import './Search.css';
 import { createSearchHubConnection } from '../../lib/hubFactory';
 import * as library from '../../lib/searches';
+import * as watchLibrary from '../../lib/watches';
 import ErrorSegment from '../Shared/ErrorSegment';
 import LoaderSegment from '../Shared/LoaderSegment';
 import PlaceholderSegment from '../Shared/PlaceholderSegment';
 import SearchDetail from './Detail/SearchDetail';
 import SearchList from './List/SearchList';
+import WatchModal from './WatchModal';
 import React, { useEffect, useRef, useState } from 'react';
 import { useHistory, useParams, useRouteMatch } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { Button, Icon, Input, Segment } from 'semantic-ui-react';
+import { Button, Icon, Input, Popup, Segment } from 'semantic-ui-react';
 import { v4 as uuidv4 } from 'uuid';
 
 const Searches = ({ server } = {}) => {
@@ -20,6 +22,8 @@ const Searches = ({ server } = {}) => {
   const [removing, setRemoving] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [watchDraft, setWatchDraft] = useState(undefined);
+  const [watches, setWatches] = useState({});
 
   const inputRef = useRef();
 
@@ -96,6 +100,24 @@ const Searches = ({ server } = {}) => {
 
     connect();
 
+    const loadWatches = async () => {
+      try {
+        const all = await watchLibrary.getAll();
+
+        setWatches(
+          all.reduce((accumulator, watch) => {
+            accumulator[watch.searchId] = watch;
+            return accumulator;
+          }, {}),
+        );
+      } catch (watchError) {
+        // a list that cannot be badged is still a usable list
+        console.error(watchError);
+      }
+    };
+
+    loadWatches();
+
     return () => {
       searchHub.stop();
     };
@@ -130,6 +152,36 @@ const Searches = ({ server } = {}) => {
         createError?.response?.data ?? createError?.message ?? createError,
       );
       setCreating(false);
+    }
+  };
+
+  // create the search, then watch it. a watch is an extension of a search rather
+  // than a thing of its own -- what it has already reported is keyed on the
+  // search's id -- so there is nothing to watch until the search exists
+  const createWatch = async (watch) => {
+    const ref = inputRef?.current?.inputRef?.current;
+    const searchText = watchDraft?.searchText || ref?.value;
+    const id = uuidv4();
+
+    try {
+      await library.create({ id, searchText });
+      const { watch: saved } = await watchLibrary.put({ id, watch });
+
+      setWatches((old) => ({ ...old, [id]: saved }));
+      setWatchDraft(undefined);
+
+      try {
+        ref.value = '';
+      } catch {
+        // the input is not mounted; nothing to clear
+      }
+
+      toast.success(`Watching '${searchText}'`);
+    } catch (watchError) {
+      console.error(watchError);
+      toast.error(
+        watchError?.response?.data ?? watchError?.message ?? watchError,
+      );
     }
   };
 
@@ -222,6 +274,22 @@ const Searches = ({ server } = {}) => {
                 icon="plus"
                 onClick={create}
               />
+              <Popup
+                content="Re-run this search on a schedule and email me what is new"
+                position="bottom center"
+                trigger={
+                  <Button
+                    disabled={creating || !server.isConnected}
+                    icon="clock outline"
+                    onClick={() =>
+                      setWatchDraft({
+                        searchText:
+                          inputRef?.current?.inputRef?.current?.value ?? '',
+                      })
+                    }
+                  />
+                }
+              />
               <Button
                 disabled={creating || !server.isConnected}
                 icon="search"
@@ -261,6 +329,15 @@ const Searches = ({ server } = {}) => {
           onRemove={remove}
           onStop={stop}
           searches={searches}
+          watches={watches}
+        />
+      )}
+      {watchDraft && (
+        <WatchModal
+          onClose={() => setWatchDraft(undefined)}
+          onSave={createWatch}
+          open
+          searchText={watchDraft.searchText}
         />
       )}
     </>

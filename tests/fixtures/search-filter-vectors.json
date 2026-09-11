@@ -1,0 +1,342 @@
+{
+  "$comment": [
+    "Vectors for the search results filter language, read by BOTH implementations:",
+    "src/web/src/lib/searches.js (the page) and src/slskd/Search/SearchFilters.cs (a watch).",
+    "A watch must report exactly what the page would show, and two implementations of one",
+    "grammar drift the moment nothing forces them together. Several cases below record",
+    "behaviour that reads as a mistake; they are here so that it cannot be changed in one",
+    "implementation without the other's suite failing.",
+    "Note what several cases record: the page tests attributes against `undefined`, while the API sends `null`. null < 320 is true (null converts to 0) where undefined < 320 is false, and null === undefined is false while !null is true. So an unreported value fails every minimum, and iscbr and isvbr disagree about what to do with one. The first C# port assumed otherwise and these vectors caught it."
+  ],
+  "files": {
+    "flac": {
+      "filename": "Artist - Album/01 Track.flac",
+      "size": 30000000,
+      "bitRate": null,
+      "bitDepth": 16,
+      "sampleRate": 44100,
+      "length": 210,
+      "isVariableBitRate": null
+    },
+    "mp3_320_cbr": {
+      "filename": "Artist - Album/01 Track.mp3",
+      "size": 8000000,
+      "bitRate": 320,
+      "bitDepth": null,
+      "sampleRate": null,
+      "length": 210,
+      "isVariableBitRate": false
+    },
+    "mp3_192_vbr": {
+      "filename": "Artist - Album/02 Other.mp3",
+      "size": 5000000,
+      "bitRate": 192,
+      "bitDepth": null,
+      "sampleRate": null,
+      "length": 200,
+      "isVariableBitRate": true
+    },
+    "bare": {
+      "filename": "Bootlegs/unknown rip.flac",
+      "size": 25000000,
+      "bitRate": null,
+      "bitDepth": null,
+      "sampleRate": null,
+      "length": null,
+      "isVariableBitRate": null
+    },
+    "zero_rate": {
+      "filename": "Odd/zero.flac",
+      "size": 1000,
+      "bitRate": null,
+      "bitDepth": 0,
+      "sampleRate": 0,
+      "length": 10,
+      "isVariableBitRate": null
+    }
+  },
+  "cases": [
+    {
+      "name": "an empty filter keeps everything",
+      "filter": "",
+      "passes": [
+        "flac",
+        "mp3_320_cbr",
+        "mp3_192_vbr",
+        "bare",
+        "zero_rate"
+      ]
+    },
+    {
+      "name": "islossless needs both a sample rate and a bit depth",
+      "filter": "islossless",
+      "passes": [
+        "flac"
+      ]
+    },
+    {
+      "name": "islossless rejects a real flac from a peer that reported no attributes",
+      "filter": "islossless",
+      "rejects": [
+        "bare"
+      ]
+    },
+    {
+      "name": "a zero sample rate counts as missing, not as present",
+      "filter": "islossless",
+      "rejects": [
+        "zero_rate"
+      ]
+    },
+    {
+      "name": "islossy is the complement, so an attribute-less file counts as lossy",
+      "filter": "islossy",
+      "passes": [
+        "mp3_320_cbr",
+        "mp3_192_vbr",
+        "bare",
+        "zero_rate"
+      ]
+    },
+    {
+      "name": "iscbr rejects only a file explicitly flagged variable; an unreported flag is kept",
+      "filter": "iscbr",
+      "passes": [
+        "mp3_320_cbr",
+        "flac",
+        "bare"
+      ],
+      "rejects": [
+        "mp3_192_vbr"
+      ]
+    },
+    {
+      "name": "isvbr rejects an unreported flag, where iscbr keeps it -- the two are asymmetric",
+      "filter": "isvbr",
+      "passes": [
+        "mp3_192_vbr"
+      ],
+      "rejects": [
+        "mp3_320_cbr",
+        "flac",
+        "bare"
+      ]
+    },
+    {
+      "name": "a minimum excludes a file that reports less",
+      "filter": "minbitrate:320",
+      "rejects": [
+        "mp3_192_vbr"
+      ]
+    },
+    {
+      "name": "an unreported value is compared as zero, so it fails a minimum",
+      "filter": "minbitrate:320",
+      "rejects": [
+        "flac",
+        "bare"
+      ]
+    },
+    {
+      "name": "minbr is the same field as minbitrate",
+      "filter": "minbr:320",
+      "rejects": [
+        "mp3_192_vbr"
+      ]
+    },
+    {
+      "name": "minfilesize is compared against bytes, so the page's own placeholder excludes nothing",
+      "filter": "minfilesize:10",
+      "passes": [
+        "flac",
+        "mp3_320_cbr",
+        "mp3_192_vbr",
+        "bare",
+        "zero_rate"
+      ]
+    },
+    {
+      "name": "minfilesize in bytes does exclude, given a byte count",
+      "filter": "minfilesize:10000000",
+      "passes": [
+        "flac",
+        "bare"
+      ],
+      "rejects": [
+        "mp3_320_cbr",
+        "zero_rate"
+      ]
+    },
+    {
+      "name": "minlength is in seconds",
+      "filter": "minlength:205",
+      "passes": [
+        "flac",
+        "mp3_320_cbr"
+      ],
+      "rejects": [
+        "mp3_192_vbr",
+        "zero_rate"
+      ]
+    },
+    {
+      "name": "an unreported length fails a minimum for the same reason",
+      "filter": "minlength:205",
+      "rejects": [
+        "bare"
+      ]
+    },
+    {
+      "name": "minbitdepth excludes a lower depth and an unreported one alike",
+      "filter": "minbitdepth:24",
+      "rejects": [
+        "flac",
+        "zero_rate",
+        "mp3_320_cbr",
+        "bare"
+      ]
+    },
+    {
+      "name": "an include term matches anywhere in the path",
+      "filter": "album",
+      "passes": [
+        "flac",
+        "mp3_320_cbr",
+        "mp3_192_vbr"
+      ],
+      "rejects": [
+        "bare"
+      ]
+    },
+    {
+      "name": "include terms are ANDed, so this can never match",
+      "filter": "album bootlegs",
+      "rejects": [
+        "flac",
+        "bare"
+      ]
+    },
+    {
+      "name": "matching is case insensitive",
+      "filter": "ARTIST",
+      "passes": [
+        "flac"
+      ]
+    },
+    {
+      "name": "a leading dash excludes",
+      "filter": "-bootlegs",
+      "passes": [
+        "flac"
+      ],
+      "rejects": [
+        "bare"
+      ]
+    },
+    {
+      "name": "include and exclude combine",
+      "filter": "track -mp3",
+      "passes": [
+        "flac"
+      ],
+      "rejects": [
+        "mp3_320_cbr"
+      ]
+    },
+    {
+      "name": "a flag is not also an include term",
+      "filter": "islossless",
+      "passes": [
+        "flac"
+      ]
+    },
+    {
+      "name": "a field is not also an include term",
+      "filter": "minbitrate:320 track",
+      "passes": [
+        "mp3_320_cbr"
+      ]
+    },
+    {
+      "name": "consecutive spaces yield empty terms, which match everything",
+      "filter": "track  flac",
+      "passes": [
+        "flac"
+      ]
+    },
+    {
+      "name": "flags and fields and terms together",
+      "filter": "islossless minbitdepth:16 track -bootlegs",
+      "passes": [
+        "flac"
+      ],
+      "rejects": [
+        "bare",
+        "mp3_320_cbr"
+      ]
+    }
+  ],
+  "parseCases": [
+    {
+      "filter": "minbr:320",
+      "expect": {
+        "minBitRate": 320
+      }
+    },
+    {
+      "filter": "minbitrate:320",
+      "expect": {
+        "minBitRate": 320
+      }
+    },
+    {
+      "filter": "minbd:24 minfs:100 minlen:60 minfif:8",
+      "expect": {
+        "minBitDepth": 24,
+        "minFileSize": 100,
+        "minLength": 60,
+        "minFilesInFolder": 8
+      }
+    },
+    {
+      "filter": "isvbr iscbr islossless islossy",
+      "expect": {
+        "isVBR": true,
+        "isCBR": true,
+        "isLossless": true,
+        "isLossy": true,
+        "include": [],
+        "exclude": []
+      }
+    },
+    {
+      "filter": "one -two three",
+      "expect": {
+        "include": [
+          "one",
+          "three"
+        ],
+        "exclude": [
+          "two"
+        ]
+      }
+    },
+    {
+      "filter": "",
+      "expect": {
+        "minBitRate": 0,
+        "include": [
+          ""
+        ],
+        "exclude": []
+      }
+    },
+    {
+      "filter": "MinBitRate:320 ISLOSSLESS",
+      "expect": {
+        "minBitRate": 320,
+        "isLossless": true
+      }
+    }
+  ]
+}

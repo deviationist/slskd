@@ -44,12 +44,33 @@ namespace slskd.Search
 
         public DbSet<Search> Searches { get; set; }
 
+        public DbSet<slskd.Search.Watches.Watch> Watches { get; set; }
+
+        public DbSet<slskd.Search.Watches.WatchFile> WatchFiles { get; set; }
+
+        public DbSet<slskd.Search.Watches.WatchRun> WatchRuns { get; set; }
+
+        public DbSet<slskd.Search.Watches.WatchNotification> WatchNotifications { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder
                 .Entity<Search>()
                 .Property(e => e.StartedAt)
                 .HasConversion(v => v, v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
+
+            modelBuilder
+                .Entity<slskd.Search.Watches.WatchFile>()
+                .HasIndex(e => new { e.SearchId, e.Username, e.Filename })
+                .IsUnique();
+
+            modelBuilder
+                .Entity<slskd.Search.Watches.WatchRun>()
+                .HasIndex(e => new { e.SearchId, e.StartedAt });
+
+            modelBuilder
+                .Entity<slskd.Search.Watches.WatchNotification>()
+                .HasIndex(e => new { e.SearchId, e.SentAt });
 
             modelBuilder
                 .Entity<Search>()

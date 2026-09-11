@@ -129,3 +129,78 @@
   display: inline;
   margin-left: auto;
 }
+/* Its own segment rather than the detail header's: that one is a flex container
+   with a fixed 78px height, which makes anything inside it a flex item sized to
+   its content -- so a panel placed there neither fills the width nor fits two
+   lines of text. */
+.watch-panel-segment {
+  margin-top: 15px !important;
+}
+
+/* The watch panel: a summary that grows, beside actions that do not.
+   The text stacks and wraps in the space it has; without a min-width of zero a
+   flex item refuses to shrink below its content, which is what pushed the
+   buttons onto their own line. */
+.watch-panel {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75em;
+}
+
+.watch-panel-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35em;
+  min-width: 0;
+  flex: 1 1 20em;
+}
+
+.watch-panel-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5em;
+}
+
+.watch-panel-muted {
+  opacity: 0.7;
+  font-size: 0.92em;
+}
+
+.watch-panel-actions {
+  flex: 0 0 auto;
+}
+
+/* The destructive action is a sibling of the group rather than its last button:
+   it no longer shares an edge with 'Emails', and on a narrow screen it can take
+   a row of its own instead of being squeezed against the others. */
+.watch-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 0.5em;
+  /* may shrink: `0 0 auto` refuses to go below its content, so on a narrow
+     screen the buttons overflowed the panel rather than wrapping inside it */
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.watch-panel-actions > .ui.buttons {
+  max-width: 100%;
+}
+
+/* below this the actions take a row of their own under the summary, and the
+   destructive one takes a row under those */
+@media (max-width: 550px) {
+  .watch-panel-actions {
+    flex-basis: 100%;
+  }
+
+  .watch-panel-stop {
+    flex-basis: 100%;
+  }
+}
