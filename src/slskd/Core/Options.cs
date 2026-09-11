@@ -193,6 +193,14 @@ namespace slskd
         public bool RemoteFileManagement { get; init; } = false;
 
         /// <summary>
+        ///     Gets a value indicating whether remote retrieval of files is allowed.
+        /// </summary>
+        [Argument(default, "remote-file-retrieval")]
+        [EnvironmentVariable("REMOTE_FILE_RETRIEVAL")]
+        [Description("allow remote retrieval (downloading to the browser) of files")]
+        public bool RemoteFileRetrieval { get; init; } = false;
+
+        /// <summary>
         ///     Gets the unique name for this instance.
         /// </summary>
         [Argument('i', "instance-name")]

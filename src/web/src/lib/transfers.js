@@ -1,4 +1,6 @@
+import { apiBaseUrl } from '../config';
 import api from './api';
+import { downloadFile } from './util';
 
 export const getAll = async ({ direction }) => {
   const response = (
@@ -189,6 +191,152 @@ export const summariseDeletions = (results = []) => {
     message: `Removed ${total} and deleted ${deletedFiles.length === 1 ? 'the file' : `${deletedFiles.length} files`}${folders}`,
   };
 };
+
+/**
+ * Fetches the file a completed download produced, and hands it to the browser
+ * as a save.
+ *
+ * The transfer is named by its **id**. The path of the file is resolved
+ * server-side, from what the application recorded when it wrote it -- no path
+ * is sent from here, which is what makes a traversal impossible rather than
+ * merely guarded against.
+ *
+ * The response is read into a Blob before it is saved, because the API is
+ * authenticated with a bearer token and a plain `<a download>` link cannot
+ * carry one. The endpoint itself streams and serves ranges, so a deployment
+ * that authenticates some other way -- a reverse proxy in front of it, or
+ * `no_auth` -- can fetch the URL directly and stream it without this hop.
+ * @param {object} params
+ * @param {string} params.username - The user the download came from.
+ * @param {string} params.id - The id of the download.
+ * @param {string} params.filename - The name to save as.
+ * @returns {Promise<void>} Resolves once the save has been handed to the browser.
+ */
+export const retrieveFile = async ({ username, id, filename }) => {
+  const response = await api.get(
+    `/transfers/downloads/${encodeURIComponent(username)}/${encodeURIComponent(id)}/file`,
+    { responseType: 'blob' },
+  );
+
+  downloadFile(response.data, filename, response.headers['content-type']);
+};
+
+/**
+ * What to say when a retrieval fails.
+ *
+ * The request asks for a Blob, so axios hands back a *Blob* on an error
+ * response too -- the body of a 403 is a Blob, not a string, and toasting it
+ * would print '[object Blob]'. The status is the part that is readable without
+ * unpacking it, and it is the part that says what to do next.
+ */
+export const describeRetrievalError = (error) => {
+  switch (error?.response?.status) {
+    case 403:
+      return 'Downloading files to the browser is not enabled on this server (remote_file_retrieval)';
+    case 404:
+      return 'There is no file on disk for this download';
+    default:
+      return error?.message ?? 'the file could not be retrieved';
+  }
+};
+
+/**
+ * Whether a failed retrieval means the file is gone, rather than something that
+ * might work next time.
+ *
+ * Worth knowing because a file *going* is the normal end of a download's life
+ * here -- something downstream moves finished files into a library -- so a row
+ * whose file has gone is not an error state to retry, it is a button that
+ * should stop offering itself.
+ */
+export const isRetrievalPermanentlyGone = (error) =>
+  error?.response?.status === 404;
+
+/**
+ * Asks which of the specified downloads still have a file that could go into an
+ * archive.
+ *
+ * Asked before an archive is started rather than discovered during it: the
+ * archive is streamed, so once it has begun there is no way left to tell the
+ * operator that a third of what they picked was not there.
+ * @param {object} params
+ * @param {string} params.username - The user the downloads came from.
+ * @param {string[]} params.ids - The ids of the downloads.
+ * @returns {Promise<{available: {id: string, filename: string}[], missing: {id: string, filename: string}[]}>} What is there and what is not.
+ */
+export const archiveAvailability = async ({ username, ids }) => {
+  const response = await api.post(
+    `/transfers/downloads/${encodeURIComponent(username)}/archive/availability`,
+    { ids },
+  );
+
+  return response.data;
+};
+
+/**
+ * Sends the browser to `url` to be downloaded, without navigating this page.
+ *
+ * A hidden iframe rather than assigning `location`: on success the response is
+ * an attachment and nothing navigates either way, but on a failure it is a
+ * page -- and assigning `location` would replace the running app with it. The
+ * cost is that such a failure is invisible here, which is the right trade when
+ * the ticket being used was issued a moment ago and for exactly this request.
+ *
+ * The frame is left in place for a while because removing it before the
+ * response has begun cancels the download.
+ */
+const streamToBrowser = (url) => {
+  const frame = document.createElement('iframe');
+
+  frame.style.display = 'none';
+  frame.src = url;
+
+  document.body.append(frame);
+
+  setTimeout(() => frame.remove(), 60_000);
+};
+
+/**
+ * Fetches an archive of the specified downloads, and hands it to the browser's
+ * own download manager.
+ *
+ * Unlike the single-file path this does **not** read the response in this tab.
+ * An album is too big to hold in memory, so the browser is sent to the URL
+ * instead and streams it to disk itself. A navigation cannot carry an
+ * Authorization header, which is what the ticket is for: it is asked for here,
+ * over the authenticated API, and spent immediately.
+ * @param {object} params
+ * @param {string} params.username - The user the downloads came from.
+ * @param {string[]} params.ids - The ids of the downloads.
+ * @returns {Promise<void>} Resolves once the browser has been sent to the archive.
+ */
+export const retrieveArchive = async ({ username, ids }) => {
+  const { ticket } = (
+    await api.post(
+      `/transfers/downloads/${encodeURIComponent(username)}/archive/ticket`,
+      { ids },
+    )
+  ).data;
+
+  const url = `${apiBaseUrl}/transfers/downloads/${encodeURIComponent(
+    username,
+  )}/archive?ticket=${encodeURIComponent(ticket)}`;
+
+  streamToBrowser(url);
+};
+
+/**
+ * What to say when an archive could not be started.
+ *
+ * These responses are JSON, not Blobs -- the pre-flight and the ticket are
+ * ordinary API calls -- so unlike a single-file retrieval the body is readable
+ * and worth reaching for first.
+ */
+export const describeArchiveError = (error) =>
+  error?.response?.data ??
+  (error?.response?.status === 403
+    ? 'Downloading files to the browser is not enabled on this server (remote_file_retrieval)'
+    : error?.message ?? 'the archive could not be started');
 
 export const clearCompleted = ({ direction }) => {
   return api.delete(`/transfers/${direction}s/all/completed`);

@@ -1,6 +1,8 @@
+import * as transfers from '../../lib/transfers';
 import { formatBytes, formatBytesAsUnit, getFileName } from '../../lib/util';
 import TransferDetails from './TransferDetails';
 import React, { Component } from 'react';
+import { toast } from 'react-toastify';
 import {
   Button,
   Checkbox,
@@ -73,6 +75,17 @@ const getColor = (state) => {
 const isRetryableState = (state) => getColor(state).color === 'red';
 const isQueuedState = (state) => state.includes('Queued');
 
+/* Whether this row has a file the server can hand back.
+ *
+ * Three things have to hold, and the last is the one that is easy to forget:
+ * `localFilename` is null for downloads that finished before this application
+ * began recording where it wrote them, and the server answers 404 for those.
+ * A button that is always refused is worse than no button. */
+const isRetrievable = (file) =>
+  file.direction === 'Download' &&
+  file.state === 'Completed, Succeeded' &&
+  Boolean(file.localFilename);
+
 const formatBytesTransferred = ({ size, transferred }) => {
   const [s, sExtension] = formatBytes(size, 1).split(' ');
   const t = formatBytesAsUnit(transferred, sExtension, 1);
@@ -86,8 +99,40 @@ class TransferList extends Component {
 
     this.state = {
       isFolded: false,
+      retrieving: null,
+      // ids whose file the server has already said is gone. something downstream
+      // moves finished files out of the downloads directory, so a download whose
+      // file has left is the normal end of its life rather than an error worth
+      // retrying -- and a button that has been refused once should stop offering
+      // itself
+      unavailable: new Set(),
     };
   }
+
+  handleRetrieve = async (file) => {
+    const { username } = this.props;
+
+    try {
+      this.setState({ retrieving: file.id });
+
+      await transfers.retrieveFile({
+        filename: getFileName(file.filename),
+        id: file.id,
+        username,
+      });
+    } catch (error) {
+      console.error(error);
+      toast.error(transfers.describeRetrievalError(error));
+
+      if (transfers.isRetrievalPermanentlyGone(error)) {
+        this.setState((previousState) => ({
+          unavailable: new Set(previousState.unavailable).add(file.id),
+        }));
+      }
+    } finally {
+      this.setState({ retrieving: null });
+    }
+  };
 
   handleClick = (file) => {
     const { direction, state } = file;
@@ -110,8 +155,9 @@ class TransferList extends Component {
   };
 
   render() {
-    const { directoryName, files, onSelectionChange } = this.props;
-    const { isFolded } = this.state;
+    const { directoryName, files, onSelectionChange, retrievalEnabled } =
+      this.props;
+    const { isFolded, retrieving, unavailable } = this.state;
 
     return (
       <div>
@@ -156,6 +202,9 @@ class TransferList extends Component {
                     <Table.HeaderCell className="transferlist-size">
                       Size
                     </Table.HeaderCell>
+                    {retrievalEnabled && (
+                      <Table.HeaderCell className="transferlist-retrieve" />
+                    )}
                     <Table.HeaderCell className="transferlist-detail">
                       <Icon
                         name="info circle"
@@ -239,6 +288,44 @@ class TransferList extends Component {
                             </span>
                           </div>
                         </Table.Cell>
+                        {retrievalEnabled && (
+                          <Table.Cell className="transferlist-retrieve">
+                            {isRetrievable(f) &&
+                              (unavailable.has(f.id) ? (
+                                <Popup
+                                  content="This file is no longer on disk"
+                                  position="left center"
+                                  trigger={
+                                    <Icon
+                                      disabled
+                                      name="download"
+                                      size="small"
+                                    />
+                                  }
+                                />
+                              ) : (
+                                <Popup
+                                  content="Download this file to your browser"
+                                  position="left center"
+                                  trigger={
+                                    <Icon
+                                      color="grey"
+                                      disabled={retrieving === f.id}
+                                      link
+                                      loading={retrieving === f.id}
+                                      name={
+                                        retrieving === f.id
+                                          ? 'spinner'
+                                          : 'download'
+                                      }
+                                      onClick={() => this.handleRetrieve(f)}
+                                      size="small"
+                                    />
+                                  }
+                                />
+                              ))}
+                          </Table.Cell>
+                        )}
                         <Table.Cell className="transferlist-detail">
                           <Popup
                             className="transfer-details-popup"

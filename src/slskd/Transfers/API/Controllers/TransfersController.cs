@@ -38,13 +38,16 @@ namespace slskd.Transfers.API
     using System.Collections.Generic;
     using System.IO;
     using System.ComponentModel.DataAnnotations;
+    using System.IO.Compression;
     using System.Linq;
     using System.Threading;
     using System.Threading.Tasks;
     using Asp.Versioning;
     using Microsoft.AspNetCore.Authorization;
     using Microsoft.AspNetCore.Http;
+    using Microsoft.AspNetCore.Http.Features;
     using Microsoft.AspNetCore.Mvc;
+    using Microsoft.AspNetCore.StaticFiles;
     using Serilog;
     using slskd.Files;
     using slskd.Users;
@@ -65,22 +68,43 @@ namespace slskd.Transfers.API
         /// <param name="optionsSnapshot"></param>
         /// <param name="userService"></param>
         /// <param name="transferService"></param>
+        /// <param name="fileService"></param>
+        /// <param name="downloadTicketService"></param>
         public TransfersController(
             TransferService transferService,
             IUserService userService,
             FileService fileService,
+            DownloadTicketService downloadTicketService,
             IOptionsSnapshot<Options> optionsSnapshot)
         {
             Transfers = transferService;
             Users = userService;
             Files = fileService;
+            Tickets = downloadTicketService;
             OptionsSnapshot = optionsSnapshot;
         }
+
+        /// <summary>
+        ///     Gets the map of file extensions to content types used when serving a downloaded file.
+        /// </summary>
+        /// <remarks>
+        ///     The framework's built-in map doesn't include some of the formats that are most common on the Soulseek
+        ///     network, so they are added here. Anything still unmapped is served as 'application/octet-stream'.
+        /// </remarks>
+        private static FileExtensionContentTypeProvider ContentTypeProvider { get; } = new()
+        {
+            Mappings =
+            {
+                [".flac"] = "audio/flac",
+                [".opus"] = "audio/ogg",
+            },
+        };
 
         private static SemaphoreSlim DownloadRequestLimiter { get; } = new SemaphoreSlim(2, 2);
         private TransferService Transfers { get; }
         private IUserService Users { get; }
         private FileService Files { get; }
+        private DownloadTicketService Tickets { get; }
         private IOptionsSnapshot<Options> OptionsSnapshot { get; }
         private ILogger Log { get; set; } = Serilog.Log.ForContext<TransfersController>();
 
@@ -801,6 +825,375 @@ namespace slskd.Transfers.API
         }
 
         /// <summary>
+        ///     Gets the contents of the file produced by the specified download.
+        /// </summary>
+        /// <param name="username">The username of the download source.</param>
+        /// <param name="id">The id of the download.</param>
+        /// <returns></returns>
+        /// <remarks>
+        ///     <para>
+        ///         The download is identified by its id, and the path of the file it produced is resolved here, from the
+        ///         path this application recorded when it wrote the file. No part of the path is supplied by the caller,
+        ///         so there is no path for a caller to traverse.
+        ///     </para>
+        ///     <para>
+        ///         The recorded path is nonetheless opened through the file service, which allows the configured downloads
+        ///         and incomplete directories and nothing else. It was derived from a filename a remote peer chose, so it
+        ///         is checked rather than trusted -- and a path recorded before the downloads directory was reconfigured is
+        ///         refused here exactly as it would be anywhere else.
+        ///     </para>
+        ///     <para>
+        ///         Only a download that succeeded is served. While one is running its recorded path is the partial file in
+        ///         the incomplete directory, and a partial file served under the finished file's name is worse than no file
+        ///         at all. A download that finished before this application began recording where the bytes went has no
+        ///         recorded path, and is reported as not found rather than guessed at.
+        ///     </para>
+        /// </remarks>
+        /// <response code="200">The request completed successfully.</response>
+        /// <response code="400">The specified id is not a valid id.</response>
+        /// <response code="403">Retrieval is disabled, or the recorded file is not in an application-controlled directory.</response>
+        /// <response code="404">The specified download was not found, did not succeed, or produced no file that still exists.</response>
+        [HttpGet("downloads/{username}/{id}/file")]
+        [Authorize(Policy = AuthPolicy.Any)]
+        [ProducesResponseType(typeof(FileResult), 200)]
+        [ProducesResponseType(400)]
+        [ProducesResponseType(403)]
+        [ProducesResponseType(404)]
+        public IActionResult GetDownloadedFile([FromRoute, UrlEncoded, Required] string username, [FromRoute, Required] string id)
+        {
+            if (Program.IsRelayAgent)
+            {
+                return Forbid();
+            }
+
+            if (!OptionsSnapshot.Value.RemoteFileRetrieval)
+            {
+                return Forbid();
+            }
+
+            if (!Guid.TryParse(id, out var guid))
+            {
+                return BadRequest();
+            }
+
+            var download = Transfers.Downloads.Find(t => t.Id == guid);
+
+            if (download == default)
+            {
+                return NotFound();
+            }
+
+            if (!TransferStateCategories.Successful.Contains(download.State))
+            {
+                Log.Debug("Download {Id} is in state {State}; only a successful download has a file to serve", guid, download.State);
+                return NotFound();
+            }
+
+            var filename = download.LocalFilename;
+
+            if (string.IsNullOrWhiteSpace(filename))
+            {
+                Log.Debug("No local file is recorded for download {Id}; there is nothing to serve", guid);
+                return NotFound();
+            }
+
+            Log.Information("Serving the file produced by download {Id} from '{File}'", guid, filename);
+
+            try
+            {
+                // the service resolves symlinks and checks containment before it opens anything; if it returns a
+                // Stream, the file is known to reside within an application-controlled directory
+                var stream = Files.OpenFile(filename);
+
+                if (!ContentTypeProvider.TryGetContentType(filename, out var contentType))
+                {
+                    contentType = "application/octet-stream";
+                }
+
+                // the framework takes care of Content-Length, Accept-Ranges, and the RFC 6266 encoding of the
+                // filename in the Content-Disposition header, and disposes of the Stream once the response has
+                // been written. the file is streamed; it is never read into memory here
+                return File(
+                    fileStream: stream,
+                    contentType: contentType,
+                    fileDownloadName: Path.GetFileName(filename),
+                    enableRangeProcessing: true);
+            }
+            catch (Exception ex) when (ex is UnauthorizedException || ex is ArgumentException)
+            {
+                Log.Warning("The file recorded for download {Id} is not one this application may serve: {Message}", guid, ex.Message);
+                return Forbid();
+            }
+            catch (NotFoundException)
+            {
+                Log.Debug("The file recorded for download {Id} no longer exists at '{File}'", guid, filename);
+                return NotFound();
+            }
+        }
+
+        /// <summary>
+        ///     Reports which of the specified downloads still have a file that can be archived.
+        /// </summary>
+        /// <param name="username">The username of the download source.</param>
+        /// <param name="request">The ids of the downloads to check.</param>
+        /// <returns></returns>
+        /// <remarks>
+        ///     Asked before an archive is started, because an archive is *streamed*: once its first byte is written the
+        ///     response is committed, and there is no longer any way to tell the caller that half of what they asked
+        ///     for was not there. This is what lets the UI say so while it can still be acted on.
+        /// </remarks>
+        /// <response code="200">The request completed successfully.</response>
+        /// <response code="400">No ids were specified, or one of them is not a valid id.</response>
+        /// <response code="403">Retrieval is disabled.</response>
+        [HttpPost("downloads/{username}/archive/availability")]
+        [Authorize(Policy = AuthPolicy.Any)]
+        [ProducesResponseType(typeof(ArchiveAvailabilityResponse), 200)]
+        [ProducesResponseType(400)]
+        [ProducesResponseType(403)]
+        public IActionResult GetArchiveAvailability([FromRoute, UrlEncoded, Required] string username, [FromBody] ArchiveRequest request)
+        {
+            if (Program.IsRelayAgent)
+            {
+                return Forbid();
+            }
+
+            if (!OptionsSnapshot.Value.RemoteFileRetrieval)
+            {
+                return Forbid();
+            }
+
+            if (!TryParseIds(request, out var ids, out var error))
+            {
+                return BadRequest(error);
+            }
+
+            var available = new List<ArchiveAvailabilityEntry>();
+            var missing = new List<ArchiveAvailabilityEntry>();
+
+            foreach (var id in ids)
+            {
+                var download = Transfers.Downloads.Find(t => t.Id == id);
+                var entry = new ArchiveAvailabilityEntry { Id = id.ToString(), Filename = DisplayNameOf(download, id) };
+
+                // opened and closed again rather than merely looked for, so that this answers exactly the question the
+                // archive will ask of the same file a moment later -- whether it can be *read*, not only whether
+                // something is sitting at that path
+                if (TryOpenDownloadedFile(download, out var stream, out _))
+                {
+                    stream.Dispose();
+                    available.Add(entry);
+                }
+                else
+                {
+                    missing.Add(entry);
+                }
+            }
+
+            return Ok(new ArchiveAvailabilityResponse { Available = available, Missing = missing });
+        }
+
+        /// <summary>
+        ///     Issues a short-lived, single-use ticket authorizing one download of an archive of the specified downloads.
+        /// </summary>
+        /// <param name="username">The username of the download source.</param>
+        /// <param name="request">The ids of the downloads to be archived.</param>
+        /// <returns></returns>
+        /// <remarks>
+        ///     The archive is fetched by navigating to it, so that the browser streams it to disk with its own download
+        ///     manager instead of holding the whole thing in the memory of a tab -- and a navigation cannot carry an
+        ///     Authorization header. This ticket is the credential for that one navigation. See
+        ///     <see cref="DownloadTicketService"/> for what it is bound to and how long it lives.
+        /// </remarks>
+        /// <response code="200">The request completed successfully.</response>
+        /// <response code="400">No ids were specified, or one of them is not a valid id.</response>
+        /// <response code="403">Retrieval is disabled.</response>
+        [HttpPost("downloads/{username}/archive/ticket")]
+        [Authorize(Policy = AuthPolicy.Any)]
+        [ProducesResponseType(typeof(DownloadTicketResponse), 200)]
+        [ProducesResponseType(400)]
+        [ProducesResponseType(403)]
+        public IActionResult CreateArchiveTicket([FromRoute, UrlEncoded, Required] string username, [FromBody] ArchiveRequest request)
+        {
+            if (Program.IsRelayAgent)
+            {
+                return Forbid();
+            }
+
+            if (!OptionsSnapshot.Value.RemoteFileRetrieval)
+            {
+                return Forbid();
+            }
+
+            if (!TryParseIds(request, out var ids, out var error))
+            {
+                return BadRequest(error);
+            }
+
+            var (ticket, expiresAtUtc) = Tickets.Issue(username, ids);
+
+            // the count, never the ticket. it is a bearer credential, and keeping it out of the log is the whole
+            // reason it is tolerable to put one in a URL
+            Log.Debug("Issued an archive download ticket for {Count} file(s) from {Username}", ids.Length, username);
+
+            return Ok(new DownloadTicketResponse { Ticket = ticket, ExpiresAtUtc = expiresAtUtc });
+        }
+
+        /// <summary>
+        ///     Gets an archive of the files produced by the downloads a ticket authorizes.
+        /// </summary>
+        /// <param name="username">The username of the download source.</param>
+        /// <param name="ticket">A ticket issued for this set of downloads.</param>
+        /// <returns></returns>
+        /// <remarks>
+        ///     <para>
+        ///         <b>Anonymous by design, and authorized by the ticket instead.</b> A browser navigation cannot carry
+        ///         an Authorization header, and a navigation is what lets the browser stream a large archive to disk
+        ///         rather than into the memory of a tab. The ticket is therefore the credential: 256 random bits,
+        ///         single-use, valid for a minute, and bound to the exact username and ids it was issued for, so one
+        ///         that leaks cannot be replayed against anything else. It is issued only to an authenticated caller.
+        ///     </para>
+        ///     <para>
+        ///         The archive is streamed and *stored* rather than deflated. Nothing is staged on disk: entries are
+        ///         written straight to the response as they are read. Audio does not compress, so deflating would spend
+        ///         CPU for nothing -- and storing is also what makes this a pass-through with nothing to wait for.
+        ///     </para>
+        ///     <para>
+        ///         Every path is resolved from what this application recorded and opened through the file service,
+        ///         entry by entry, exactly as a single-file retrieval is. A file that has gone missing since the
+        ///         availability check is skipped and named in a MISSING.txt written at the end of the archive: a
+        ///         response already most of the way to the browser must not be failed over one file.
+        ///     </para>
+        /// </remarks>
+        /// <response code="200">The request completed successfully.</response>
+        /// <response code="400">No ticket was specified.</response>
+        /// <response code="403">Retrieval is disabled, or the ticket is not one issued for this request.</response>
+        /// <response code="410">The ticket has expired.</response>
+        [HttpGet("downloads/{username}/archive")]
+        [AllowAnonymous]
+        [ProducesResponseType(typeof(FileResult), 200)]
+        [ProducesResponseType(400)]
+        [ProducesResponseType(403)]
+        [ProducesResponseType(410)]
+        public async Task<IActionResult> GetArchiveAsync([FromRoute, UrlEncoded, Required] string username, [FromQuery] string ticket)
+        {
+            // before anything else, and before anything can log this request: the ticket travels in the query string,
+            // because a navigation has nowhere else to put it. Serilog's request logging reads the raw target *after*
+            // the pipeline has run, so overwriting it here is what keeps the ticket out of this application's own log.
+            // (a proxy in front of this still records the URL it was asked for -- which is why a ticket is good for
+            // one use and one minute)
+            ScrubQueryFromRequestLog();
+
+            if (Program.IsRelayAgent)
+            {
+                return Forbid();
+            }
+
+            if (!OptionsSnapshot.Value.RemoteFileRetrieval)
+            {
+                return Forbid();
+            }
+
+            if (string.IsNullOrWhiteSpace(ticket))
+            {
+                return BadRequest("A ticket is required");
+            }
+
+            var redemption = Tickets.Redeem(ticket, username, out var ids);
+
+            if (redemption == TicketRedemption.Expired)
+            {
+                Log.Debug("An expired archive download ticket was presented for {Username}", username);
+                return StatusCode(StatusCodes.Status410Gone, "The download ticket has expired");
+            }
+
+            if (redemption != TicketRedemption.Valid)
+            {
+                Log.Warning("An invalid archive download ticket was presented for {Username}", username);
+                return Forbid();
+            }
+
+            // ordered by remote filename rather than left in selection order, so that two identical requests produce
+            // two identical archives -- which also makes the entry names, and any numbering applied to them, stable
+            var downloads = ids
+                .Select(id => (Id: id, Download: Transfers.Downloads.Find(t => t.Id == id)))
+                .OrderBy(t => t.Download?.Filename ?? t.Id.ToString(), StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var remoteFilenames = downloads.Select(t => t.Download?.Filename ?? t.Id.ToString()).ToList();
+            var entryNames = ArchiveNaming.EntryNamesFor(remoteFilenames);
+            var archiveName = ArchiveNaming.ArchiveNameFor(username, remoteFilenames, DateTime.UtcNow);
+
+            var contentDisposition = new Microsoft.Net.Http.Headers.ContentDispositionHeaderValue("attachment");
+            contentDisposition.SetHttpFileName(archiveName);
+
+            Response.ContentType = "application/zip";
+            Response.Headers.ContentDisposition = contentDisposition.ToString();
+
+            // no Content-Length. the size of a store-only archive *is* computable in advance, but only with a writer
+            // that controls every byte, and a Content-Length wrong by one is a broken download
+
+            // ask a reverse proxy not to buffer: nginx spools a proxied response to a temporary file by default, which
+            // for a streamed archive means waiting for all of it before the browser is handed any of it
+            Response.Headers["X-Accel-Buffering"] = "no";
+
+            Log.Information("Streaming an archive of {Count} file(s) from {Username} as '{Archive}'", downloads.Count, username, archiveName);
+
+            var skipped = new List<string>();
+
+            try
+            {
+                using var archive = new ZipArchive(Response.Body, ZipArchiveMode.Create, leaveOpen: true);
+
+                for (var i = 0; i < downloads.Count; i++)
+                {
+                    var download = downloads[i].Download;
+
+                    if (!TryOpenDownloadedFile(download, out var source, out var reason))
+                    {
+                        Log.Warning("Skipping '{Entry}' in the archive for {Username}: {Reason}", entryNames[i], username, reason);
+                        skipped.Add($"{entryNames[i]}{Environment.NewLine}    {reason}");
+                        continue;
+                    }
+
+                    await using (source)
+                    {
+                        var entry = archive.CreateEntry(entryNames[i], CompressionLevel.NoCompression);
+
+                        await using var target = entry.Open();
+                        await source.CopyToAsync(target, HttpContext.RequestAborted);
+                    }
+                }
+
+                // last, because entries are written in the order they are created, and this one can only be written
+                // once every other entry has had its turn and either made it or not
+                if (skipped.Count > 0)
+                {
+                    var entry = archive.CreateEntry(ArchiveNaming.MissingEntryName, CompressionLevel.NoCompression);
+
+                    await using var target = entry.Open();
+                    await using var writer = new StreamWriter(target);
+
+                    await writer.WriteLineAsync($"{skipped.Count} of the {downloads.Count} selected file(s) could not be added to this archive.");
+                    await writer.WriteLineAsync();
+
+                    foreach (var line in skipped)
+                    {
+                        await writer.WriteLineAsync(line);
+                        await writer.WriteLineAsync();
+                    }
+                }
+            }
+            catch (Exception ex) when (ex is OperationCanceledException || ex is IOException)
+            {
+                // the browser went away, or the connection did. there is no response left to put an error into, and
+                // nothing here is this application's fault
+                Log.Debug("The archive download for {Username} ended early: {Message}", username, ex.Message);
+            }
+
+            return new EmptyResult();
+        }
+
+        /// <summary>
         ///     Gets the download for the specified username matching the specified filename, and requests
         ///     the current place in the remote queue of the specified download.
         /// </summary>
@@ -945,6 +1338,137 @@ namespace slskd.Transfers.API
             }
 
             return Ok(upload);
+        }
+
+        /// <summary>
+        ///     Parses the ids in the specified <paramref name="request"/>.
+        /// </summary>
+        /// <remarks>
+        ///     Ids arrive as strings so that a malformed one can be reported as such. Bound as Guids they would become
+        ///     an empty Guid, match no transfer, and be reported as a file that has gone missing -- an answer that is
+        ///     both wrong and hard to argue with.
+        /// </remarks>
+        /// <param name="request">The request.</param>
+        /// <param name="ids">The parsed ids, if all of them parsed.</param>
+        /// <param name="error">What was wrong, if something was.</param>
+        /// <returns>A value indicating whether the request carried a usable set of ids.</returns>
+        private static bool TryParseIds(ArchiveRequest request, out Guid[] ids, out string error)
+        {
+            ids = null;
+            error = null;
+
+            var raw = request?.Ids?.ToArray() ?? [];
+
+            if (raw.Length == 0)
+            {
+                error = "One or more download ids must be specified";
+                return false;
+            }
+
+            var parsed = new List<Guid>();
+
+            foreach (var value in raw)
+            {
+                if (!Guid.TryParse(value, out var id))
+                {
+                    error = $"'{value}' is not a valid download id";
+                    return false;
+                }
+
+                parsed.Add(id);
+            }
+
+            ids = [.. parsed.Distinct()];
+            return true;
+        }
+
+        /// <summary>
+        ///     Returns the name to show an operator for the specified <paramref name="download"/>.
+        /// </summary>
+        /// <remarks>
+        ///     The last segment of the remote filename -- what the transfer list already shows. Not the local path,
+        ///     which is where the file sits on the server and is nobody's business in a confirmation dialog.
+        /// </remarks>
+        /// <param name="download">The download, if it is known.</param>
+        /// <param name="id">The id, used when it isn't.</param>
+        /// <returns>The name to display.</returns>
+        private static string DisplayNameOf(slskd.Transfers.Transfer download, Guid id)
+            => (download?.Filename ?? string.Empty)
+                .Split(['\\', '/'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .LastOrDefault() ?? id.ToString();
+
+        /// <summary>
+        ///     Opens the file produced by the specified <paramref name="download"/>, or says why it can't be opened.
+        /// </summary>
+        /// <remarks>
+        ///     The several ways a download can have no file to offer -- unknown, unsuccessful, no recorded path, a
+        ///     recorded path that no longer resolves to something readable inside an application-controlled directory
+        ///     -- collapse to one answer here, because to a caller archiving a folder they are one fact. The
+        ///     single-file endpoint keeps them apart, because there a status code can carry the difference.
+        /// </remarks>
+        /// <param name="download">The download.</param>
+        /// <param name="stream">The opened file, if it could be opened.</param>
+        /// <param name="reason">Why it could not be, if it could not.</param>
+        /// <returns>A value indicating whether the file was opened.</returns>
+        private bool TryOpenDownloadedFile(slskd.Transfers.Transfer download, out Stream stream, out string reason)
+        {
+            stream = null;
+            reason = null;
+
+            if (download is null)
+            {
+                reason = "this download is not known to this instance";
+                return false;
+            }
+
+            if (!TransferStateCategories.Successful.Contains(download.State))
+            {
+                reason = $"this download did not succeed ({download.State})";
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(download.LocalFilename))
+            {
+                reason = "no local file was recorded for this download";
+                return false;
+            }
+
+            try
+            {
+                // through the file service, so that a path recorded from a filename a remote peer chose is checked
+                // for containment before it is opened, exactly as it is everywhere else
+                stream = Files.OpenFile(download.LocalFilename);
+                return true;
+            }
+            catch (NotFoundException)
+            {
+                reason = "the file is no longer on disk";
+                return false;
+            }
+            catch (Exception ex) when (ex is UnauthorizedException || ex is ArgumentException || ex is IOException)
+            {
+                reason = ex.Message;
+                return false;
+            }
+        }
+
+        /// <summary>
+        ///     Replaces what this request will be logged as with its path alone, discarding the query string.
+        /// </summary>
+        /// <remarks>
+        ///     Serilog's request logging reads the request's raw target -- which includes the query string -- once the
+        ///     rest of the pipeline has run, so overwriting it from inside the action is what stops a credential in a
+        ///     query string from reaching the log. Nothing downstream of an action reads the raw target for anything
+        ///     other than diagnostics.
+        /// </remarks>
+        private void ScrubQueryFromRequestLog()
+        {
+            var feature = HttpContext.Features.Get<IHttpRequestFeature>();
+
+            if (feature is not null)
+            {
+                feature.RawTarget = HttpContext.Request.Path;
+            }
         }
     }
 }
