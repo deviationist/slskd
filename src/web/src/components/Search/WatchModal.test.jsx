@@ -1,3 +1,4 @@
+import * as watches from '../../lib/watches';
 import { WatchForm } from './WatchModal';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -66,6 +67,19 @@ describe('WatchForm', () => {
     for (const preset of ['Every hour', 'Once a day', 'Weekdays']) {
       expect(html).toContain(preset);
     }
+  });
+
+  it('uses native selects, whose menus belong to the browser', () => {
+    // a Semantic Dropdown here closed when the pointer entered its own menu.
+    // this is the only dropdown in the application inside a modal, and rather
+    // than chase that interaction the menu is the browser's, where nothing in
+    // the page can close it
+    const html = render();
+
+    expect(html.match(/<select/gu) ?? []).toHaveLength(2);
+    expect(html.match(/<option/gu) ?? []).toHaveLength(
+      watches.PRESETS.length + 24,
+    );
   });
 
   it('offers to skip what is already found only when creating', () => {
