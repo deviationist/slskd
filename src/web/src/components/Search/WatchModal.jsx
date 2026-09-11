@@ -211,6 +211,7 @@ const WatchModal = ({
 
   return (
     <Modal
+      className="watch-modal"
       closeIcon
       onClose={onClose}
       open={open}
