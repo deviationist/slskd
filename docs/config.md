@@ -1094,6 +1094,13 @@ Schedules are stored as RFC 5545 recurrence rules and read in a named IANA time 
 server's local time.  "Every day at 03:00" is a different instant in summer than in winter, and an operator who asked
 for 03:00 meant 03:00 where they are.
 
+> **A watch is for a search narrow enough to have stable results.**  The network answers a search with whichever
+> peers happen to reply, and that set differs every time — so a broad search reports hundreds of files it has never
+> seen on *every* run, none of which are newly available.  Measured on a popular query: two runs a minute apart
+> returned 252 and 250 responses, with 1471 files between them the first had not seen.  A notification lists at most
+> 50 files and says how many more there were, but the right fix for a noisy watch is a narrower search, not a longer
+> mail.
+
 Mail goes out through the [Mail](#mail) integration, so that must be configured; a watch may name its own recipient or
 use the configured default.  Every notification is recorded, including the ones that failed, so a watch whose mail has
 been bouncing says so rather than appearing to have found nothing.

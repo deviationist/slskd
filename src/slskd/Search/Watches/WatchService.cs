@@ -467,6 +467,19 @@ public class WatchService
         return added;
     }
 
+    /// <summary>
+    ///     The most files a notification lists, and the most it records.
+    /// </summary>
+    /// <remarks>
+    ///     A broad search finds hundreds of files it has never reported on every run, and not because anything new
+    ///     appeared: the network answers a search with whichever peers happen to reply, and the set differs every
+    ///     time. Measured on a popular query, two runs a minute apart returned 252 and 250 responses with 1471 files
+    ///     between them that the first run had not seen. A mail listing all of them is unreadable and a record of all
+    ///     of them is a third of a megabyte per run, so both are capped and the true count is kept alongside.
+    /// </remarks>
+    private const int MaximumFilesListed = 50;
+    private const int MaximumFilesRecorded = 200;
+
     private async Task NotifyAsync(Watch watch, string searchText, List<Match> files)
     {
         if (files.Count == 0)
@@ -481,11 +494,23 @@ public class WatchService
         body.AppendLine($"A watch on '{searchText}' found {files.Count} file(s) it has not reported before.");
         body.AppendLine();
 
-        foreach (var file in files.OrderBy(f => f.Username).ThenBy(f => f.Filename))
+        var listed = files.OrderBy(f => f.Username).ThenBy(f => f.Filename).Take(MaximumFilesListed).ToList();
+
+        foreach (var file in listed)
         {
             body.AppendLine($"  {file.Username}");
             body.AppendLine($"    {file.Filename}");
             body.AppendLine($"    {file.Size / 1024 / 1024} MB{(file.BitRate.HasValue ? $", {file.BitRate} kbps" : string.Empty)}{(file.Length.HasValue ? $", {file.Length / 60}:{file.Length % 60:00}" : string.Empty)}");
+            body.AppendLine();
+        }
+
+        if (files.Count > listed.Count)
+        {
+            body.AppendLine($"...and {files.Count - listed.Count} more.");
+            body.AppendLine();
+            body.AppendLine("A search this broad will report hundreds of files on every run, because the network");
+            body.AppendLine("answers with whichever peers happen to reply and that set differs each time. A watch");
+            body.AppendLine("is at its best on a search narrow enough that its results are stable.");
             body.AppendLine();
         }
 
@@ -525,7 +550,7 @@ public class WatchService
             Recipient = string.IsNullOrWhiteSpace(watch.NotifyEmail) ? options.To : watch.NotifyEmail,
             Subject = subject,
             FileCount = files.Count,
-            FilesJson = JsonSerializer.Serialize(files),
+            FilesJson = JsonSerializer.Serialize(files.Take(MaximumFilesRecorded)),
             Sent = error is null,
             Error = error,
         });
