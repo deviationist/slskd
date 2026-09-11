@@ -182,10 +182,24 @@
   flex-wrap: wrap;
   align-items: flex-start;
   gap: 0.5em;
-  flex: 0 0 auto;
+  /* may shrink: `0 0 auto` refuses to go below its content, so on a narrow
+     screen the buttons overflowed the panel rather than wrapping inside it */
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
 }
 
+.watch-panel-actions > .ui.buttons {
+  max-width: 100%;
+}
+
+/* below this the actions take a row of their own under the summary, and the
+   destructive one takes a row under those */
 @media (max-width: 550px) {
+  .watch-panel-actions {
+    flex-basis: 100%;
+  }
+
   .watch-panel-stop {
     flex-basis: 100%;
   }
