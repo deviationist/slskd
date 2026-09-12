@@ -1,7 +1,7 @@
 import * as transfers from '../../lib/transfers';
 import { formatBytes, formatBytesAsUnit, getFileName } from '../../lib/util';
 import TransferDetails from './TransferDetails';
-import React, { Component } from 'react';
+import React, { Component, useEffect } from 'react';
 import { toast } from 'react-toastify';
 import {
   Button,
@@ -64,36 +64,60 @@ const detailsPopperModifiers = [
  * the pointer between aiming and clicking, so the one thing worth showing is
  * which file this turned out to be about.
  */
-const ConfirmRemovalModal = ({ busy, onCancel, onConfirm, plan }) => (
-  <Modal
-    actions={[
-      'Cancel',
-      {
-        content: plan.confirmLabel,
-        key: 'remove',
-        loading: busy,
-        negative: true,
-        onClick: onConfirm,
-      },
-    ]}
-    centered
-    content={
-      <Modal.Content>
-        <p>{plan.prompt}</p>
-        <p className="transferlist-remove-path">{plan.filename}</p>
-      </Modal.Content>
-    }
-    header={
-      <Header
-        content={plan.header}
-        icon="trash alternate"
-      />
-    }
-    onClose={onCancel}
-    open
-    size="small"
-  />
-);
+const ConfirmRemovalModal = ({ busy, onCancel, onConfirm, plan }) => {
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (
+        transfers.confirmsRemoval({
+          busy,
+          key: event.key,
+          repeat: event.repeat,
+          targetTag: event.target?.tagName,
+        })
+      ) {
+        event.preventDefault();
+        onConfirm();
+      }
+    };
+
+    // on the document rather than the modal: nothing inside it holds focus when
+    // it opens, so a handler on the element itself would never see the key
+    document.addEventListener('keydown', onKeyDown);
+
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [busy, onConfirm]);
+
+  return (
+    <Modal
+      actions={[
+        'Cancel',
+        {
+          content: plan.confirmLabel,
+          key: 'remove',
+          loading: busy,
+          negative: true,
+          onClick: onConfirm,
+        },
+      ]}
+      centered
+      content={
+        <Modal.Content>
+          <p>{plan.prompt}</p>
+          <p className="transferlist-remove-path">{plan.filename}</p>
+        </Modal.Content>
+      }
+      header={
+        <Header
+          content={plan.header}
+          icon="trash alternate"
+        />
+      }
+      onClose={onCancel}
+      open
+      size="small"
+    />
+  );
+};
 
 const getColor = (state) => {
   switch (state) {

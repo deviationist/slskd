@@ -503,6 +503,34 @@ export const isStateRemovable = (state) => state.includes('Completed');
  * @param {boolean} [params.deleteFileOnRemoval] - Whether the server deletes files on removal; undefined where that is not yet known.
  * @returns {boolean} Whether a removal would delete a file.
  */
+/**
+ * Whether a keypress should confirm a removal dialog.
+ *
+ * Escape is Semantic's own; Enter is not, and it needs more care than it looks.
+ * A held key repeats, and a dialog that acted on every repeat would delete and
+ * then act again on whatever took its place. And the browser already activates
+ * a focused button on Enter -- so acting again when focus is on Cancel would
+ * both cancel and confirm, which is the worst possible pair.
+ * @param {object} params
+ * @param {string} params.key - The key pressed.
+ * @param {boolean} params.repeat - Whether this is a key-repeat.
+ * @param {boolean} params.busy - Whether the removal is already running.
+ * @param {string} params.targetTag - The tag name of the focused element.
+ * @returns {boolean} Whether it should confirm.
+ */
+export const confirmsRemoval = ({
+  busy = false,
+  key,
+  repeat = false,
+  targetTag = '',
+}) =>
+  key === 'Enter' &&
+  !repeat &&
+  !busy &&
+  !['A', 'BUTTON', 'INPUT', 'SELECT', 'TEXTAREA'].includes(
+    (targetTag ?? '').toUpperCase(),
+  );
+
 export const removalDeletesFile = ({ file, deleteFileOnRemoval }) =>
   deleteFileOnRemoval !== false &&
   file?.direction === 'Download' &&
