@@ -161,11 +161,12 @@ const Searches = ({ server } = {}) => {
   const createWatch = async (watch) => {
     const ref = inputRef?.current?.inputRef?.current;
     const searchText = watchDraft?.searchText ?? ref?.value;
-    const id = uuidv4();
 
     try {
-      await library.create({ id, searchText });
-      const { watch: saved } = await watchLibrary.put({ id, watch });
+      const { id, watch: saved } = await watchLibrary.createWatchedSearch({
+        searchText,
+        watch,
+      });
 
       setWatches((old) => ({ ...old, [id]: saved }));
       setWatchDraft(undefined);
