@@ -623,11 +623,23 @@ public class WatchService
 
         var listed = files.OrderBy(f => f.Username).ThenBy(f => f.Filename).Take(MaximumFilesListed).ToList();
 
+        var baseUrl = options.BaseUrl?.TrimEnd('/');
+
         foreach (var file in listed)
         {
             body.AppendLine($"  {file.Username}");
             body.AppendLine($"    {file.Filename}");
             body.AppendLine($"    {file.Size / 1024 / 1024} MB{(file.BitRate.HasValue ? $", {file.BitRate} kbps" : string.Empty)}{(file.Length.HasValue ? $", {file.Length / 60}:{file.Length % 60:00}" : string.Empty)}");
+
+            // a link to stop hearing about this one, which is the thing an operator wants at the moment they are
+            // reading about a file they do not want. it opens the search and asks before it does anything: the link
+            // carries no authority of its own, so following it is safe for anything that prefetches links in mail
+            if (!string.IsNullOrWhiteSpace(baseUrl))
+            {
+                var name = Uri.EscapeDataString(IgnoreSet.NameOf(file.Filename) ?? string.Empty);
+                body.AppendLine($"    Never report this again: {baseUrl}/searches/{watch.SearchId}?ignore={name}");
+            }
+
             body.AppendLine();
         }
 

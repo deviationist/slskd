@@ -1220,6 +1220,11 @@ stops that: it matches a **filename**, from anyone, in every watch.  A peer can 
 There is deliberately no third kind matching one path from one peer: a watch's own memory already covers that, so such
 a rule would only ever matter to a second watch over the same ground.
 
+Each file in a notification carries a link that offers to ignore it.  The link carries **no authority of its own** —
+it asks the page to offer the action, and the page asks before taking it — so anything that follows links in mail on
+the reader's behalf changes nothing.  It also works after the watch that sent the mail has been deleted, because an
+ignore is global and a notification outlives the watch that sent it.
+
 Ignores are applied **before** a match is recorded, so an ignored file is never marked as reported — remove the ignore
 and the next run reports it as new, rather than never.  Each run records how many matches an ignore removed, and the
 watch panel lists what is ignored with a way to undo it, because a suppression nobody can see is the failure this

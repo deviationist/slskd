@@ -2,6 +2,7 @@ import { formatBytes } from '../../../lib/util';
 import * as library from '../../../lib/watches';
 import WatchModal from '../WatchModal';
 import React, { useEffect, useState } from 'react';
+import { useHistory, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import {
   Button,
@@ -32,6 +33,12 @@ const WatchPanel = ({ searchId, searchText }) => {
   const [opened, setOpened] = useState(undefined);
   const [ignores, setIgnores] = useState([]);
   const [showingIgnores, setShowingIgnores] = useState(false);
+
+  // a link in a notification asks the page to offer this; the page asks before
+  // it does anything, so following the link changes nothing by itself
+  const location = useLocation();
+  const history = useHistory();
+  const asked = library.ignoreTargetFrom(location.search);
 
   const load = async () => {
     try {
@@ -69,8 +76,50 @@ const WatchPanel = ({ searchId, searchText }) => {
     }
   };
 
+  const dismissAsked = () => history.replace(location.pathname);
+
+  // the prompt is rendered whether or not there is still a watch here. a
+  // notification outlives the watch that sent it, and an ignore is global --
+  // so a link followed after the watch was deleted should still work, rather
+  // than doing nothing with no explanation
+  const askedPrompt = asked && (
+    <Modal
+      onClose={dismissAsked}
+      open
+      size="small"
+    >
+      <Modal.Header>
+        <Icon name="ban" />
+        Never report this again?
+      </Modal.Header>
+      <Modal.Content>
+        <p>No watch will report a file with this name again, from any peer.</p>
+        <p className="watch-panel-asked">{asked}</p>
+        <p className="watch-panel-muted">
+          Files already reported stay reported. This can be undone from Ignored
+          on any watched search.
+        </p>
+      </Modal.Content>
+      <Modal.Actions>
+        <Button onClick={dismissAsked}>Cancel</Button>
+        <Button
+          negative
+          onClick={async () => {
+            await act(
+              () => library.addIgnore({ kind: 'Name', value: asked }),
+              'Ignored everywhere',
+            );
+            dismissAsked();
+          }}
+        >
+          Ignore it
+        </Button>
+      </Modal.Actions>
+    </Modal>
+  );
+
   if (!watch) {
-    return null;
+    return askedPrompt ?? null;
   }
 
   const badge = library.watchBadge({ notifications, watch });
@@ -81,6 +130,7 @@ const WatchPanel = ({ searchId, searchText }) => {
       className="watch-panel-segment"
       raised
     >
+      {askedPrompt}
       <div className="watch-panel">
         <div className="watch-panel-summary">
           <div className="watch-panel-line">

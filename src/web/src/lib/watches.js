@@ -267,6 +267,27 @@ export const filesFrom = (notification) => {
  * @param {object} ignore - The ignore.
  * @returns {string} The description.
  */
+/**
+ * Reads the file a link asked to ignore, from a query string.
+ *
+ * The link in a notification carries no authority: it asks the page to *offer*
+ * the action, and the page asks before taking it. Anything that follows links
+ * in mail on the reader's behalf therefore changes nothing.
+ * @param {string} query - The query string, with or without its leading question mark.
+ * @returns {string|undefined} The filename, or undefined if none was asked for.
+ */
+export const ignoreTargetFrom = (query) => {
+  if (!query) {
+    return undefined;
+  }
+
+  const value = new URLSearchParams(query).get('ignore');
+
+  // a blank target would offer to ignore the empty string, which every file
+  // would then match
+  return value && value.trim().length > 0 ? value.trim() : undefined;
+};
+
 export const describeIgnore = (ignore) =>
   ignore?.kind === 'User' || ignore?.kind === 1
     ? `Everything from ${ignore.value}`
