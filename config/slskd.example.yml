@@ -180,6 +180,7 @@
 #     minimum_interval: 60 # minutes; the shortest a watch may recur at
 #     gap: 10 # seconds of quiet between one watch's search and the next
 #     limit: 25 # the most watches that may be enabled at once
+#     download_limit: 5 # the most files one run may queue, where a watch downloads what it finds
 #     timezone: Etc/UTC # the default zone a watch's schedule is read in
 # retention:
 #   search: 10080 # 7 days, in minutes

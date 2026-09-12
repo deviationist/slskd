@@ -84,6 +84,11 @@ public class WatchRequest
     public string Filter { get; set; }
 
     /// <summary>
+    ///     Gets or sets a value indicating whether new files are queued for download as they are found.
+    /// </summary>
+    public bool AutoDownload { get; set; }
+
+    /// <summary>
     ///     Gets or sets a value indicating whether what this search has already found should be recorded without
     ///     being reported.
     /// </summary>
@@ -283,6 +288,7 @@ public class WatchesController : ControllerBase
             IncludeLocked = request.IncludeLocked,
             RequireFreeSlot = request.RequireFreeSlot,
             Filter = request.Filter,
+            AutoDownload = request.AutoDownload,
             CreatedAt = existing?.CreatedAt ?? DateTime.UtcNow,
         };
 
