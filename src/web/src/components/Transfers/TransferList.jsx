@@ -64,7 +64,7 @@ const detailsPopperModifiers = [
  * the pointer between aiming and clicking, so the one thing worth showing is
  * which file this turned out to be about.
  */
-const ConfirmRemovalModal = ({ busy, onCancel, onConfirm, plan }) => {
+export const ConfirmRemovalModal = ({ busy, onCancel, onConfirm, plan }) => {
   useEffect(() => {
     const onKeyDown = (event) => {
       if (
@@ -103,7 +103,19 @@ const ConfirmRemovalModal = ({ busy, onCancel, onConfirm, plan }) => {
       content={
         <Modal.Content>
           <p>{plan.prompt}</p>
-          <p className="transferlist-remove-path">{plan.filename}</p>
+          {(plan.filenames ?? [plan.filename]).map((filename) => (
+            <p
+              className="transferlist-remove-path"
+              key={filename}
+            >
+              {filename}
+            </p>
+          ))}
+          {plan.remaining > 0 && (
+            <p className="transferlist-remove-path">
+              {`...and ${plan.remaining} more.`}
+            </p>
+          )}
         </Modal.Content>
       }
       header={

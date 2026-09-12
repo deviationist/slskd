@@ -1,6 +1,6 @@
 import * as transfers from '../../lib/transfers';
 import { getFileName } from '../../lib/util';
-import TransferList from './TransferList';
+import TransferList, { ConfirmRemovalModal } from './TransferList';
 import React, { Component } from 'react';
 import { toast } from 'react-toastify';
 import {
@@ -77,6 +77,9 @@ class TransferGroup extends Component {
     super(props);
 
     this.state = {
+      // the selection waiting on a confirmation, with what it would delete.
+      // undefined means nothing is pending
+      confirmingSelection: undefined,
       isFolded: false,
       selections: new Set(),
       // what the pre-flight found, once it has found something worth asking
@@ -286,6 +289,30 @@ class TransferGroup extends Component {
     await this.removeAll(direction, user.username, [file]);
   };
 
+  /**
+   * Asks before removing a selection, where the removal would delete files.
+   *
+   * The same rule the row applies, and for the stronger reason: a selection is
+   * the more destructive of the two paths, since it can take a folder's worth
+   * at once. Where nothing would be deleted it does not ask -- a dialog over a
+   * harmless action is one that gets dismissed unread, which is how the one
+   * that matters gets clicked through.
+   */
+  confirmRemoveAll = (selected) => {
+    const { deleteFileOnRemoval, direction, user } = this.props;
+    const plan = transfers.planSelectionRemoval({
+      deleteFileOnRemoval,
+      files: selected,
+    });
+
+    if (!plan.confirm) {
+      this.removeAll(direction, user.username, selected);
+      return;
+    }
+
+    this.setState({ confirmingSelection: { plan, selected } });
+  };
+
   handleRetry = async (file) => {
     const { filename, size, username } = file;
 
@@ -369,7 +396,7 @@ class TransferGroup extends Component {
             <Button
               content={`Remove${all}`}
               icon="trash alternate"
-              onClick={() => this.removeAll(direction, user.username, selected)}
+              onClick={() => this.confirmRemoveAll(selected)}
             />
           )}
           {(allRetryable || anyCancellable || allRemovable) &&
@@ -397,7 +424,7 @@ class TransferGroup extends Component {
 
   render() {
     const { user } = this.props;
-    const { archive, archiveBusy, isFolded } = this.state;
+    const { archive, archiveBusy, confirmingSelection, isFolded } = this.state;
 
     const selected = this.getSelectedFiles();
 
@@ -407,6 +434,19 @@ class TransferGroup extends Component {
         key={user.username}
         raised
       >
+        {confirmingSelection && (
+          <ConfirmRemovalModal
+            busy={false}
+            onCancel={() => this.setState({ confirmingSelection: undefined })}
+            onConfirm={() => {
+              const { selected: files } = confirmingSelection;
+
+              this.setState({ confirmingSelection: undefined });
+              this.removeAll(this.props.direction, user.username, files);
+            }}
+            plan={confirmingSelection.plan}
+          />
+        )}
         <Card.Content>
           <Card.Header>
             <Icon

@@ -808,3 +808,70 @@ describe('confirmsRemoval', () => {
     }
   });
 });
+
+describe('planSelectionRemoval', () => {
+  const download = (localFilename) => ({
+    direction: 'Download',
+    localFilename,
+    state: 'Completed, Succeeded',
+  });
+
+  it('asks nothing when nothing would be deleted', () => {
+    // the same argument the row makes: a dialog over a harmless action is one
+    // that gets dismissed unread, which is how the one that matters gets
+    // clicked through
+    const plan = transfers.planSelectionRemoval({
+      files: [{ direction: 'Upload', state: 'Completed, Succeeded' }],
+    });
+
+    expect(plan.confirm).toBe(false);
+    expect(plan.deleting).toBe(0);
+  });
+
+  it('counts only the rows that would lose a file', () => {
+    const plan = transfers.planSelectionRemoval({
+      files: [download('/a.flac'), download(null), download('/b.flac')],
+    });
+
+    expect(plan.deleting).toBe(2);
+    expect(plan.filenames).toEqual(['/a.flac', '/b.flac']);
+  });
+
+  it('names the paths the server will delete', () => {
+    const plan = transfers.planSelectionRemoval({ files: [download('/a.flac')] });
+
+    expect(plan.filenames).toEqual(['/a.flac']);
+    expect(plan.header).toBe('Delete this file?');
+  });
+
+  it('counts in the plural where there are several', () => {
+    const plan = transfers.planSelectionRemoval({
+      files: [download('/a.flac'), download('/b.flac')],
+    });
+
+    expect(plan.header).toBe('Delete 2 files?');
+    expect(plan.confirmLabel).toBe('Remove and delete 2');
+  });
+
+  it('caps the list and says how many it did not name', () => {
+    // a confirmation nobody reads to the end is one nobody read; the count
+    // carries the weight
+    const files = Array.from({ length: 25 }, (_, index) =>
+      download(`/${index}.flac`),
+    );
+    const plan = transfers.planSelectionRemoval({ files });
+
+    expect(plan.filenames).toHaveLength(10);
+    expect(plan.remaining).toBe(15);
+    expect(plan.deleting).toBe(25);
+  });
+
+  it('asks nothing when the server does not delete on removal', () => {
+    const plan = transfers.planSelectionRemoval({
+      deleteFileOnRemoval: false,
+      files: [download('/a.flac')],
+    });
+
+    expect(plan.confirm).toBe(false);
+  });
+})
