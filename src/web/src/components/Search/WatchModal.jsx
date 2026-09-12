@@ -1,5 +1,6 @@
+import * as optionsLibrary from '../../lib/options';
 import * as library from '../../lib/watches';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Button,
   Checkbox,
@@ -35,6 +36,7 @@ const PRESETS_BY_KEY = Object.fromEntries(
  * all server-side, so a test of the whole modal asserts nothing -- which is how
  * a version of this shipped with every field silently dropped.
  * @param {object} params
+ * @param {string} params.configured - The address mail falls back to, if any.
  * @param {object} params.draft - The draft being edited.
  * @param {Function} params.onSearchTextChange - Called when the phrase is edited.
  * @param {Function} params.set - Applies changes to the draft.
@@ -43,6 +45,7 @@ const PRESETS_BY_KEY = Object.fromEntries(
  * @returns {object} The form.
  */
 export const WatchForm = ({
+  configured = undefined,
   draft,
   existing,
   onSearchTextChange = () => {},
@@ -108,7 +111,11 @@ export const WatchForm = ({
         control={Input}
         label="Email"
         onChange={(_event, { value }) => set({ notifyEmail: value })}
-        placeholder="leave blank to use the configured address"
+        placeholder={
+          configured
+            ? `Leave blank to use ${configured}`
+            : 'Leave blank to use the configured address'
+        }
         value={draft.notifyEmail}
       />
       <Form.Field>
@@ -177,6 +184,24 @@ const WatchModal = ({
     seed: true,
   });
   const [saving, setSaving] = useState(false);
+  const [configured, setConfigured] = useState(undefined);
+
+  useEffect(() => {
+    // the address a blank field falls back to. worth naming rather than
+    // alluding to: "the configured address" does not answer the question an
+    // operator actually has, which is whether there is one at all
+    const load = async () => {
+      try {
+        const options = await optionsLibrary.getCurrent();
+
+        setConfigured(options?.integrations?.mail?.to || undefined);
+      } catch {
+        // the placeholder falls back to the vaguer wording
+      }
+    };
+
+    load();
+  }, []);
 
   const set = (values) => setDraft((old) => ({ ...old, ...values }));
 
@@ -225,6 +250,7 @@ const WatchModal = ({
           not been reported before.
         </p>
         <WatchForm
+          configured={configured}
           draft={draft}
           existing={existing}
           onSearchTextChange={onSearchTextChange}

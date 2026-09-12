@@ -221,7 +221,7 @@
    on the dimmer, clear of the modal itself. Ours belongs in the header beside
    the title, so it is placed there and takes the header's own colour rather
    than the white that only works against a dimmer. */
-.watch-modal > .close {
+.ui.modal.watch-modal > .close {
   top: 1rem;
   right: 1rem;
   color: inherit;
