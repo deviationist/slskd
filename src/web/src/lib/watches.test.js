@@ -261,3 +261,24 @@ describe('createWatchedSearch', () => {
     );
   });
 });
+
+describe('filesFrom, across casings', () => {
+  it('reads a record the server wrote before it sent camelCase', () => {
+    expect.assertions(1);
+
+    // the log keeps what was written at the time, and a row that cannot be read
+    // is worse than one written in the wrong shape
+    const read = watches.filesFrom({
+      fileCount: 1,
+      filesJson: JSON.stringify([
+        { Filename: 'a.flac', Size: 42, Username: 'someone' },
+      ]),
+    });
+
+    expect(read.files[0]).toEqual({
+      filename: 'a.flac',
+      size: 42,
+      username: 'someone',
+    });
+  });
+});
