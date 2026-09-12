@@ -226,3 +226,11 @@
   right: 1rem;
   color: inherit;
 }
+
+/* The filename a notification's link asked about. Broken anywhere, because a
+   remote path is as long as a peer's directory tree and must not widen a
+   dialog past the screen. */
+.watch-panel-asked {
+  font-family: monospace;
+  word-break: break-all;
+}

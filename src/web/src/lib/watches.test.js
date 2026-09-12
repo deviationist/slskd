@@ -308,3 +308,37 @@ describe('describeIgnore', () => {
     );
   });
 });
+
+describe('ignoreTargetFrom', () => {
+  it('reads the file a link asked about', () => {
+    expect.assertions(1);
+    expect(watches.ignoreTargetFrom('?ignore=01%20Xtal.flac')).toBe(
+      '01 Xtal.flac',
+    );
+  });
+
+  it('works without the leading question mark', () => {
+    expect.assertions(1);
+    expect(watches.ignoreTargetFrom('ignore=a.flac')).toBe('a.flac');
+  });
+
+  it('reads it from among other parameters', () => {
+    expect.assertions(1);
+    expect(watches.ignoreTargetFrom('?x=1&ignore=a.flac&y=2')).toBe('a.flac');
+  });
+
+  it('finds nothing where nothing was asked', () => {
+    expect.assertions(3);
+    expect(watches.ignoreTargetFrom('?other=1')).toBeUndefined();
+    expect(watches.ignoreTargetFrom('')).toBeUndefined();
+    expect(watches.ignoreTargetFrom(undefined)).toBeUndefined();
+  });
+
+  it('refuses a blank target', () => {
+    // a blank one would offer to ignore the empty string, which every file
+    // would then match -- one link silencing every watch
+    expect.assertions(2);
+    expect(watches.ignoreTargetFrom('?ignore=')).toBeUndefined();
+    expect(watches.ignoreTargetFrom('?ignore=%20%20')).toBeUndefined();
+  });
+});
