@@ -4,7 +4,7 @@ import { formatBytes, getDirectoryName } from '../../lib/util';
 import FileList from '../Shared/FileList';
 import React, { Component } from 'react';
 import { toast } from 'react-toastify';
-import { Button, Card, Icon, Label } from 'semantic-ui-react';
+import { Button, Card, Icon, Label, Popup } from 'semantic-ui-react';
 
 const buildTree = (response) => {
   let { files = [] } = response;
@@ -168,12 +168,18 @@ class Response extends Component {
               name="circle"
             />
             {response.username}
-            <Icon
-              className="close-button"
-              color="red"
-              link
-              name="close"
-              onClick={() => this.props.onHide()}
+            <Popup
+              content="Hide this user's results. They come back when the search is reloaded or run again -- nothing is remembered."
+              position="left center"
+              trigger={
+                <Icon
+                  className="close-button"
+                  color="red"
+                  link
+                  name="close"
+                  onClick={() => this.props.onHide()}
+                />
+              }
             />
           </Card.Header>
           <Card.Meta className="result-meta">
