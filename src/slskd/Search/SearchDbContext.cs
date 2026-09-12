@@ -52,6 +52,8 @@ namespace slskd.Search
 
         public DbSet<slskd.Search.Watches.WatchNotification> WatchNotifications { get; set; }
 
+        public DbSet<slskd.Search.Watches.Ignore> Ignores { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             modelBuilder

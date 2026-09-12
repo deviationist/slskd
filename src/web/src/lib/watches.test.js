@@ -282,3 +282,29 @@ describe('filesFrom, across casings', () => {
     });
   });
 });
+
+describe('describeIgnore', () => {
+  it('describes a peer', () => {
+    expect.assertions(1);
+    expect(watches.describeIgnore({ kind: 'User', value: 'transcoder' })).toBe(
+      'Everything from transcoder',
+    );
+  });
+
+  it('describes a filename', () => {
+    expect.assertions(1);
+    expect(
+      watches.describeIgnore({ kind: 'Name', value: '01 Xtal.flac' }),
+    ).toBe('Any file named 01 Xtal.flac');
+  });
+
+  it('reads the numeric form the API may send', () => {
+    // the enum serialises as a name or a number depending on configuration, and
+    // a log that rendered "Any file named someone" for a muted peer would be
+    // quietly telling the operator the wrong thing
+    expect.assertions(1);
+    expect(watches.describeIgnore({ kind: 1, value: 'transcoder' })).toBe(
+      'Everything from transcoder',
+    );
+  });
+});

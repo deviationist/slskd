@@ -186,6 +186,15 @@ public record WatchRun
 
     public int NewCount { get; set; }
 
+    /// <summary>
+    ///     Gets or sets the number of matches a global ignore removed.
+    /// </summary>
+    /// <remarks>
+    ///     Recorded so that a watch which suddenly reports nothing can be told apart from one whose results are all
+    ///     being ignored. A suppression nobody can see is the failure this feature invites.
+    /// </remarks>
+    public int IgnoredCount { get; set; }
+
     public WatchRunOutcome Outcome { get; set; }
 
     public string Error { get; set; }
