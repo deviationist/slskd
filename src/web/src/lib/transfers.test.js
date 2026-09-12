@@ -31,7 +31,12 @@ describe('summariseDeletions', () => {
     ok: true,
   };
   const refused = {
-    data: { deleted: false, error: 'permission denied', filename: '/a.flac', removed: true },
+    data: {
+      deleted: false,
+      error: 'permission denied',
+      filename: '/a.flac',
+      removed: true,
+    },
     ok: true,
   };
   const failed = { error: { message: 'Network Error' }, ok: false };
@@ -74,7 +79,9 @@ describe('summariseDeletions', () => {
   it('announces nothing over downloads that never wrote a file', () => {
     // they are a success -- nothing was written, which is the end state asked
     // for -- but "deleted 2 files" over two of them would be an invention.
-    expect(transfers.summariseDeletions([neverStarted, neverStarted])).toBeNull();
+    expect(
+      transfers.summariseDeletions([neverStarted, neverStarted]),
+    ).toBeNull();
   });
 
   it('counts only the files it really deleted', () => {
@@ -100,7 +107,9 @@ describe('summariseDeletions', () => {
   // predating the recording of local filenames lands in. "Removed" alone over
   // this is how a delete that did nothing comes to look like one that worked.
   it('does not let a delete that deleted nothing pass for one that worked', () => {
-    expect(transfers.summariseDeletions([unrecorded, unrecorded])).toMatchObject({
+    expect(
+      transfers.summariseDeletions([unrecorded, unrecorded]),
+    ).toMatchObject({
       kind: 'warning',
       message:
         'Removed 2, but deleted nothing: there is no record of where these were written',
@@ -119,7 +128,8 @@ describe('summariseDeletions', () => {
   it('reports a refused deletion as a removal that happened', () => {
     expect(transfers.summariseDeletions([deleted, refused])).toMatchObject({
       kind: 'error',
-      message: 'Removed 2, but 1 file(s) could not be deleted: permission denied',
+      message:
+        'Removed 2, but 1 file(s) could not be deleted: permission denied',
     });
   });
 
@@ -755,6 +765,46 @@ describe('planRowRemoval', () => {
           file: removableDownload(),
         }).offered,
       ).toBe(true);
+    }
+  });
+});
+
+describe('confirmsRemoval', () => {
+  const press = (overrides = {}) =>
+    transfers.confirmsRemoval({ key: 'Enter', targetTag: 'DIV', ...overrides });
+
+  it('confirms on Enter', () => {
+    expect(press()).toBe(true);
+  });
+
+  it('ignores every other key', () => {
+    expect(press({ key: 'Escape' })).toBe(false);
+    expect(press({ key: ' ' })).toBe(false);
+    expect(press({ key: 'a' })).toBe(false);
+  });
+
+  it('ignores a key-repeat', () => {
+    // a held Enter would confirm, and then act again on whatever took the
+    // dialog's place
+    expect(press({ repeat: true })).toBe(false);
+  });
+
+  it('does nothing while the removal is already running', () => {
+    expect(press({ busy: true })).toBe(false);
+  });
+
+  it('leaves a focused control to the browser', () => {
+    // the browser already activates a focused button on Enter, so acting again
+    // when focus is on Cancel would both cancel and confirm
+    for (const tag of [
+      'BUTTON',
+      'button',
+      'A',
+      'INPUT',
+      'SELECT',
+      'TEXTAREA',
+    ]) {
+      expect(press({ targetTag: tag })).toBe(false);
     }
   });
 });
