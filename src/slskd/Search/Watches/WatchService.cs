@@ -480,6 +480,19 @@ public class WatchService
     private const int MaximumFilesListed = 50;
     private const int MaximumFilesRecorded = 200;
 
+    /// <summary>
+    ///     How the recorded file list is written.
+    /// </summary>
+    /// <remarks>
+    ///     camelCase, because this is read by the web client, and everything else this application sends it is
+    ///     camelCase. Written with the serializer's defaults it was PascalCase, so every field of every row read as
+    ///     undefined -- a size of "NaN undefined" beside two empty columns.
+    /// </remarks>
+    private static readonly JsonSerializerOptions RecordedFileOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    };
+
     private async Task NotifyAsync(Watch watch, string searchText, List<Match> files)
     {
         if (files.Count == 0)
@@ -550,7 +563,7 @@ public class WatchService
             Recipient = string.IsNullOrWhiteSpace(watch.NotifyEmail) ? options.To : watch.NotifyEmail,
             Subject = subject,
             FileCount = files.Count,
-            FilesJson = JsonSerializer.Serialize(files.Take(MaximumFilesRecorded)),
+            FilesJson = JsonSerializer.Serialize(files.Take(MaximumFilesRecorded), RecordedFileOptions),
             Sent = error is null,
             Error = error,
         });

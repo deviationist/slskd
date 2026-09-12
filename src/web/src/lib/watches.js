@@ -248,7 +248,14 @@ export const filesFrom = (notification) => {
   const total = notification?.fileCount ?? files.length;
 
   return {
-    files,
+    // read either casing: records written before the server sent camelCase are
+    // still in the log, and a row that cannot be read is worse than one written
+    // in the wrong shape
+    files: files.map((file) => ({
+      filename: file.filename ?? file.Filename,
+      size: file.size ?? file.Size,
+      username: file.username ?? file.Username,
+    })),
     shown: files.length,
     total,
     truncated: total > files.length,
