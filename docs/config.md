@@ -1197,6 +1197,20 @@ for 03:00 meant 03:00 where they are.
 > 50 files and says how many more there were, but the right fix for a noisy watch is a narrower search, not a longer
 > mail.
 
+## Ignoring things everywhere
+
+A watch reports any given file from any given peer exactly once, so the thing that still repeats is *the same release
+from different peers* — each copy is a different peer and a different path, so each is genuinely new.  An **ignore**
+stops that: it matches a **filename**, from anyone, in every watch.  A peer can be ignored wholesale as well.
+
+There is deliberately no third kind matching one path from one peer: a watch's own memory already covers that, so such
+a rule would only ever matter to a second watch over the same ground.
+
+Ignores are applied **before** a match is recorded, so an ignored file is never marked as reported — remove the ignore
+and the next run reports it as new, rather than never.  Each run records how many matches an ignore removed, and the
+watch panel lists what is ignored with a way to undo it, because a suppression nobody can see is the failure this
+invites: a watch that reports nothing looks identical to one whose every result is being ignored.
+
 Mail goes out through the [Mail](#mail) integration, so that must be configured; a watch may name its own recipient or
 use the configured default.  Every notification is recorded, including the ones that failed, so a watch whose mail has
 been bouncing says so rather than appearing to have found nothing.

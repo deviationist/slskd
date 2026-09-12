@@ -94,6 +94,28 @@ public class WatchRequest
 }
 
 /// <summary>
+///     A file or peer to ignore, as asked for.
+/// </summary>
+public class IgnoreRequest
+{
+    /// <summary>
+    ///     Gets or sets what to match on: Name or User.
+    /// </summary>
+    public IgnoreKind Kind { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the filename or username to match.
+    /// </summary>
+    [Required]
+    public string Value { get; set; }
+
+    /// <summary>
+    ///     Gets or sets a note about why.
+    /// </summary>
+    public string Note { get; set; }
+}
+
+/// <summary>
 ///     Search watches.
 /// </summary>
 [Route("api/v{version:apiVersion}/searches/{id}/watch")]
@@ -131,6 +153,68 @@ public class WatchesController : ControllerBase
     [ProducesResponseType(typeof(List<Watch>), 200)]
     public async Task<IActionResult> List()
         => Ok(await Watches.ListAsync());
+
+    /// <summary>
+    ///     Lists everything no watch will report.
+    /// </summary>
+    /// <returns></returns>
+    /// <response code="200">The request completed successfully.</response>
+    [HttpGet("/api/v{version:apiVersion}/watches/ignores")]
+    [Authorize(Policy = AuthPolicy.Any)]
+    [ProducesResponseType(typeof(List<Ignore>), 200)]
+    public async Task<IActionResult> ListIgnores()
+        => Ok(await Watches.ListIgnoresAsync());
+
+    /// <summary>
+    ///     Stops every watch reporting a filename, or a peer.
+    /// </summary>
+    /// <remarks>
+    ///     A filename rather than a path: the same release sits on dozens of peers under dozens of paths, and each
+    ///     copy is new to a watch. Matching the name is what stops one rejected release arriving forty times.
+    /// </remarks>
+    /// <param name="request">What to ignore.</param>
+    /// <returns></returns>
+    /// <response code="200">The request completed successfully.</response>
+    /// <response code="400">The specified value is not valid.</response>
+    [HttpPost("/api/v{version:apiVersion}/watches/ignores")]
+    [Authorize(Policy = AuthPolicy.Any)]
+    [ProducesResponseType(typeof(Ignore), 200)]
+    [ProducesResponseType(400)]
+    public async Task<IActionResult> AddIgnore([FromBody] IgnoreRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request?.Value))
+        {
+            return BadRequest("A value to ignore is required");
+        }
+
+        // stored as the name alone even when a whole path is sent, so that what was ignored is what is matched --
+        // an ignore that reads back as a path nobody will ever match again is worse than an error
+        var value = request.Kind == IgnoreKind.Name
+            ? IgnoreSet.NameOf(request.Value.Trim())
+            : request.Value.Trim();
+
+        return Ok(await Watches.AddIgnoreAsync(new Ignore
+        {
+            Kind = request.Kind,
+            Value = value,
+            Note = request.Note,
+        }));
+    }
+
+    /// <summary>
+    ///     Stops ignoring something.
+    /// </summary>
+    /// <param name="ignoreId">The id of the ignore.</param>
+    /// <returns></returns>
+    /// <response code="204">The request completed successfully.</response>
+    [HttpDelete("/api/v{version:apiVersion}/watches/ignores/{ignoreId}")]
+    [Authorize(Policy = AuthPolicy.Any)]
+    [ProducesResponseType(204)]
+    public async Task<IActionResult> DeleteIgnore([FromRoute] Guid ignoreId)
+    {
+        await Watches.DeleteIgnoreAsync(ignoreId);
+        return NoContent();
+    }
 
     /// <summary>
     ///     Gets the watch on the specified search.

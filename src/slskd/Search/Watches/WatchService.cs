@@ -90,6 +90,58 @@ public class WatchService
     private Options.SearchesOptions.WatchesOptions WatchOptions => OptionsMonitor.CurrentValue.Searches.Watches;
 
     /// <summary>
+    ///     Lists everything no watch should report.
+    /// </summary>
+    /// <returns>The ignores.</returns>
+    public async Task<List<Ignore>> ListIgnoresAsync()
+    {
+        using var context = ContextFactory.CreateDbContext();
+        return await context.Ignores.AsNoTracking().OrderByDescending(i => i.CreatedAt).ToListAsync();
+    }
+
+    /// <summary>
+    ///     Adds an ignore, or returns the one that already covers it.
+    /// </summary>
+    /// <param name="ignore">The ignore to add.</param>
+    /// <returns>The stored ignore.</returns>
+    public async Task<Ignore> AddIgnoreAsync(Ignore ignore)
+    {
+        using var context = ContextFactory.CreateDbContext();
+
+        var existing = await context.Ignores
+            .FirstOrDefaultAsync(i => i.Kind == ignore.Kind && i.Value == ignore.Value);
+
+        if (existing is not null)
+        {
+            return existing;
+        }
+
+        context.Ignores.Add(ignore);
+        await context.SaveChangesAsync();
+
+        Log.Information("Ignoring {Kind} '{Value}' in every watch", ignore.Kind, ignore.Value);
+
+        return ignore;
+    }
+
+    /// <summary>
+    ///     Removes an ignore.
+    /// </summary>
+    /// <param name="id">The id of the ignore.</param>
+    /// <returns>The operation context.</returns>
+    public async Task DeleteIgnoreAsync(Guid id)
+    {
+        using var context = ContextFactory.CreateDbContext();
+        await context.Ignores.Where(i => i.Id == id).ExecuteDeleteAsync();
+    }
+
+    private async Task<IgnoreSet> IgnoresAsync()
+    {
+        using var context = ContextFactory.CreateDbContext();
+        return new IgnoreSet(await context.Ignores.AsNoTracking().ToListAsync());
+    }
+
+    /// <summary>
     ///     Lists every watch.
     /// </summary>
     /// <returns>The watches.</returns>
@@ -334,6 +386,14 @@ public class WatchService
 
                 var matches = Matches(watch, completed);
                 run.MatchCount = matches.Count;
+
+                // before the memory, not after: an ignored file is never marked as reported, so removing the ignore
+                // later reports it as new rather than never
+                var ignores = await IgnoresAsync();
+                var kept = matches.Where(m => !ignores.Ignores(m.Username, m.Filename)).ToList();
+
+                run.IgnoredCount = matches.Count - kept.Count;
+                matches = kept;
 
                 var added = await RecordAsync(watch.SearchId, matches, seeded: false);
                 run.NewCount = added;

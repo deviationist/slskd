@@ -262,6 +262,24 @@ export const filesFrom = (notification) => {
   };
 };
 
+/**
+ * Says what an ignore does, in a sentence.
+ * @param {object} ignore - The ignore.
+ * @returns {string} The description.
+ */
+export const describeIgnore = (ignore) =>
+  ignore?.kind === 'User' || ignore?.kind === 1
+    ? `Everything from ${ignore.value}`
+    : `Any file named ${ignore?.value}`;
+
+export const getIgnores = async () => (await api.get('/watches/ignores')).data;
+
+export const addIgnore = async ({ kind, note, value }) =>
+  (await api.post('/watches/ignores', { kind, note, value })).data;
+
+export const removeIgnore = async ({ id }) =>
+  api.delete(`/watches/ignores/${encodeURIComponent(id)}`);
+
 export const getAll = async () => (await api.get('/watches')).data;
 
 export const get = async ({ id }) =>

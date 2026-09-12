@@ -30,6 +30,8 @@ const WatchPanel = ({ searchId, searchText }) => {
   const [showingLog, setShowingLog] = useState(false);
   const [working, setWorking] = useState(false);
   const [opened, setOpened] = useState(undefined);
+  const [ignores, setIgnores] = useState([]);
+  const [showingIgnores, setShowingIgnores] = useState(false);
 
   const load = async () => {
     try {
@@ -38,6 +40,7 @@ const WatchPanel = ({ searchId, searchText }) => {
       setWatch(found);
       setNotifications(await library.getNotifications({ id: searchId }));
       setRuns(await library.getRuns({ id: searchId }));
+      setIgnores(await library.getIgnores());
     } catch {
       // a 404 is the ordinary case: most searches are not watched
       setWatch(undefined);
@@ -145,6 +148,12 @@ const WatchPanel = ({ searchId, searchText }) => {
             onClick={() => setEditing(true)}
           />
           <Button
+            content={`Ignored (${ignores.length})`}
+            disabled={working}
+            icon="ban"
+            onClick={() => setShowingIgnores(true)}
+          />
+          <Button
             content={`Emails (${notifications.length})`}
             disabled={working}
             icon="mail"
@@ -180,6 +189,56 @@ const WatchPanel = ({ searchId, searchText }) => {
           searchText={searchText}
         />
       )}
+      <Modal
+        onClose={() => setShowingIgnores(false)}
+        open={showingIgnores}
+        size="small"
+      >
+        <Modal.Header>
+          <Icon name="ban" />
+          Never reported, by any watch
+        </Modal.Header>
+        <Modal.Content scrolling>
+          {ignores.length === 0 ? (
+            <p>
+              Nothing is ignored. Use the ban icon beside a file in the email
+              log to stop every watch reporting that name.
+            </p>
+          ) : (
+            <Table size="small">
+              <Table.Body>
+                {ignores.map((ignore) => (
+                  <Table.Row key={ignore.id}>
+                    <Table.Cell>{library.describeIgnore(ignore)}</Table.Cell>
+                    <Table.Cell collapsing>{when(ignore.createdAt)}</Table.Cell>
+                    <Table.Cell collapsing>
+                      <Popup
+                        content="Stop ignoring this. A watch will report it again the next time it finds it."
+                        position="left center"
+                        trigger={
+                          <Icon
+                            link
+                            name="undo"
+                            onClick={() =>
+                              act(
+                                () => library.removeIgnore({ id: ignore.id }),
+                                'No longer ignored',
+                              )
+                            }
+                          />
+                        }
+                      />
+                    </Table.Cell>
+                  </Table.Row>
+                ))}
+              </Table.Body>
+            </Table>
+          )}
+        </Modal.Content>
+        <Modal.Actions>
+          <Button onClick={() => setShowingIgnores(false)}>Close</Button>
+        </Modal.Actions>
+      </Modal>
       <Modal
         onClose={() => setShowingLog(false)}
         open={showingLog}
@@ -275,6 +334,28 @@ const WatchPanel = ({ searchId, searchText }) => {
                                         <Table.Cell>{file.filename}</Table.Cell>
                                         <Table.Cell collapsing>
                                           {formatBytes(file.size)}
+                                        </Table.Cell>
+                                        <Table.Cell collapsing>
+                                          <Popup
+                                            content="Never report a file with this name again, in any watch"
+                                            position="left center"
+                                            trigger={
+                                              <Icon
+                                                link
+                                                name="ban"
+                                                onClick={() =>
+                                                  act(
+                                                    () =>
+                                                      library.addIgnore({
+                                                        kind: 'Name',
+                                                        value: file.filename,
+                                                      }),
+                                                    'Ignored everywhere',
+                                                  )
+                                                }
+                                              />
+                                            }
+                                          />
                                         </Table.Cell>
                                       </Table.Row>
                                     ))}
