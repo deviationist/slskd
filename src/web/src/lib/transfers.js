@@ -537,6 +537,57 @@ export const removalDeletesFile = ({ file, deleteFileOnRemoval }) =>
   Boolean(file?.localFilename);
 
 /**
+ * What a selection's *Remove* must ask before it runs.
+ *
+ * The same rule the row applies, over a set: ask only where files would
+ * actually be deleted, and name them. A selection is the more destructive of
+ * the two paths -- it can take a folder's worth at once -- so the thing worth
+ * showing is how many, and which.
+ *
+ * The list is capped. A confirmation nobody reads to the end is a confirmation
+ * nobody read, and the count carries the weight anyway.
+ * @param {object} params
+ * @param {object[]} params.files - The selected transfers.
+ * @param {boolean} [params.deleteFileOnRemoval] - Whether the server deletes files on removal.
+ * @param {number} [params.limit] - The most paths to name.
+ * @returns {{confirm: boolean, deleting: number, filenames: string[], remaining: number, header?: string, prompt?: string, confirmLabel?: string}} What to ask.
+ */
+export const planSelectionRemoval = ({
+  deleteFileOnRemoval,
+  files = [],
+  limit = 10,
+}) => {
+  const deleting = files.filter((file) =>
+    removalDeletesFile({ deleteFileOnRemoval, file }),
+  );
+
+  if (deleting.length === 0) {
+    return { confirm: false, deleting: 0, filenames: [], remaining: 0 };
+  }
+
+  const filenames = deleting.slice(0, limit).map((file) => file.localFilename);
+
+  return {
+    confirm: true,
+    confirmLabel:
+      deleting.length === 1
+        ? 'Remove and delete'
+        : `Remove and delete ${deleting.length}`,
+    deleting: deleting.length,
+    filenames,
+    header:
+      deleting.length === 1
+        ? 'Delete this file?'
+        : `Delete ${deleting.length} files?`,
+    prompt:
+      deleting.length === 1
+        ? 'Removing this download also deletes the file it wrote. This cannot be undone.'
+        : `Removing these downloads also deletes the ${deleting.length} files they wrote. This cannot be undone.`,
+    remaining: deleting.length - filenames.length,
+  };
+};
+
+/**
  * What a row's own remove control offers, and what it must ask first.
  *
  * Which rows offer it is `isStateRemovable` and nothing else -- the same rule
