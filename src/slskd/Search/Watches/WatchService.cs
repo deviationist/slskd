@@ -43,6 +43,7 @@ using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using slskd.Integrations.Mail;
+using slskd.Transfers;
 using ISoulseekClient = Soulseek.ISoulseekClient;
 using SearchOptions = Soulseek.SearchOptions;
 using SearchQuery = Soulseek.SearchQuery;
@@ -60,12 +61,14 @@ public class WatchService
     /// </summary>
     public WatchService(
         ISearchService searchService,
+        TransferService transferService,
         IDbContextFactory<SearchDbContext> contextFactory,
         ISoulseekClient soulseekClient,
         MailService mailService,
         IOptionsMonitor<Options> optionsMonitor)
     {
         Searches = searchService;
+        Transfers = transferService;
         ContextFactory = contextFactory;
         Client = soulseekClient;
         Mail = mailService;
@@ -75,6 +78,7 @@ public class WatchService
     }
 
     private ISearchService Searches { get; }
+    private TransferService Transfers { get; }
     private IDbContextFactory<SearchDbContext> ContextFactory { get; }
     private ISoulseekClient Client { get; }
     private MailService Mail { get; }
@@ -398,9 +402,16 @@ public class WatchService
                 var added = await RecordAsync(watch.SearchId, matches, seeded: false);
                 run.NewCount = added;
 
+                var isNew = matches.Where(m => m.IsNew).ToList();
+
+                if (watch.AutoDownload && isNew.Count > 0)
+                {
+                    run.EnqueuedCount = await EnqueueAsync(isNew);
+                }
+
                 if (added > 0)
                 {
-                    await NotifyAsync(watch, completed.SearchText, matches.Where(m => m.IsNew).ToList());
+                    await NotifyAsync(watch, completed.SearchText, isNew, run.EnqueuedCount);
                 }
 
                 run.Outcome = WatchRunOutcome.Completed;
@@ -452,6 +463,9 @@ public class WatchService
                 matches.Add(new Match
                 {
                     Username = response.Username,
+                    HasFreeUploadSlot = response.HasFreeUploadSlot,
+                    UploadSpeed = response.UploadSpeed,
+                    QueueLength = response.QueueLength,
                     Filename = file.Filename,
                     Size = file.Size,
                     BitRate = file.BitRate,
@@ -553,7 +567,47 @@ public class WatchService
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
     };
 
-    private async Task NotifyAsync(Watch watch, string searchText, List<Match> files)
+    /// <summary>
+    ///     Queues the chosen files for download, and returns how many were accepted.
+    /// </summary>
+    /// <remarks>
+    ///     A failure here is recorded and not thrown: the point of a watch is to say what it found, and a peer that
+    ///     went offline between answering and being asked must not cost the notification that would have told you.
+    /// </remarks>
+    private async Task<int> EnqueueAsync(List<Match> isNew)
+    {
+        var chosen = AutoDownload.Choose(isNew, WatchOptions.DownloadLimit);
+        var enqueued = 0;
+
+        foreach (var group in chosen.GroupBy(match => match.Username))
+        {
+            try
+            {
+                var files = group.Select(match => (match.Filename, match.Size));
+                var (accepted, failed) = await Transfers.Downloads.EnqueueAsync(group.Key, files);
+
+                enqueued += accepted.Count;
+
+                foreach (var (filename, message) in failed)
+                {
+                    Log.Warning("A watch could not queue '{File}' from {User}: {Message}", filename, group.Key, message);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "A watch could not queue {Count} file(s) from {User}: {Message}", group.Count(), group.Key, ex.Message);
+            }
+        }
+
+        if (enqueued > 0)
+        {
+            Log.Information("A watch queued {Count} file(s) for download", enqueued);
+        }
+
+        return enqueued;
+    }
+
+    private async Task NotifyAsync(Watch watch, string searchText, List<Match> files, int enqueued)
     {
         if (files.Count == 0)
         {
@@ -574,6 +628,12 @@ public class WatchService
             body.AppendLine($"  {file.Username}");
             body.AppendLine($"    {file.Filename}");
             body.AppendLine($"    {file.Size / 1024 / 1024} MB{(file.BitRate.HasValue ? $", {file.BitRate} kbps" : string.Empty)}{(file.Length.HasValue ? $", {file.Length / 60}:{file.Length % 60:00}" : string.Empty)}");
+            body.AppendLine();
+        }
+
+        if (enqueued > 0)
+        {
+            body.AppendLine($"{enqueued} of these have been queued for download.");
             body.AppendLine();
         }
 
@@ -666,6 +726,21 @@ public class WatchService
     public class Match
     {
         public string Username { get; init; }
+
+        /// <summary>
+        ///     Gets a value indicating whether the peer had a free upload slot when it answered.
+        /// </summary>
+        public bool HasFreeUploadSlot { get; init; }
+
+        /// <summary>
+        ///     Gets the peer's upload speed, as reported with the response.
+        /// </summary>
+        public int UploadSpeed { get; init; }
+
+        /// <summary>
+        ///     Gets the peer's queue length, as reported with the response.
+        /// </summary>
+        public long QueueLength { get; init; }
 
         public string Filename { get; init; }
 

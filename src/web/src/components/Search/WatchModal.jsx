@@ -128,6 +128,22 @@ export const WatchForm = ({
       </Form.Field>
       <Form.Field>
         <Checkbox
+          checked={draft.autoDownload}
+          label="Download what it finds, without waiting for me"
+          onChange={() => set({ autoDownload: !draft.autoDownload })}
+          toggle
+        />
+        <div>
+          <small>
+            One copy per filename, from whichever peer is most likely to send
+            it, and only a few per run. The point of a watch is often a peer who
+            is rarely online -- waiting until the email is read can mean waiting
+            until they have gone again.
+          </small>
+        </div>
+      </Form.Field>
+      <Form.Field>
+        <Checkbox
           checked={draft.requireFreeSlot}
           label="Only report peers with a free upload slot"
           onChange={() => set({ requireFreeSlot: !draft.requireFreeSlot })}
@@ -175,6 +191,7 @@ const WatchModal = ({
   };
 
   const [draft, setDraft] = useState({
+    autoDownload: existing?.autoDownload ?? false,
     filter: existing?.filter ?? '',
     hour: initial.hour,
     includeLocked: existing?.includeLocked ?? false,
@@ -213,6 +230,7 @@ const WatchModal = ({
 
     try {
       await onSave({
+        autoDownload: draft.autoDownload,
         enabled: existing?.enabled ?? true,
         filter: draft.filter,
         includeLocked: draft.includeLocked,

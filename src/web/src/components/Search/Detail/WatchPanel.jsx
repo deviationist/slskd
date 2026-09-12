@@ -100,7 +100,15 @@ const WatchPanel = ({ searchId, searchText }) => {
             <span>{`Next run ${library.describeNextRun({ watch })}`}</span>
             {lastRun && (
               <span>
-                {`Last run ${when(lastRun.startedAt)} · ${lastRun.newCount} new`}
+                {`Last run ${when(lastRun.startedAt)} · ${lastRun.newCount} new${
+                  lastRun.enqueuedCount > 0
+                    ? ` · ${lastRun.enqueuedCount} queued`
+                    : ''
+                }${
+                  lastRun.ignoredCount > 0
+                    ? ` · ${lastRun.ignoredCount} ignored`
+                    : ''
+                }`}
               </span>
             )}
           </div>

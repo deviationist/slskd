@@ -1197,6 +1197,20 @@ for 03:00 meant 03:00 where they are.
 > 50 files and says how many more there were, but the right fix for a noisy watch is a narrower search, not a longer
 > mail.
 
+## Downloading what a watch finds
+
+A watch can queue what it finds, rather than waiting for the mail to be read — which is often the point, since the
+peer a watch exists for is one who is rarely online.
+
+Two bounds, both deliberate.  **One copy per filename**, chosen from whichever peer has a free upload slot, then the
+faster one, then the shorter queue: the same release sits on dozens of peers, so queueing every new match would fetch
+one track twenty times over.  And **no more than `watch_download_limit` per run** (five by default), because a watch
+on a broad phrase finds hundreds of new files every run and one left on auto-download would fill a disk while its
+operator read the mail about it.
+
+A queue that fails is recorded and does not fail the run: a peer that went offline between answering the search and
+being asked for the file must not cost you the notification that would have told you it existed.
+
 ## Ignoring things everywhere
 
 A watch reports any given file from any given peer exactly once, so the thing that still repeats is *the same release

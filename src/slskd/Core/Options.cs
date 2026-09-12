@@ -1603,6 +1603,19 @@ namespace slskd
                 public int Limit { get; init; } = 25;
 
                 /// <summary>
+                ///     Gets the most files a single run may queue for download.
+                /// </summary>
+                /// <remarks>
+                ///     A watch on a broad phrase finds hundreds of new files every run. Without a bound, a watch left
+                ///     on auto-download would fill a disk while its operator read the mail about it.
+                /// </remarks>
+                [Argument(default, "watch-download-limit")]
+                [EnvironmentVariable("WATCH_DOWNLOAD_LIMIT")]
+                [Description("the most files a single watch run may queue for download")]
+                [Range(1, 1000)]
+                public int DownloadLimit { get; init; } = 5;
+
+                /// <summary>
                 ///     Gets the default IANA time zone for a watch that does not name one.
                 /// </summary>
                 [Argument(default, "watch-timezone")]

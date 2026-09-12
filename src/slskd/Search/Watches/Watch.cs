@@ -114,6 +114,15 @@ public record Watch
     public string Filter { get; set; }
 
     /// <summary>
+    ///     Gets or sets a value indicating whether new files are queued for download as they are found.
+    /// </summary>
+    /// <remarks>
+    ///     For the case this feature exists for: a rare track whose only holder is rarely online. Waiting until the
+    ///     mail is read can mean waiting until they have gone again.
+    /// </remarks>
+    public bool AutoDownload { get; set; }
+
+    /// <summary>
     ///     Gets or sets the instant this watch was created.
     /// </summary>
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
@@ -185,6 +194,11 @@ public record WatchRun
     public int MatchCount { get; set; }
 
     public int NewCount { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the number of files queued for download.
+    /// </summary>
+    public int EnqueuedCount { get; set; }
 
     /// <summary>
     ///     Gets or sets the number of matches a global ignore removed.
