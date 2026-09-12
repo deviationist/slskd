@@ -1,5 +1,10 @@
 import * as watches from './watches';
 
+jest.mock('./api', () => ({
+  __esModule: true,
+  default: { post: jest.fn(), put: jest.fn() },
+}));
+
 describe('rruleFor / presetFor', () => {
   it('builds a rule for a preset that takes no hour', () => {
     expect(watches.rruleFor({ key: 'every6' })).toBe('FREQ=HOURLY;INTERVAL=6');
@@ -223,5 +228,36 @@ describe('filesFrom', () => {
     expect(watches.filesFrom({ filesJson: 'not json' }).files).toEqual([]);
     expect(watches.filesFrom({}).files).toEqual([]);
     expect(watches.filesFrom(undefined).files).toEqual([]);
+  });
+});
+
+describe('createWatchedSearch', () => {
+  it('creates the search before it watches it', async () => {
+    expect.assertions(3);
+
+    // the order is the whole point: what a watch has reported is keyed on the
+    // search's id, so there is nothing to watch until the search exists
+    const { default: api } = jest.requireMock('./api');
+
+    // the implementations are set here rather than in the factory because this
+    // project's jest resets mocks before every test, which strips them
+    api.post.mockResolvedValue({ data: {} });
+    api.put.mockResolvedValue({
+      data: { seeded: 0, watch: { enabled: true } },
+    });
+
+    await watches.createWatchedSearch({
+      searchText: 'a phrase',
+      watch: { rrule: 'FREQ=DAILY' },
+    });
+
+    expect(api.post).toHaveBeenCalledWith('/searches', expect.any(Object));
+    expect(api.put).toHaveBeenCalledWith(
+      expect.stringMatching(/^\/searches\/.+\/watch$/u),
+      expect.any(Object),
+    );
+    expect(api.post.mock.invocationCallOrder[0]).toBeLessThan(
+      api.put.mock.invocationCallOrder[0],
+    );
   });
 });

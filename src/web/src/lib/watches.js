@@ -1,5 +1,7 @@
 import api from './api';
+import * as searches from './searches';
 import { validateSearchText } from './searches';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * The recurrences a watch can be given.
@@ -273,3 +275,27 @@ export const getRuns = async ({ id }) =>
 export const getNotifications = async ({ id }) =>
   (await api.get(`/searches/${encodeURIComponent(id)}/watch/notifications`))
     .data;
+
+/**
+ * Creates a search and puts a watch on it.
+ *
+ * In that order, and not by accident: a watch is an extension of a search
+ * rather than a thing of its own, and what it has already reported is keyed on
+ * the search's id -- so there is nothing to watch until the search exists.
+ *
+ * Shared, because two pages offer this and a second copy of the order would be
+ * a second chance to get it wrong.
+ * @param {object} params
+ * @param {string} params.searchText - The phrase to search for.
+ * @param {object} params.watch - The watch to put on it.
+ * @returns {Promise<{id: string, watch: object, seeded: number}>} What was created.
+ */
+export const createWatchedSearch = async ({ searchText, watch }) => {
+  const id = uuidv4();
+
+  await searches.create({ id, searchText });
+
+  const { seeded, watch: saved } = await put({ id, watch });
+
+  return { id, seeded, watch: saved };
+};
