@@ -349,17 +349,27 @@ is adjacent — people already schedule searches from outside and complain that
 it clogs the Search screen, which is an argument for re-running in place rather
 than accumulating rows.
 
+## Built after this plan, and why the shape changed
+
+Both of these were deferred here and shipped the same day, and each landed
+differently from the sketch above — worth recording, because the difference is
+the interesting part.
+
+- **A global ignore list.** The sketch assumed it would key on the same
+  identity as the memory, a path from a peer. It does not: the memory already
+  reports any given file from any given peer exactly once, so a global rule of
+  that shape would only ever matter to a *second* watch over the same ground.
+  What actually repeats is one release sitting on dozens of peers, so an ignore
+  matches a **filename**, from anyone. The seam turned out to be right — it is
+  a rule consulted before `WatchFile` — but the key was wrong.
+- **Auto-enqueue on hit.** The concern named here was "scoring and disk", and
+  both turned out to be the whole feature rather than caveats: one copy per
+  *filename* from the peer most likely to send it (free slot, then speed, then
+  queue), and a hard per-run limit, because a broad watch finds hundreds of new
+  files every run.
+
 ## Not in this plan
 
-- **A global ignore list** — "never tell me about this file again, in any
-  watch". Deliberately deferred: the per-watch memory covers the described
-  workflow, and a global list is a second, cross-cutting store with its own UI
-  and its own retention question. It slots in cleanly later as a rule consulted
-  before `WatchFile` — the hit pipeline should be written with that seam in mind.
-- **Auto-enqueue on hit** — grabbing the file while the peer is online rather
-  than when you read the mail. Tempting, and the runner already holds
-  everything needed; left out because "download without me looking" deserves
-  its own decision about scoring and disk.
 - **New criteria fields of any kind** — format allowlists, quality scoring,
   duration windows. The watch persists the controls that exist and evaluates
   them; anything it cannot express is a gap in the filter language, to be
