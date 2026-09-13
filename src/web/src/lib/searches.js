@@ -213,3 +213,90 @@ export const filterResponse = ({
     lockedFiles: filteredLockedFiles,
   };
 };
+
+/*
+ * The results, grouped by the user who holds them, are the only shape the
+ * search page has ever had -- which makes "the biggest file in these results"
+ * a question it cannot answer, because size lives on a file and the sort lives
+ * on a response. Flattening is what puts every file in one list, where a
+ * comparison between two of them is possible at all.
+ *
+ * Flatten *after* filtering, never before: `filterResponse`, the locked-file
+ * toggle and the free-slot toggle all work on responses, so a list built from
+ * the responses that survived them inherits every filter for free. Building it
+ * from the raw results instead would mean reimplementing all three.
+ */
+
+/**
+ * The identity of a file in a flattened list.
+ *
+ * A filename is not unique -- the same release sits on dozens of peers, which
+ * is the normal case rather than a collision -- so the row is keyed on who has
+ * it as well. A newline is the separator because it is the one character a
+ * Soulseek path will not contain.
+ * @param {object} params
+ * @param {string} params.username - The peer holding the file.
+ * @param {string} params.filename - Its full remote path.
+ * @returns {string} A key unique within one search's results.
+ */
+export const fileKey = ({ username, filename }) => `${username}\n${filename}`;
+
+/**
+ * One row of a flattened list: the file, plus what the peer contributes.
+ * @param {object} response - The response the file came from.
+ * @param {object} file - The file.
+ * @param {boolean} locked - Whether it came from the locked collection.
+ * @returns {object} The row.
+ */
+const rowFor = (response, file, locked) => ({
+  ...file,
+  hasFreeUploadSlot: response.hasFreeUploadSlot,
+  key: fileKey({ filename: file.filename, username: response.username }),
+  locked,
+  queueLength: response.queueLength,
+  uploadSpeed: response.uploadSpeed,
+  username: response.username,
+});
+
+/**
+ * Every file in every response, as one list.
+ *
+ * Each row carries the fields a sort might use -- size, bitrate, length -- and
+ * the ones that belong to the peer rather than the file, since a flat list has
+ * nowhere else to show who has it or whether they can send it now.
+ * @param {object} params
+ * @param {object[]} params.responses - Responses, already filtered.
+ * @returns {object[]} One row per file, locked files included and marked.
+ */
+export const flattenResponses = ({ responses = [] }) =>
+  responses.flatMap((response) => [
+    ...(response.files ?? []).map((file) => rowFor(response, file, false)),
+
+    // locked files are a separate collection on the response rather than a
+    // flag on the file, so the flag is applied here -- the grouped view does
+    // the same thing in its own tree builder
+    ...(response.lockedFiles ?? []).map((file) => rowFor(response, file, true)),
+  ]);
+
+/**
+ * Groups selected rows back into one download request per peer.
+ *
+ * Selecting across users is the point of a flat list, and the transfer API
+ * takes one user at a time -- so a selection of twenty files from three peers
+ * is three requests, not twenty and not one.
+ * @param {object[]} rows - The selected rows.
+ * @returns {{username: string, files: {filename: string, size: number}[]}[]} One entry per peer.
+ */
+export const groupByUser = (rows = []) => {
+  const byUser = new Map();
+
+  for (const { username, filename, size } of rows) {
+    if (!byUser.has(username)) {
+      byUser.set(username, []);
+    }
+
+    byUser.get(username).push({ filename, size });
+  }
+
+  return [...byUser].map(([username, files]) => ({ files, username }));
+};
