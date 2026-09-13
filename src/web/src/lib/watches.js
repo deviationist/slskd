@@ -197,6 +197,22 @@ export const watchBadge = ({ watch, notifications = [] }) => {
 };
 
 /**
+ * Whether the page should offer to start watching this search.
+ *
+ * Asked from two render sites -- the detail header draws its buttons once for
+ * a wide screen and again for a narrow one -- which is the reason it is a rule
+ * here rather than a condition written twice. A search that already carries a
+ * watch is not offered a second one: `put` would replace the first one's
+ * schedule in place, silently, and the panel below is where an existing watch
+ * is changed.
+ * @param {object} params
+ * @param {boolean} params.loaded - Whether the search itself has loaded.
+ * @param {object} params.watch - The watch on it, if there is one.
+ * @returns {boolean} Whether to offer it.
+ */
+export const canWatch = ({ loaded, watch }) => Boolean(loaded) && !watch;
+
+/**
  * Whether a draft can be saved.
  * @param {object} draft - The draft.
  * @returns {{ok: boolean, reason?: string}} Whether it can, and why not.

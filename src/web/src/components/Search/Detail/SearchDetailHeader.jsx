@@ -1,3 +1,4 @@
+import * as watchLibrary from '../../../lib/watches';
 import SearchStatusIcon from '../SearchStatusIcon';
 import React from 'react';
 import { useMediaQuery } from 'react-responsive';
@@ -22,6 +23,32 @@ const RefreshButton = ({
     >
       <Icon name="refresh" />
       {(!isSmallScreen || isTinyScreen) && 'Search Again'}
+    </Button>
+  );
+
+/**
+ * Offers to turn a one-off search into a recurring one.
+ *
+ * Beside Search Again on purpose: both answer "run this again", and the only
+ * difference is whether you have to be here to ask. Absent once the search is
+ * watched -- the panel below the header is where a watch is changed.
+ */
+const WatchButton = ({
+  isSmallScreen,
+  isTinyScreen,
+  loaded,
+  onWatch,
+  watch,
+  working,
+}) =>
+  watchLibrary.canWatch({ loaded, watch }) && (
+    <Button
+      disabled={working}
+      icon={isSmallScreen && !isTinyScreen}
+      onClick={onWatch}
+    >
+      <Icon name="clock outline" />
+      {(!isSmallScreen || isTinyScreen) && 'Watch'}
     </Button>
   );
 
@@ -57,9 +84,11 @@ const SearchDetailHeader = ({
   onCreate,
   onRemove,
   onStop,
+  onWatch,
   removing,
   search,
   stopping,
+  watch,
 }) => {
   const isSmallScreen = useMediaQuery({ query: '(max-width: 899px)' });
   const isTinyScreen = useMediaQuery({ query: '(max-width: 684px)' });
@@ -100,6 +129,14 @@ const SearchDetailHeader = ({
               searchText={searchText}
               working={working}
             />
+            <WatchButton
+              isSmallScreen={isSmallScreen}
+              isTinyScreen={isTinyScreen}
+              loaded={loaded}
+              onWatch={onWatch}
+              watch={watch}
+              working={working}
+            />
             <StopOrDeleteButton
               isComplete={isComplete}
               isSmallScreen={isSmallScreen}
@@ -123,6 +160,14 @@ const SearchDetailHeader = ({
             loaded={loaded}
             onCreate={onCreate}
             searchText={searchText}
+            working={working}
+          />
+          <WatchButton
+            isSmallScreen={isSmallScreen}
+            isTinyScreen={isTinyScreen}
+            loaded={loaded}
+            onWatch={onWatch}
+            watch={watch}
             working={working}
           />
           <StopOrDeleteButton

@@ -368,6 +368,26 @@ the interesting part.
   queue), and a hard per-run limit, because a broad watch finds hundreds of new
   files every run.
 
+- **Watching a search that already exists.** The plan assumed a watch is
+  created *with* its search — the modal on `/searches` makes both — and
+  `WatchPanel` said as much in its own docstring. But the case that actually
+  comes up is the other one: you search, find nothing worth taking, and only
+  then decide the question is worth asking again. There is now a **Watch**
+  button beside *Search Again* on the detail page. It needed no server work at
+  all; `PUT /searches/{id}/watch` resolves an existing search by id and upserts
+  against it, so the endpoint had always supported this and only the UI had
+  not.
+
+  Two things fell out of it. `WatchModal`'s `existing` prop was answering two
+  questions at once — *is the phrase settled* and *does the watch already have
+  a memory* — and this case is the first caller that wants opposite answers:
+  the phrase is fixed, but seeding still matters, and matters more here than
+  anywhere else, because an unseeded watch on a search with results on screen
+  emails you every one of them. The two questions are now two props. And the
+  watch moved from `WatchPanel` up to `SearchDetail`, because the header and
+  the panel both need it and two fetches of one fact disagree while either is
+  in flight.
+
 ## Not in this plan
 
 - **New criteria fields of any kind** — format allowlists, quality scoring,

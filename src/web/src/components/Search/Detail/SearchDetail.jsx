@@ -4,13 +4,16 @@ import {
   parseFiltersFromString,
 } from '../../../lib/searches';
 import { sleep } from '../../../lib/util';
+import * as watchLibrary from '../../../lib/watches';
 import ErrorSegment from '../../Shared/ErrorSegment';
 import LoaderSegment from '../../Shared/LoaderSegment';
 import Switch from '../../Shared/Switch';
 import Response from '../Response';
+import WatchModal from '../WatchModal';
 import SearchDetailHeader from './SearchDetailHeader';
 import WatchPanel from './WatchPanel';
 import React, { useEffect, useMemo, useState } from 'react';
+import { toast } from 'react-toastify';
 import { Button, Checkbox, Dropdown, Input, Segment } from 'semantic-ui-react';
 
 const sortDropdownOptions = [
@@ -41,6 +44,12 @@ const SearchDetail = ({
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(undefined);
+
+  // the watch on this search, owned here because both the header and the panel
+  // below it need the same answer -- the header to decide whether to offer one,
+  // the panel to show the one that exists
+  const [watch, setWatch] = useState(undefined);
+  const [watching, setWatching] = useState(false);
 
   const [results, setResults] = useState([]);
 
@@ -140,6 +149,23 @@ const SearchDetail = ({
 
   const filteredCount = results?.length - sortedAndFilteredResults.length;
   const remainingCount = sortedAndFilteredResults.length - displayCount;
+  const loadWatch = async () => {
+    try {
+      const found = await watchLibrary.get({ id });
+
+      setWatch(found);
+      return found;
+    } catch {
+      // a 404 is the ordinary case: most searches are not watched
+      setWatch(undefined);
+      return undefined;
+    }
+  };
+
+  useEffect(() => {
+    loadWatch();
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const loaded = !removing && !creating && !loading && results;
 
   if (error) {
@@ -156,9 +182,11 @@ const SearchDetail = ({
         onCreate={create}
         onRemove={remove}
         onStop={onStop}
+        onWatch={() => setWatching(true)}
         removing={removing}
         search={search}
         stopping={stopping}
+        watch={watch}
       />
       <Switch
         loading={loading && <LoaderSegment />}
@@ -177,8 +205,10 @@ const SearchDetail = ({
         }
       >
         <WatchPanel
+          onWatchChanged={loadWatch}
           searchId={search.id}
           searchText={search.searchText}
+          watch={watch}
         />
         {loaded && (
           <Segment
@@ -272,6 +302,30 @@ const SearchDetail = ({
             ''
           ))}
       </Switch>
+      {watching && (
+        <WatchModal
+          onClose={() => setWatching(false)}
+          onSave={async (created) => {
+            try {
+              await watchLibrary.put({ id, watch: created });
+              await loadWatch();
+              setWatching(false);
+              toast.success(`Watching '${search.searchText}'`);
+            } catch (watchError) {
+              console.error(watchError);
+              toast.error(
+                watchError?.response?.data ?? watchError?.message ?? watchError,
+              );
+            }
+          }}
+          open
+          searchText={search.searchText}
+          // the search already exists and the watch's memory will be keyed on
+          // its id, so the phrase is settled -- but this is still a new watch,
+          // which is what keeps the seeding switch on offer
+          searchTextFixed
+        />
+      )}
     </>
   );
 };

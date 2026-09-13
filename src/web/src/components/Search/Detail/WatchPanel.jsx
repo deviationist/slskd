@@ -20,11 +20,12 @@ const when = (iso) => (iso ? new Date(iso).toLocaleString() : '-');
  * The watch on a search: what it does, when it next runs, and what it has sent.
  *
  * Shown only where there is one. A search that is not watched says nothing
- * here; the control for creating one lives on the searches page, beside the
- * search box, because a watch is created with the search rather than after it.
+ * here; it is the header above that offers to start one, which is also why the
+ * watch itself is owned by the page rather than by this panel -- both need the
+ * same answer, and two fetches of it would disagree for as long as one is in
+ * flight.
  */
-const WatchPanel = ({ searchId, searchText }) => {
-  const [watch, setWatch] = useState(undefined);
+const WatchPanel = ({ onWatchChanged, searchId, searchText, watch }) => {
   const [notifications, setNotifications] = useState([]);
   const [runs, setRuns] = useState([]);
   const [editing, setEditing] = useState(false);
@@ -40,30 +41,38 @@ const WatchPanel = ({ searchId, searchText }) => {
   const history = useHistory();
   const asked = library.ignoreTargetFrom(location.search);
 
-  const load = async () => {
-    try {
-      const found = await library.get({ id: searchId });
+  // what the watch has done. asked for only where there is one: these
+  // endpoints answer 404 for an unwatched search, and most searches are
+  // unwatched, so asking anyway would make the ordinary case an error
+  const loadLog = async () => {
+    if (!watch) {
+      setNotifications([]);
+      setRuns([]);
+      return;
+    }
 
-      setWatch(found);
+    try {
       setNotifications(await library.getNotifications({ id: searchId }));
       setRuns(await library.getRuns({ id: searchId }));
       setIgnores(await library.getIgnores());
     } catch {
-      // a 404 is the ordinary case: most searches are not watched
-      setWatch(undefined);
+      // the watch was deleted between these requests; the panel empties
     }
   };
 
+  // reloads when a watch appears or disappears, not on every change to it: the
+  // log is a consequence of the runs, and a rename does not move it
   useEffect(() => {
-    load();
-  }, [searchId]); // eslint-disable-line react-hooks/exhaustive-deps
+    loadLog();
+  }, [searchId, Boolean(watch)]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const act = async (action, message) => {
     setWorking(true);
 
     try {
       await action();
-      await load();
+      await onWatchChanged();
+      await loadLog();
 
       if (message) {
         toast.success(message);
