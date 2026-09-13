@@ -1,5 +1,6 @@
 import {
   downloadStateOf,
+  folderOf,
   groupByUser,
   selectionState,
 } from '../../lib/searches';
@@ -294,6 +295,9 @@ const FlatFileList = ({ disabled, downloads, onHideUser, rows }) => {
               <Table.HeaderCell className="flatlist-filename">
                 File
               </Table.HeaderCell>
+              <Table.HeaderCell className="flatlist-folder">
+                Folder
+              </Table.HeaderCell>
               <Table.HeaderCell className="flatlist-user">
                 User
               </Table.HeaderCell>
@@ -314,7 +318,7 @@ const FlatFileList = ({ disabled, downloads, onHideUser, rows }) => {
             {paddingTop > 0 && (
               <Table.Row>
                 <Table.Cell
-                  colSpan={8}
+                  colSpan={9}
                   style={{ height: paddingTop, padding: 0 }}
                 />
               </Table.Row>
@@ -359,6 +363,14 @@ const FlatFileList = ({ disabled, downloads, onHideUser, rows }) => {
                       />
                     )}
                     {getFileName(row.filename)}
+                  </Table.Cell>
+                  <Table.Cell
+                    className="flatlist-folder"
+                    // the whole path, since the column shows only the last
+                    // segment of it and the rest is often where it came from
+                    title={row.filename}
+                  >
+                    {folderOf(row)}
                   </Table.Cell>
                   <Table.Cell className="flatlist-user">
                     <Popup
@@ -425,7 +437,7 @@ const FlatFileList = ({ disabled, downloads, onHideUser, rows }) => {
             {paddingBottom > 0 && (
               <Table.Row>
                 <Table.Cell
-                  colSpan={8}
+                  colSpan={9}
                   style={{ height: paddingBottom, padding: 0 }}
                 />
               </Table.Row>

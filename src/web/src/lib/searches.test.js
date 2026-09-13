@@ -587,3 +587,43 @@ describe('indexDownloads / downloadStateOf', () => {
     expect(search.downloadStateOf({ row: {} })).toBeUndefined();
   });
 });
+
+describe('folderOf', () => {
+  it('takes the folder the file is actually in', () => {
+    expect(
+      search.folderOf({
+        filename: '@@abc\\Music\\FLAC\\Artist - Album (2003)\\01.flac',
+      }),
+    ).toBe('Artist - Album (2003)');
+  });
+
+  it('takes the last segment, not the first', () => {
+    // the end of someone else's library path is the part that says anything;
+    // the start is their drive letter and their username
+    expect(
+      search.folderOf({
+        filename: 'C:\\shared\\music\\Aphex Twin - SAW\\a.mp3',
+      }),
+    ).toBe('Aphex Twin - SAW');
+  });
+
+  it('handles forward slashes too', () => {
+    expect(search.folderOf({ filename: '/home/x/Some Album/track.flac' })).toBe(
+      'Some Album',
+    );
+  });
+
+  it('is empty for a file with no folder', () => {
+    // getDirectoryName returns the whole path when there is no separator, and
+    // that is the filename -- showing it in a Folder column would be a lie
+    expect(search.folderOf({ filename: 'loose.mp3' })).toBe('');
+    expect(search.folderOf({ filename: '' })).toBe('');
+    expect(search.folderOf({})).toBe('');
+  });
+
+  it('ignores a trailing separator rather than returning nothing', () => {
+    expect(search.folderOf({ filename: 'a\\Album\\\\track.mp3' })).toBe(
+      'Album',
+    );
+  });
+});

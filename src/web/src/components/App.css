@@ -243,6 +243,16 @@ body {
     height: auto;
 }
 
+/* The folder the file sits in. Given room to breathe in wide mode, where it is
+   most of the reason to be in wide mode; still useful narrow, where it takes
+   what is left after the fixed columns. */
+.flatlist-folder {
+    max-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .flatlist-user {
     width: 180px;
     overflow: hidden;
@@ -367,6 +377,20 @@ body {
   max-width: 1200px !important;
   margin-left: auto !important;
   margin-right: auto !important;
+}
+
+/* Wide mode, from the menu. The cap lives in three places -- here, the search
+   container and the show-more button -- and lifting one without the others
+   leaves the page ragged, with a table wider than the button under it.
+
+   2400 rather than none at all: on a very wide monitor an unbounded table puts
+   the size and length columns so far from the filename that reading across a
+   row needs a ruler. Wide enough for a remote path and its folder, not so wide
+   that the row stops being one thing. */
+:root.wide .view,
+:root.wide .search-container,
+:root.wide .showmore-button {
+  max-width: 2400px !important;
 }
   
 .view:last-child {
