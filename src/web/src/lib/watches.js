@@ -167,6 +167,43 @@ export const describeNextRun = ({ watch, now = new Date() }) => {
 };
 
 /**
+ * When a watch next runs, as the parts a <time> element needs.
+ *
+ * `describeNextRun` answers in the relative terms worth reading at a glance --
+ * "in 12 h" -- which is exactly the phrasing that cannot be checked against a
+ * clock. The moment itself goes in `dateTime`, where it is machine-readable,
+ * and in a title to hover.
+ *
+ * Rendered in the *browser's* zone, not the watch's. The watch's zone says how
+ * its rule is interpreted and is already shown beside the rule; this answers a
+ * different question -- when the run lands where the reader is sitting -- and
+ * those two are the same only by coincidence.
+ * @param {object} params
+ * @param {object} params.watch - The watch.
+ * @param {Date} params.now - The current moment.
+ * @returns {{text: string, dateTime?: string, exact?: string}} The parts.
+ */
+export const nextRun = ({ watch, now = new Date() }) => {
+  const text = describeNextRun({ watch, now });
+
+  if (!watch?.enabled || !watch?.nextRunAt) {
+    return { text };
+  }
+
+  const at = new Date(watch.nextRunAt);
+
+  // a timestamp the server could not have produced. the relative text has
+  // already coped with it in its own way; an Invalid Date rendered into a
+  // dateTime attribute is worse than the attribute being absent, because it
+  // claims to be machine-readable and is not
+  if (Number.isNaN(at.getTime())) {
+    return { text };
+  }
+
+  return { dateTime: at.toISOString(), exact: at.toLocaleString(), text };
+};
+
+/**
  * Says how a watched row should read.
  * @param {object} params
  * @param {object} params.watch - The watch, if there is one.

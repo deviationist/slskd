@@ -133,6 +133,7 @@ const WatchPanel = ({ onWatchChanged, searchId, searchText, watch }) => {
 
   const badge = library.watchBadge({ notifications, watch });
   const lastRun = runs[0];
+  const next = library.nextRun({ watch });
 
   return (
     <Segment
@@ -156,7 +157,22 @@ const WatchPanel = ({ onWatchChanged, searchId, searchText, watch }) => {
             </span>
           </div>
           <div className="watch-panel-line watch-panel-muted">
-            <span>{`Next run ${library.describeNextRun({ watch })}`}</span>
+            <span>
+              {'Next run '}
+              {next.dateTime ? (
+                // the relative phrasing is what is worth reading at a glance;
+                // the moment it stands for is a hover away, and in the markup
+                // for anything that reads the page rather than looks at it
+                <time
+                  dateTime={next.dateTime}
+                  title={next.exact}
+                >
+                  {next.text}
+                </time>
+              ) : (
+                next.text
+              )}
+            </span>
             {lastRun && (
               <span>
                 {`Last run ${when(lastRun.startedAt)} · ${lastRun.newCount} new${
