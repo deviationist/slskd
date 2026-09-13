@@ -290,6 +290,10 @@ public class WatchesController : ControllerBase
             Filter = request.Filter,
             AutoDownload = request.AutoDownload,
             CreatedAt = existing?.CreatedAt ?? DateTime.UtcNow,
+
+            // carried, never recomputed on an edit: a watch edited before its first run still owes itself the
+            // seeding it was created asking for, and rebuilding this from `request` would drop it silently
+            SeedPending = existing?.SeedPending ?? false,
         };
 
         // a rule is refused for searching too often when it is *set*, rather than quietly slowed down later: an
@@ -311,6 +315,14 @@ public class WatchesController : ControllerBase
             }
         }
 
+        // a search that is still running has found nothing to seed from yet, and that is the ordinary case rather
+        // than the exception: a watch created alongside its search is written within a breath of the search starting.
+        // seeding is deferred to the first run, which reads the haul before replacing it
+        watch.SeedPending = Watch.SeedingMustWait(
+            isNew: existing is null,
+            seedRequested: request.SeedFromCurrentResults,
+            searchIsComplete: search.IsComplete) || watch.SeedPending;
+
         var saved = await Watches.UpsertAsync(watch);
 
         // seeding reads what this search *currently* holds, so it only means anything at creation -- a watch that has
@@ -318,10 +330,10 @@ public class WatchesController : ControllerBase
         if (existing is null && request.SeedFromCurrentResults)
         {
             var seeded = await Watches.SeedAsync(saved);
-            return Ok(new { watch = saved, seeded });
+            return Ok(new { watch = saved, seeded, seedPending = saved.SeedPending });
         }
 
-        return Ok(new { watch = saved, seeded = 0 });
+        return Ok(new { watch = saved, seeded = 0, seedPending = saved.SeedPending });
     }
 
     /// <summary>

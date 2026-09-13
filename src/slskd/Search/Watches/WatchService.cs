@@ -368,6 +368,22 @@ public class WatchService
         {
             Log.Information("Running watch on search {SearchId}: '{Text}'", watch.SearchId, search.SearchText);
 
+            // before the re-run, because the re-run replaces the responses this reads. the watch was created asking
+            // not to be told what its search had already found, over a search that had not found it yet -- so the
+            // haul is only here to be recorded now. the run still reports whatever is new, so this costs no run
+            if (watch.SeedPending)
+            {
+                var seeded = await SeedAsync(watch);
+
+                watch.SeedPending = false;
+                await ClearSeedPendingAsync(watch.SearchId);
+
+                Log.Information(
+                    "Seeded watch on search {SearchId} with {Count} files already found; they will not be reported",
+                    watch.SearchId,
+                    seeded);
+            }
+
             // in place: same id, same row, same url. the memory of what has been reported is keyed on that id
             await Searches.StartAsync(
                 id: watch.SearchId,
@@ -723,6 +739,24 @@ public class WatchService
             : null;
 
         await context.SaveChangesAsync();
+    }
+
+    /// <summary>
+    ///     Clears the pending-seed flag, on its own, without disturbing anything else on the row.
+    /// </summary>
+    /// <remarks>
+    ///     Not an <see cref="UpsertAsync"/>: that recomputes NextRunAt, and this runs in the middle of a run whose
+    ///     own rescheduling happens at the end.
+    /// </remarks>
+    /// <param name="searchId">The id of the search.</param>
+    /// <returns>The operation context.</returns>
+    private async Task ClearSeedPendingAsync(Guid searchId)
+    {
+        using var context = ContextFactory.CreateDbContext();
+
+        await context.Watches
+            .Where(w => w.SearchId == searchId)
+            .ExecuteUpdateAsync(s => s.SetProperty(w => w.SeedPending, false));
     }
 
     private async Task SaveRunAsync(WatchRun run)

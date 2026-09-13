@@ -96,6 +96,33 @@ public class SearchDbContextTests : IDisposable
     }
 
     [Fact]
+    public void Seed_pending_survives_a_round_trip()
+    {
+        // the flag decides whether the first run suppresses its findings, and the run reads it from the database
+        // rather than from whatever wrote it, so it has to come back
+        var id = Guid.NewGuid();
+        var at = new DateTime(2026, 9, 14, 1, 0, 21, DateTimeKind.Utc);
+
+        context.Watches.Add(new Watch
+        {
+            SearchId = id,
+            Enabled = true,
+            Rrule = "FREQ=DAILY;BYHOUR=3;BYMINUTE=0",
+            TimeZone = "Europe/Oslo",
+            Anchor = at,
+            NextRunAt = at,
+            CreatedAt = at,
+            UpdatedAt = at,
+            SeedPending = true,
+        });
+
+        context.SaveChanges();
+        context.ChangeTracker.Clear();
+
+        Assert.True(context.Watches.AsNoTracking().Single(w => w.SearchId == id).SeedPending);
+    }
+
+    [Fact]
     public void Watch_timestamps_serialise_with_a_zone()
     {
         // the assertion that matches what the browser actually receives: no Z means local time to `new Date(...)`

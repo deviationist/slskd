@@ -123,9 +123,41 @@ public record Watch
     public bool AutoDownload { get; set; }
 
     /// <summary>
+    ///     Gets or sets a value indicating whether this watch still owes itself a seeding.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Set when a watch is created asking to be seeded over a search that has not finished yet -- which is
+    ///         every watch created together with its search, because the search is started and the watch written
+    ///         within the same breath. Seeding then reads a search that has found nothing, records nothing, and the
+    ///         first scheduled run reports the entire haul as though it were new.
+    ///     </para>
+    ///     <para>
+    ///         The next run seeds from what the search holds by then -- the original haul -- before re-running it,
+    ///         and clears this. The run still reports whatever is genuinely new, so the seeding costs no run.
+    ///     </para>
+    /// </remarks>
+    public bool SeedPending { get; set; }
+
+    /// <summary>
     ///     Gets or sets the instant this watch was created.
     /// </summary>
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    ///     Decides whether a watch being saved must seed later rather than now.
+    /// </summary>
+    /// <remarks>
+    ///     Seeding reads what the search holds, so it can only work once the search holds something. A watch created
+    ///     together with its search is written within a breath of the search starting, and so asks a search that has
+    ///     found nothing -- which is the ordinary path through the searches page, not an edge case.
+    /// </remarks>
+    /// <param name="isNew">Whether this watch is being created rather than edited.</param>
+    /// <param name="seedRequested">Whether the caller asked not to be told what the search has already found.</param>
+    /// <param name="searchIsComplete">Whether the search has finished, and so has something to seed from.</param>
+    /// <returns>A value indicating whether seeding must wait for the first run.</returns>
+    public static bool SeedingMustWait(bool isNew, bool seedRequested, bool searchIsComplete)
+        => isNew && seedRequested && !searchIsComplete;
 
     /// <summary>
     ///     Gets or sets the instant this watch was last changed.
