@@ -247,6 +247,20 @@ body {
     text-align: center !important;
 }
 
+/* Semantic gives .ui.checkbox `vertical-align: initial`, which is baseline, so
+   the box sits on the text baseline of its line rather than in the middle of
+   the cell. Invisible while every row is one line tall and obvious the moment
+   a filename wraps, which in this list is most of them. Both halves are needed:
+   the cell decides where the line box goes, the checkbox where it sits in it. */
+.flatlist td,
+.flatlist th {
+    vertical-align: middle;
+}
+
+.flatlist .ui.checkbox {
+    vertical-align: middle;
+}
+
 /* Sits under the table rather than floating: the grouped view puts its
    download button in the card's own footer, and this is the same idea for a
    list that has no card to sit in. */
