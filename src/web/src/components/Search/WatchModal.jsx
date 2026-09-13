@@ -41,6 +41,7 @@ const PRESETS_BY_KEY = Object.fromEntries(
  * @param {Function} params.onSearchTextChange - Called when the phrase is edited.
  * @param {Function} params.set - Applies changes to the draft.
  * @param {object} params.existing - The watch being edited, if any.
+ * @param {boolean} params.searchTextFixed - Whether the phrase is already settled.
  * @param {string} params.searchText - The search this watch is for.
  * @returns {object} The form.
  */
@@ -50,15 +51,21 @@ export const WatchForm = ({
   existing,
   onSearchTextChange = () => {},
   searchText,
+  searchTextFixed = false,
   set,
 }) => {
   const takesHour = PRESETS_BY_KEY[draft.key]?.hour;
 
+  // the phrase is editable only where this modal is what creates the search.
+  // an existing watch cannot change it -- what it has reported is keyed on the
+  // search's id -- and neither can a watch being added to a search that is
+  // already there, which is a different case and the reason this is its own
+  // prop rather than a second reading of `existing`
+  const phraseSettled = Boolean(existing) || searchTextFixed;
+
   return (
     <Form>
-      {existing ? (
-        // a watch's search cannot be changed once it exists: the search is
-        // already created, and what the watch has reported is keyed on its id.
+      {phraseSettled ? (
         // shown as a heading rather than a field nobody can use
         <Form.Field>
           <strong>{searchText}</strong>
@@ -184,6 +191,7 @@ const WatchModal = ({
   onSearchTextChange = () => {},
   open,
   searchText,
+  searchTextFixed = false,
 }) => {
   const initial = library.presetFor(existing?.rrule) ?? {
     hour: library.DEFAULT_HOUR,
@@ -273,6 +281,7 @@ const WatchModal = ({
           existing={existing}
           onSearchTextChange={onSearchTextChange}
           searchText={searchText}
+          searchTextFixed={searchTextFixed}
           set={set}
         />
         {validation.ok ? (

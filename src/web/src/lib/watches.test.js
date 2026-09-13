@@ -156,6 +156,40 @@ describe('watchBadge', () => {
   });
 });
 
+describe('canWatch', () => {
+  it('offers a watch on a loaded search that has none', () => {
+    expect(watches.canWatch({ loaded: true, watch: undefined })).toBe(true);
+  });
+
+  it('does not offer one before the search has loaded', () => {
+    expect(watches.canWatch({ loaded: false, watch: undefined })).toBe(false);
+  });
+
+  it('does not offer a second watch on a search that has one', () => {
+    expect(watches.canWatch({ loaded: true, watch: { enabled: true } })).toBe(
+      false,
+    );
+  });
+
+  it('does not offer one on a search whose watch is merely paused', () => {
+    // a paused watch is still a watch, and starting a "new" one here would
+    // overwrite its schedule rather than resume it
+    expect(watches.canWatch({ loaded: true, watch: { enabled: false } })).toBe(
+      false,
+    );
+  });
+
+  it('answers with a boolean rather than the results array it was given', () => {
+    // `loaded` in SearchDetail is `!removing && !creating && !loading &&
+    // results` -- an array, not a boolean -- and a truthy non-boolean rendered
+    // by JSX puts the array on the page
+    expect(watches.canWatch({ loaded: [], watch: undefined })).toBe(true);
+    expect(watches.canWatch({ loaded: undefined, watch: undefined })).toBe(
+      false,
+    );
+  });
+});
+
 describe('validateDraft', () => {
   const searchText = 'aphex twin';
 

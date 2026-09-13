@@ -25,6 +25,7 @@ const render = (overrides = {}) =>
       }}
       existing={overrides.existing}
       searchText={overrides.searchText ?? 'aphex twin selected ambient'}
+      searchTextFixed={overrides.searchTextFixed}
       set={() => {}}
     />,
   );
@@ -48,6 +49,18 @@ describe('WatchForm', () => {
 
     expect(html).toContain('aphex twin selected ambient');
     expect(html).not.toContain('>Search<');
+  });
+
+  it('shows the phrase but still offers seeding when watching an existing search', () => {
+    // the case `existing` cannot express: the *search* is already there, so the
+    // phrase is settled, but the *watch* is new, so its memory is empty and
+    // seeding is the difference between a first email of one file and one of
+    // everything already on the page
+    const html = render({ searchTextFixed: true });
+
+    expect(html).toContain('aphex twin selected ambient');
+    expect(html).not.toContain('>Search<');
+    expect(html).toContain('tell me what this search has already found');
   });
 
   it('renders a control for every field, not just its label', () => {
