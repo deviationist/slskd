@@ -1,5 +1,6 @@
 import {
   filterResponse,
+  flattenResponses,
   getResponses,
   parseFiltersFromString,
 } from '../../../lib/searches';
@@ -8,6 +9,7 @@ import * as watchLibrary from '../../../lib/watches';
 import ErrorSegment from '../../Shared/ErrorSegment';
 import LoaderSegment from '../../Shared/LoaderSegment';
 import Switch from '../../Shared/Switch';
+import FlatFileList from '../FlatFileList';
 import Response from '../Response';
 import WatchModal from '../WatchModal';
 import SearchDetailHeader from './SearchDetailHeader';
@@ -28,6 +30,78 @@ const sortDropdownOptions = [
     value: 'queueLength',
   },
 ];
+
+/**
+ * The footer under the grouped results: more to show, or why some are not.
+ *
+ * Its own component because the page it sits on is at the linter's complexity
+ * ceiling, and a nested ternary in the middle of a long render is the first
+ * thing worth lifting out of one.
+ * @param {object} params
+ * @param {number} params.filteredCount - Results hidden by the filters.
+ * @param {Function} params.onShowMore - Reveals the next page.
+ * @param {number} params.remainingCount - Results not yet drawn.
+ * @returns {object} The footer, or nothing when there is neither to report.
+ */
+const ShowMore = ({ filteredCount, onShowMore, remainingCount }) => {
+  if (remainingCount > 0) {
+    return (
+      <Button
+        className="showmore-button"
+        fluid
+        onClick={onShowMore}
+        primary
+        size="large"
+      >
+        Show {remainingCount > 5 ? 5 : remainingCount} More Results{' '}
+        {`(${remainingCount} remaining, ${filteredCount} hidden by filter(s))`}
+      </Button>
+    );
+  }
+
+  if (filteredCount > 0) {
+    return (
+      <Button
+        className="showmore-button"
+        disabled
+        fluid
+        size="large"
+      >{`All results shown. ${filteredCount} results hidden by filter(s)`}</Button>
+    );
+  }
+
+  return null;
+};
+
+/*
+ * Whether the results are drawn as one row per file or as one card per user.
+ *
+ * Remembered, unlike the filter toggles beside it: those describe *this*
+ * search and are reasonably forgotten when the page reloads, while this is a
+ * preference about how the operator reads results at all. Per browser, since
+ * that is where a display preference belongs.
+ *
+ * Guarded on both sides because localStorage throws outright in a browser with
+ * site data blocked, and the read runs on first render -- an exception there
+ * would cost the whole page rather than a preference.
+ */
+const FLAT_STORAGE_KEY = 'slskd-search-flat-results';
+
+const readStoredFlat = () => {
+  try {
+    return window.localStorage.getItem(FLAT_STORAGE_KEY) === 'true';
+  } catch {
+    return false;
+  }
+};
+
+const storeFlat = (flat) => {
+  try {
+    window.localStorage.setItem(FLAT_STORAGE_KEY, String(flat));
+  } catch {
+    // a preference that cannot be saved is still a preference for this tab
+  }
+};
 
 const SearchDetail = ({
   creating,
@@ -59,6 +133,7 @@ const SearchDetail = ({
   const [hideLocked, setHideLocked] = useState(true);
   const [hideNoFreeSlots, setHideNoFreeSlots] = useState(false);
   const [foldResults, setFoldResults] = useState(false);
+  const [flatResults, setFlatResults] = useState(readStoredFlat);
   const [resultFilters, setResultFilters] = useState('');
   const [displayCount, setDisplayCount] = useState(5);
 
@@ -146,6 +221,14 @@ const SearchDetail = ({
     reset();
     onRemove(search);
   };
+
+  // from the filtered responses, never from `results`: every filter on this
+  // page -- the filter box, hide-locked, hide-no-free-slots, and hiding a user
+  // -- works on responses, so flattening afterwards inherits all four
+  const flatRows = useMemo(
+    () => flattenResponses({ responses: sortedAndFilteredResults }),
+    [sortedAndFilteredResults],
+  );
 
   const filteredCount = results?.length - sortedAndFilteredResults.length;
   const remainingCount = sortedAndFilteredResults.length - displayCount;
@@ -245,8 +328,22 @@ const SearchDetail = ({
               <Checkbox
                 checked={foldResults}
                 className="search-options-fold-results"
+                // folding is a property of a per-user card, and the flat list
+                // has none. left visible rather than hidden so the controls do
+                // not move around under the pointer when the view changes
+                disabled={flatResults}
                 label="Fold Results"
                 onChange={() => setFoldResults(!foldResults)}
+                toggle
+              />
+              <Checkbox
+                checked={flatResults}
+                className="search-options-flat-results"
+                label="One List"
+                onChange={() => {
+                  setFlatResults(!flatResults);
+                  storeFlat(!flatResults);
+                }}
                 toggle
               />
             </div>
@@ -269,7 +366,17 @@ const SearchDetail = ({
             />
           </Segment>
         )}
+        {loaded && flatResults && (
+          <FlatFileList
+            disabled={disabled}
+            onHideUser={(username) =>
+              setHiddenResults([...hiddenResults, username])
+            }
+            rows={flatRows}
+          />
+        )}
         {loaded &&
+          !flatResults &&
           sortedAndFilteredResults.slice(0, displayCount).map((r) => (
             <Response
               disabled={disabled}
@@ -279,28 +386,13 @@ const SearchDetail = ({
               response={r}
             />
           ))}
-        {loaded &&
-          (remainingCount > 0 ? (
-            <Button
-              className="showmore-button"
-              fluid
-              onClick={() => setDisplayCount(displayCount + 5)}
-              primary
-              size="large"
-            >
-              Show {remainingCount > 5 ? 5 : remainingCount} More Results{' '}
-              {`(${remainingCount} remaining, ${filteredCount} hidden by filter(s))`}
-            </Button>
-          ) : filteredCount > 0 ? (
-            <Button
-              className="showmore-button"
-              disabled
-              fluid
-              size="large"
-            >{`All results shown. ${filteredCount} results hidden by filter(s)`}</Button>
-          ) : (
-            ''
-          ))}
+        {loaded && !flatResults && (
+          <ShowMore
+            filteredCount={filteredCount}
+            onShowMore={() => setDisplayCount(displayCount + 5)}
+            remainingCount={remainingCount}
+          />
+        )}
       </Switch>
       {watching && (
         <WatchModal

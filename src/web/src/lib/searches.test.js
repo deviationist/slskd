@@ -284,3 +284,122 @@ describe('search.validateSearchText', () => {
     );
   });
 });
+
+describe('flattenResponses', () => {
+  const responses = [
+    {
+      username: 'alice',
+      hasFreeUploadSlot: true,
+      uploadSpeed: 900,
+      queueLength: 0,
+      files: [
+        { filename: 'a\\one.flac', size: 10, bitRate: 1_000, length: 200 },
+        { filename: 'a\\two.flac', size: 20, bitRate: 1_000, length: 300 },
+      ],
+      lockedFiles: [{ filename: 'a\\three.flac', size: 30 }],
+    },
+    {
+      username: 'bob',
+      hasFreeUploadSlot: false,
+      uploadSpeed: 100,
+      queueLength: 4,
+      files: [{ filename: 'b\\one.mp3', size: 5, bitRate: 320, length: 200 }],
+    },
+  ];
+
+  it('puts every file from every response in one list', () => {
+    expect(
+      search.flattenResponses({ responses }).map((r) => r.filename),
+    ).toEqual(['a\\one.flac', 'a\\two.flac', 'a\\three.flac', 'b\\one.mp3']);
+  });
+
+  it('carries the peer down onto each file', () => {
+    // the whole point: in a flat list there is nowhere else to show who has it
+    const [first] = search.flattenResponses({ responses });
+
+    expect(first.username).toBe('alice');
+    expect(first.hasFreeUploadSlot).toBe(true);
+    expect(first.uploadSpeed).toBe(900);
+    expect(first.queueLength).toBe(0);
+  });
+
+  it('keeps the fields a sort would use', () => {
+    const [first] = search.flattenResponses({ responses });
+
+    expect(first.size).toBe(10);
+    expect(first.bitRate).toBe(1_000);
+    expect(first).toHaveLength(200);
+  });
+
+  it('marks locked files rather than dropping them', () => {
+    // hiding them is the toggle's job, upstream of this, and it does it by
+    // emptying lockedFiles on the response
+    const locked = search
+      .flattenResponses({ responses })
+      .filter((r) => r.locked);
+
+    expect(locked).toHaveLength(1);
+    expect(locked[0].filename).toBe('a\\three.flac');
+  });
+
+  it('keys a row on the peer as well as the path', () => {
+    // the same release sits on dozens of peers; a filename alone would collide
+    // constantly, and two rows sharing a key means selecting one selects both
+    const keys = search.flattenResponses({
+      responses: [
+        { username: 'alice', files: [{ filename: 'x\\same.flac', size: 1 }] },
+        { username: 'bob', files: [{ filename: 'x\\same.flac', size: 1 }] },
+      ],
+    });
+
+    expect(keys[0].key).not.toBe(keys[1].key);
+    expect(new Set(keys.map((k) => k.key)).size).toBe(2);
+  });
+
+  it('copes with a response that has neither collection', () => {
+    expect(search.flattenResponses({ responses: [{ username: 'a' }] })).toEqual(
+      [],
+    );
+    expect(search.flattenResponses({})).toEqual([]);
+  });
+});
+
+describe('groupByUser', () => {
+  it('turns a mixed selection into one request per peer', () => {
+    const grouped = search.groupByUser([
+      { username: 'alice', filename: 'a\\one.flac', size: 10 },
+      { username: 'bob', filename: 'b\\one.mp3', size: 5 },
+      { username: 'alice', filename: 'a\\two.flac', size: 20 },
+    ]);
+
+    expect(grouped).toHaveLength(2);
+    expect(grouped.find((g) => g.username === 'alice').files).toEqual([
+      { filename: 'a\\one.flac', size: 10 },
+      { filename: 'a\\two.flac', size: 20 },
+    ]);
+    expect(grouped.find((g) => g.username === 'bob').files).toEqual([
+      { filename: 'b\\one.mp3', size: 5 },
+    ]);
+  });
+
+  it('sends only what the transfer API takes', () => {
+    // a row carries the peer's upload speed and its own locked flag; posting
+    // those would be sending the server fields it has no use for
+    const [{ files }] = search.groupByUser([
+      {
+        username: 'alice',
+        filename: 'a.flac',
+        size: 1,
+        locked: false,
+        uploadSpeed: 9,
+      },
+    ]);
+
+    expect(Object.keys(files[0]).sort()).toEqual(['filename', 'size']);
+  });
+
+  it('is empty for an empty selection', () => {
+    expect(search.groupByUser([])).toEqual([]);
+    expect(search.groupByUser()).toEqual([]);
+  });
+});
