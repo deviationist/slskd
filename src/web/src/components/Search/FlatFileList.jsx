@@ -16,6 +16,7 @@ import {
 } from '../../lib/util';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { toast } from 'react-toastify';
 import {
   Button,
@@ -261,6 +262,35 @@ const FlatFileList = ({ disabled, downloads, rows }) => {
           </Button>
         )}
       </div>
+      {/*
+       * Through a portal, because neither `fixed` nor `sticky` can work where
+       * this component sits. Semantic's Sidebar.Pushable carries a transform
+       * -- an identity one, but a transform all the same -- which makes it the
+       * containing block for fixed descendants, and it is also the element
+       * that scrolls. So a bar left in place is positioned against the
+       * scrolled content and travels with it, however it is pinned. Rendering
+       * into the body escapes that ancestor entirely.
+       */}
+      {selectedRows.length > 0 &&
+        createPortal(
+          <div className="flatlist-floating">
+            <Button
+              color="green"
+              content="Download"
+              disabled={disabled || downloading}
+              icon="download"
+              label={{
+                as: 'a',
+                basic: false,
+                content: `${selectedRows.length} file${selectedRows.length === 1 ? '' : 's'}, ${formatBytes(selectedSize)}`,
+              }}
+              labelPosition="right"
+              loading={downloading}
+              onClick={download}
+            />
+          </div>,
+          document.body,
+        )}
       <div ref={listRef}>
         <Table
           className="flatlist"
@@ -426,24 +456,6 @@ const FlatFileList = ({ disabled, downloads, rows }) => {
           </Table.Body>
         </Table>
       </div>
-      {selectedRows.length > 0 && (
-        <div className="flatlist-actions">
-          <Button
-            color="green"
-            content="Download"
-            disabled={disabled || downloading}
-            icon="download"
-            label={{
-              as: 'a',
-              basic: false,
-              content: `${selectedRows.length} file${selectedRows.length === 1 ? '' : 's'}, ${formatBytes(selectedSize)}`,
-            }}
-            labelPosition="right"
-            loading={downloading}
-            onClick={download}
-          />
-        </div>
-      )}
     </Segment>
   );
 };
