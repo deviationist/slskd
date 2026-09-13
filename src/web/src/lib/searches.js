@@ -300,3 +300,28 @@ export const groupByUser = (rows = []) => {
 
   return [...byUser].map(([username, files]) => ({ files, username }));
 };
+
+/**
+ * What a select-all checkbox over a list of rows should show.
+ *
+ * Three states rather than two: a box that is merely unticked while half the
+ * list is selected says the opposite of what is true. The count comes back
+ * with it because the caller needs it in the same breath -- to label the
+ * download, and to decide whether to offer clearing at all.
+ * @param {object} params
+ * @param {object[]} params.rows - Every row currently listed.
+ * @param {Set<string>} params.selected - Keys of the selected rows.
+ * @returns {{all: boolean, some: boolean, count: number}} The state of the box.
+ */
+export const selectionState = ({ rows = [], selected = new Set() }) => {
+  const count = rows.filter((row) => selected.has(row.key)).length;
+
+  return {
+    all: rows.length > 0 && count === rows.length,
+    count,
+
+    // strictly between: `some` is what draws the dash, and a full selection
+    // draws a tick instead
+    some: count > 0 && count < rows.length,
+  };
+};

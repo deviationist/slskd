@@ -403,3 +403,53 @@ describe('groupByUser', () => {
     expect(search.groupByUser()).toEqual([]);
   });
 });
+
+describe('selectionState', () => {
+  const rows = [{ key: 'a' }, { key: 'b' }, { key: 'c' }];
+
+  it('is empty when nothing is selected', () => {
+    const state = search.selectionState({ rows, selected: new Set() });
+
+    expect(state).toEqual({ all: false, count: 0, some: false });
+  });
+
+  it('is indeterminate when only some are', () => {
+    // the state that matters: an unticked box over a half-selected list says
+    // the opposite of what is true
+    const state = search.selectionState({ rows, selected: new Set(['a']) });
+
+    expect(state.some).toBe(true);
+    expect(state.all).toBe(false);
+    expect(state.count).toBe(1);
+  });
+
+  it('is full, not indeterminate, when every row is selected', () => {
+    const state = search.selectionState({
+      rows,
+      selected: new Set(['a', 'b', 'c']),
+    });
+
+    expect(state.all).toBe(true);
+    expect(state.some).toBe(false);
+  });
+
+  it('ignores selected keys that are no longer listed', () => {
+    // a selection outlives the filter in force when it was made, so a row can
+    // be selected and then filtered away. counting the set rather than the
+    // rows would report more selected than the list contains, and mark a
+    // fully-selected list as merely partial
+    const state = search.selectionState({
+      rows,
+      selected: new Set(['a', 'b', 'c', 'gone']),
+    });
+
+    expect(state.count).toBe(3);
+    expect(state.all).toBe(true);
+  });
+
+  it('is not "all" over an empty list', () => {
+    expect(search.selectionState({ rows: [], selected: new Set() }).all).toBe(
+      false,
+    );
+  });
+});

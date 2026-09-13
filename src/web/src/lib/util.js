@@ -286,3 +286,64 @@ export const downloadFile = (data, filename, mime) => {
     window.URL.revokeObjectURL(blobURL);
   }
 };
+
+/**
+ * The nearest ancestor that actually scrolls, or null if none does.
+ *
+ * A virtualiser has to watch the element the reader is scrolling, and in this
+ * app that is neither the window nor the list's own parent: the layout puts
+ * `overflow-y: auto` on a wrapper near the root and lets the page grow inside
+ * it, so `window.scrollY` never moves however far down the list you are.
+ *
+ * Found rather than named, because a selector would be a second place to
+ * remember when the layout changes -- and the failure it produces is a list
+ * that renders its first screenful and then nothing, which reads as data
+ * missing rather than as a scroll container in the wrong place.
+ *
+ * `hidden` does not count: an element can be taller than its box and clip
+ * without ever scrolling, which is exactly what the wrapper directly above the
+ * page content does here.
+ * @param {Element} element - Where to start looking, exclusive.
+ * @returns {Element|null} The scrolling ancestor.
+ */
+export const scrollParentOf = (element) => {
+  let node = element?.parentElement;
+
+  while (node) {
+    const { overflowY } = window.getComputedStyle(node);
+
+    if (
+      overflowY === 'auto' ||
+      overflowY === 'scroll' ||
+      overflowY === 'overlay'
+    ) {
+      return node;
+    }
+
+    node = node.parentElement;
+  }
+
+  return null;
+};
+
+/**
+ * How far an element sits below the top of its scroll container's content.
+ *
+ * What a virtualiser wants as its `scrollMargin`: without it the rows are
+ * positioned as though the list began at the top of the scrolling area, and
+ * every one of them lands that far out of place.
+ * @param {Element} element - The element.
+ * @param {Element} scrollParent - Its scrolling ancestor.
+ * @returns {number} The offset in px, or 0 if either is missing.
+ */
+export const offsetWithin = (element, scrollParent) => {
+  if (!element || !scrollParent) {
+    return 0;
+  }
+
+  return (
+    element.getBoundingClientRect().top -
+    scrollParent.getBoundingClientRect().top +
+    scrollParent.scrollTop
+  );
+};
