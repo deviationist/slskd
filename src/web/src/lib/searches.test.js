@@ -627,3 +627,38 @@ describe('folderOf', () => {
     );
   });
 });
+
+describe('describeSelection', () => {
+  const state = (count, all) => ({ all, count, some: count > 0 && !all });
+
+  it('says how many files there are when none are picked', () => {
+    expect(
+      search.describeSelection({ selection: state(0, false), total: 605 }),
+    ).toBe('605 files');
+  });
+
+  it('counts a partial selection', () => {
+    expect(
+      search.describeSelection({ selection: state(12, false), total: 605 }),
+    ).toBe('605 files, 12 selected');
+  });
+
+  it('says "all selected" rather than repeating the number', () => {
+    // "605 files, 605 selected" makes the reader compare two numbers to learn
+    // what the words can just say
+    expect(
+      search.describeSelection({ selection: state(605, true), total: 605 }),
+    ).toBe('605 files, all selected');
+  });
+
+  it('gets the singular right', () => {
+    expect(
+      search.describeSelection({ selection: state(0, false), total: 1 }),
+    ).toBe('1 file');
+  });
+
+  it('copes with no selection state at all', () => {
+    expect(search.describeSelection({ total: 3 })).toBe('3 files');
+    expect(search.describeSelection({})).toBe('0 files');
+  });
+});

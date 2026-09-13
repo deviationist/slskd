@@ -414,9 +414,6 @@ const SearchDetail = ({
           <FlatFileList
             disabled={disabled}
             downloads={downloads}
-            onHideUser={(username) =>
-              setHiddenResults([...hiddenResults, username])
-            }
             rows={flatRows}
           />
         )}

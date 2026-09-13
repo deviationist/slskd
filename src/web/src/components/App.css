@@ -272,8 +272,7 @@ body {
 }
 
 .flatlist-selector,
-.flatlist-download,
-.flatlist-hide {
+.flatlist-download {
     width: 40px;
     text-align: center !important;
 }

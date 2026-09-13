@@ -1,4 +1,5 @@
 import {
+  describeSelection,
   downloadStateOf,
   folderOf,
   groupByUser,
@@ -60,7 +61,6 @@ const ROW_H = 37;
  * lost with it; a key survives, because it names the file rather than the row.
  * @param {object} params
  * @param {boolean} params.disabled - Whether the search is in a state that forbids downloading.
- * @param {Function} params.onHideUser - Hides every result from one peer.
  * @param {object[]} params.rows - Flattened, already-filtered results.
  * @returns {object} The list.
  */
@@ -98,7 +98,7 @@ const MARKS = {
   },
 };
 
-const FlatFileList = ({ disabled, downloads, onHideUser, rows }) => {
+const FlatFileList = ({ disabled, downloads, rows }) => {
   const [selected, setSelected] = useState(() => new Set());
   const [downloading, setDownloading] = useState(false);
   const [rowDownloading, setRowDownloading] = useState(undefined);
@@ -249,10 +249,7 @@ const FlatFileList = ({ disabled, downloads, onHideUser, rows }) => {
       raised
     >
       <div className="flatlist-summary">
-        <span>
-          {`${rows.length} file${rows.length === 1 ? '' : 's'}`}
-          {selection.count > 0 && `, ${selection.count} selected`}
-        </span>
+        <span>{describeSelection({ selection, total: rows.length })}</span>
         {selection.count > 0 && (
           <Button
             basic
@@ -311,14 +308,13 @@ const FlatFileList = ({ disabled, downloads, onHideUser, rows }) => {
                 Length
               </Table.HeaderCell>
               <Table.HeaderCell className="flatlist-download" />
-              <Table.HeaderCell className="flatlist-hide" />
             </Table.Row>
           </Table.Header>
           <Table.Body>
             {paddingTop > 0 && (
               <Table.Row>
                 <Table.Cell
-                  colSpan={9}
+                  colSpan={8}
                   style={{ height: paddingTop, padding: 0 }}
                 />
               </Table.Row>
@@ -416,28 +412,13 @@ const FlatFileList = ({ disabled, downloads, onHideUser, rows }) => {
                       }
                     />
                   </Table.Cell>
-                  <Table.Cell className="flatlist-hide">
-                    <Popup
-                      content={`Hide every result from ${row.username}. They come back when the search is reloaded or run again -- nothing is remembered.`}
-                      position="left center"
-                      trigger={
-                        <Icon
-                          color="red"
-                          link
-                          name="close"
-                          onClick={() => onHideUser(row.username)}
-                          size="small"
-                        />
-                      }
-                    />
-                  </Table.Cell>
                 </Table.Row>
               );
             })}
             {paddingBottom > 0 && (
               <Table.Row>
                 <Table.Cell
-                  colSpan={9}
+                  colSpan={8}
                   style={{ height: paddingBottom, padding: 0 }}
                 />
               </Table.Row>

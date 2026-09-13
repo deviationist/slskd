@@ -468,3 +468,26 @@ export const folderOf = ({ filename }) => {
 
   return directory.split(/[/\\]/u).filter(Boolean).pop() ?? '';
 };
+
+/**
+ * The line above the list: how many files there are, and how many are picked.
+ *
+ * "605 files, all selected" rather than "605 files, 605 selected". The second
+ * makes the reader compare two numbers to learn something the first just says,
+ * and they are the same number often enough for that to be a chore.
+ * @param {object} params
+ * @param {number} params.total - How many files are listed.
+ * @param {object} params.selection - The result of `selectionState`.
+ * @returns {string} The line.
+ */
+export const describeSelection = ({ total = 0, selection }) => {
+  const files = `${total} file${total === 1 ? '' : 's'}`;
+
+  if (!selection?.count) {
+    return files;
+  }
+
+  return selection.all
+    ? `${files}, all selected`
+    : `${files}, ${selection.count} selected`;
+};
