@@ -1,4 +1,4 @@
-import { groupByUser } from '../../lib/searches';
+import { groupByUser, selectionState } from '../../lib/searches';
 import * as transfers from '../../lib/transfers';
 import {
   formatAttributes,
@@ -6,7 +6,8 @@ import {
   formatSeconds,
   getFileName,
 } from '../../lib/util';
-import React, { useMemo, useState } from 'react';
+import { useWindowVirtualizer } from '@tanstack/react-virtual';
+import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
 import {
   Button,
@@ -18,13 +19,19 @@ import {
 } from 'semantic-ui-react';
 
 /**
- * How many rows are drawn before the first "show more".
+ * The height of a row, in px, and the reason the filename column is one line.
  *
- * Higher than the grouped view's five, which counts *users*: a search of any
- * size is hundreds of files, and a list that shows five of them is not a list.
- * Low enough that a thousand checkboxes are not mounted on arrival.
+ * The virtualiser positions rows by arithmetic rather than by measuring them,
+ * so they have to agree on a height. A wrapped filename would make its row two
+ * lines tall and every row below it land in the wrong place -- so the column
+ * truncates instead, with the full remote path in the cell's title where it
+ * was already. Measuring each row is the alternative, and it buys wrapping at
+ * the cost of the list shifting under the pointer as rows are measured.
+ *
+ * Must match `.flatlist tbody td` in App.css. Changing one without the other
+ * is a drift the eye catches only at the bottom of a long list.
  */
-const PAGE = 100;
+const ROW_H = 37;
 
 /**
  * The results as one row per file, rather than one card per user.
@@ -33,6 +40,12 @@ const PAGE = 100;
  * "what is here", which is the question a sort by size or bitrate is asking.
  * Both are kept -- this is a second way to read the same filtered results, not
  * a replacement -- and the toggle between them is remembered.
+ *
+ * Every row is in the list. Only the ones on screen are in the DOM, which is
+ * what lets that be true for a search of nine hundred files: the rest are two
+ * spacer rows holding the scrollbar at the right length. It virtualises
+ * against the *window* rather than a box of its own, so the page scrolls the
+ * way every other page here does and there is no scrollbar inside a scrollbar.
  *
  * Selection lives here as a set of keys rather than as a `selected` flag
  * written onto each file, which is what the grouped view does. A flat list is
@@ -46,13 +59,55 @@ const PAGE = 100;
  */
 const FlatFileList = ({ disabled, onHideUser, rows }) => {
   const [selected, setSelected] = useState(() => new Set());
-  const [shown, setShown] = useState(PAGE);
   const [downloading, setDownloading] = useState(false);
+  const [rowDownloading, setRowDownloading] = useState(undefined);
+  const [scrollMargin, setScrollMargin] = useState(0);
+  const listRef = useRef(null);
 
-  const visible = useMemo(() => rows.slice(0, shown), [rows, shown]);
+  /*
+   * Where the table starts down the document. The virtualiser measures the
+   * window's scroll against it; without it, it believes the list begins at the
+   * top of the page and draws every row that far out of place.
+   *
+   * Held in state and measured in a layout effect rather than read inline off
+   * the ref, which is null on the first render -- reading it there gives 0 for
+   * the whole life of the component unless something else happens to re-render
+   * it, which is the difference between a list that works and one that works
+   * only after you resize the window.
+   *
+   * Re-measured when the row count changes, because the panel above this one
+   * reports it and changes height when it goes from four digits to three.
+   */
+  useLayoutEffect(() => {
+    const measure = () => setScrollMargin(listRef.current?.offsetTop ?? 0);
+
+    measure();
+    window.addEventListener('resize', measure);
+
+    return () => window.removeEventListener('resize', measure);
+  }, [rows.length]);
+
+  const virtualizer = useWindowVirtualizer({
+    count: rows.length,
+    estimateSize: () => ROW_H,
+    overscan: 15,
+    scrollMargin,
+  });
+
+  const virtualRows = virtualizer.getVirtualItems();
+  const paddingTop =
+    virtualRows.length > 0
+      ? virtualRows[0].start - virtualizer.options.scrollMargin
+      : 0;
+  const paddingBottom =
+    virtualRows.length > 0
+      ? virtualizer.getTotalSize() -
+        (virtualRows[virtualRows.length - 1].end -
+          virtualizer.options.scrollMargin)
+      : 0;
 
   // a selection outlives the filter that was in force when it was made, so a
-  // row can be selected and then filtered away. counting from `rows` rather
+  // row can be selected and then filtered away. deriving from `rows` rather
   // than from the set is what stops the button offering to download a file
   // that is no longer on the page
   const selectedRows = useMemo(
@@ -60,26 +115,8 @@ const FlatFileList = ({ disabled, onHideUser, rows }) => {
     [rows, selected],
   );
 
+  const selection = selectionState({ rows, selected });
   const selectedSize = selectedRows.reduce((total, row) => total + row.size, 0);
-
-  /*
-   * The header checkbox takes the rows on screen, not every row the filters
-   * match. Selecting hundreds of files that have never been drawn, from one
-   * click on a box next to a hundred of them, is not what the box appears to
-   * offer -- and the button beside it enqueues whatever it picked up.
-   *
-   * So it says what it did instead: indeterminate while only some of the page
-   * is picked, and where there are more rows behind the paging, an explicit
-   * offer to take those too. Without the indeterminate state the box unticks
-   * itself when the next page arrives, which looks like the selection was
-   * lost when nothing was.
-   */
-  const visibleSelected = visible.filter((row) => selected.has(row.key)).length;
-  const allVisibleSelected =
-    visible.length > 0 && visibleSelected === visible.length;
-  const someVisibleSelected =
-    visibleSelected > 0 && visibleSelected < visible.length;
-  const beyondPage = rows.length - visible.length;
 
   const toggle = (key, checked) =>
     setSelected((old) => {
@@ -94,20 +131,32 @@ const FlatFileList = ({ disabled, onHideUser, rows }) => {
       return next;
     });
 
-  const toggleAllVisible = (checked) =>
-    setSelected((old) => {
-      const next = new Set(old);
+  // every row is listed, so this is the whole filtered set and says so. it was
+  // "the rows on this page" while the list was paged, which needed an extra
+  // control to reach the rest; there are no pages now
+  const toggleAll = (checked) =>
+    setSelected(checked ? new Set(rows.map((row) => row.key)) : new Set());
 
-      for (const row of visible) {
-        if (checked) {
-          next.add(row.key);
-        } else {
-          next.delete(row.key);
-        }
-      }
+  /*
+   * One row, on its own. Goes through `groupByUser` like the bulk download so
+   * there is one place that decides what is sent -- a second hand-built body
+   * here is how the two drift into disagreeing about it.
+   */
+  const downloadRow = async (row) => {
+    setRowDownloading(row.key);
 
-      return next;
-    });
+    try {
+      const [group] = groupByUser([row]);
+
+      await transfers.download(group);
+      toast.success(`Enqueued ${getFileName(row.filename)}`);
+    } catch (error) {
+      console.error(error);
+      toast.error(`Could not enqueue from ${row.username}`);
+    } finally {
+      setRowDownloading(undefined);
+    }
+  };
 
   const download = async () => {
     setDownloading(true);
@@ -147,22 +196,12 @@ const FlatFileList = ({ disabled, onHideUser, rows }) => {
       className="flatlist-segment"
       raised
     >
-      {allVisibleSelected && beyondPage > 0 && (
-        <div className="flatlist-selectall">
-          {`All ${visible.length} files on this page are selected.`}
-          <Button
-            basic
-            compact
-            onClick={() => setSelected(new Set(rows.map((row) => row.key)))}
-            size="tiny"
-          >
-            {`Select all ${rows.length}`}
-          </Button>
-        </div>
-      )}
-      {selectedRows.length > 0 && (
-        <div className="flatlist-selectall">
-          {`${selectedRows.length} file${selectedRows.length === 1 ? '' : 's'} selected.`}
+      <div className="flatlist-summary">
+        <span>
+          {`${rows.length} file${rows.length === 1 ? '' : 's'}`}
+          {selection.count > 0 && `, ${selection.count} selected`}
+        </span>
+        {selection.count > 0 && (
           <Button
             basic
             compact
@@ -171,124 +210,160 @@ const FlatFileList = ({ disabled, onHideUser, rows }) => {
           >
             Clear selection
           </Button>
-        </div>
-      )}
-      <Table
-        className="flatlist"
-        compact
-        selectable
-        size="small"
-      >
-        <Table.Header>
-          <Table.Row>
-            <Table.HeaderCell className="flatlist-selector">
-              <Popup
-                content={
-                  allVisibleSelected
-                    ? 'Deselect the files on this page'
-                    : `Select the ${visible.length} file${visible.length === 1 ? '' : 's'} on this page`
-                }
-                position="top left"
-                trigger={
-                  <Checkbox
-                    checked={allVisibleSelected}
-                    disabled={disabled || visible.length === 0}
-                    fitted
-                    indeterminate={someVisibleSelected}
-                    onChange={(_event, data) => toggleAllVisible(data.checked)}
-                  />
-                }
-              />
-            </Table.HeaderCell>
-            <Table.HeaderCell className="flatlist-filename">
-              File
-            </Table.HeaderCell>
-            <Table.HeaderCell className="flatlist-user">User</Table.HeaderCell>
-            <Table.HeaderCell className="flatlist-size">Size</Table.HeaderCell>
-            <Table.HeaderCell className="flatlist-attributes">
-              Attributes
-            </Table.HeaderCell>
-            <Table.HeaderCell className="flatlist-length">
-              Length
-            </Table.HeaderCell>
-            <Table.HeaderCell className="flatlist-hide" />
-          </Table.Row>
-        </Table.Header>
-        <Table.Body>
-          {visible.map((row) => (
-            <Table.Row key={row.key}>
-              <Table.Cell className="flatlist-selector">
-                <Checkbox
-                  checked={selected.has(row.key)}
-                  disabled={disabled}
-                  fitted
-                  onChange={(_event, data) => toggle(row.key, data.checked)}
-                />
-              </Table.Cell>
-              <Table.Cell
-                className="flatlist-filename"
-                // the full remote path, which the column has no room for and
-                // which is the only way to tell two identically named files apart
-                title={row.filename}
-              >
-                {row.locked && <Icon name="lock" />}
-                {getFileName(row.filename)}
-              </Table.Cell>
-              <Table.Cell className="flatlist-user">
+        )}
+      </div>
+      <div ref={listRef}>
+        <Table
+          className="flatlist"
+          compact
+          selectable
+          size="small"
+        >
+          <Table.Header>
+            <Table.Row>
+              <Table.HeaderCell className="flatlist-selector">
                 <Popup
-                  content={`Upload speed ${formatBytes(row.uploadSpeed)}/s · Free upload slot ${row.hasFreeUploadSlot ? 'YES' : 'NO'} · Queue length ${row.queueLength}`}
+                  content={
+                    selection.all
+                      ? 'Deselect every file'
+                      : `Select all ${rows.length} file${rows.length === 1 ? '' : 's'}`
+                  }
                   position="top left"
                   trigger={
-                    <span>
-                      <Icon
-                        color={row.hasFreeUploadSlot ? 'green' : 'yellow'}
-                        name="circle"
-                        size="small"
-                      />
-                      {row.username}
-                    </span>
-                  }
-                />
-              </Table.Cell>
-              <Table.Cell className="flatlist-size">
-                {formatBytes(row.size)}
-              </Table.Cell>
-              <Table.Cell className="flatlist-attributes">
-                {formatAttributes(row)}
-              </Table.Cell>
-              <Table.Cell className="flatlist-length">
-                {formatSeconds(row.length)}
-              </Table.Cell>
-              <Table.Cell className="flatlist-hide">
-                <Popup
-                  content={`Hide every result from ${row.username}. They come back when the search is reloaded or run again -- nothing is remembered.`}
-                  position="left center"
-                  trigger={
-                    <Icon
-                      color="red"
-                      link
-                      name="close"
-                      onClick={() => onHideUser(row.username)}
-                      size="small"
+                    <Checkbox
+                      checked={selection.all}
+                      disabled={disabled || rows.length === 0}
+                      fitted
+                      indeterminate={selection.some}
+                      onChange={(_event, data) => toggleAll(data.checked)}
                     />
                   }
                 />
-              </Table.Cell>
+              </Table.HeaderCell>
+              <Table.HeaderCell className="flatlist-filename">
+                File
+              </Table.HeaderCell>
+              <Table.HeaderCell className="flatlist-user">
+                User
+              </Table.HeaderCell>
+              <Table.HeaderCell className="flatlist-size">
+                Size
+              </Table.HeaderCell>
+              <Table.HeaderCell className="flatlist-attributes">
+                Attributes
+              </Table.HeaderCell>
+              <Table.HeaderCell className="flatlist-length">
+                Length
+              </Table.HeaderCell>
+              <Table.HeaderCell className="flatlist-download" />
+              <Table.HeaderCell className="flatlist-hide" />
             </Table.Row>
-          ))}
-        </Table.Body>
-      </Table>
-      {rows.length > shown && (
-        <Button
-          className="showmore-button"
-          fluid
-          onClick={() => setShown(shown + PAGE)}
-          primary
-          size="large"
-        >
-          {`Show ${Math.min(PAGE, rows.length - shown)} more (${rows.length - shown} remaining)`}
-        </Button>
-      )}
+          </Table.Header>
+          <Table.Body>
+            {paddingTop > 0 && (
+              <Table.Row>
+                <Table.Cell
+                  colSpan={8}
+                  style={{ height: paddingTop, padding: 0 }}
+                />
+              </Table.Row>
+            )}
+            {virtualRows.map((virtual) => {
+              const row = rows[virtual.index];
+
+              return (
+                <Table.Row key={row.key}>
+                  <Table.Cell className="flatlist-selector">
+                    <Checkbox
+                      checked={selected.has(row.key)}
+                      disabled={disabled}
+                      fitted
+                      onChange={(_event, data) => toggle(row.key, data.checked)}
+                    />
+                  </Table.Cell>
+                  <Table.Cell
+                    className="flatlist-filename"
+                    // the full remote path, which the column truncates and
+                    // which is the only way to tell two files apart when their
+                    // names differ only past where the column ends
+                    title={row.filename}
+                  >
+                    {row.locked && <Icon name="lock" />}
+                    {getFileName(row.filename)}
+                  </Table.Cell>
+                  <Table.Cell className="flatlist-user">
+                    <Popup
+                      content={`Upload speed ${formatBytes(row.uploadSpeed)}/s · Free upload slot ${row.hasFreeUploadSlot ? 'YES' : 'NO'} · Queue length ${row.queueLength}`}
+                      position="top left"
+                      trigger={
+                        <span>
+                          <Icon
+                            color={row.hasFreeUploadSlot ? 'green' : 'yellow'}
+                            name="circle"
+                            size="small"
+                          />
+                          {row.username}
+                        </span>
+                      }
+                    />
+                  </Table.Cell>
+                  <Table.Cell className="flatlist-size">
+                    {formatBytes(row.size)}
+                  </Table.Cell>
+                  <Table.Cell className="flatlist-attributes">
+                    {formatAttributes(row)}
+                  </Table.Cell>
+                  <Table.Cell className="flatlist-length">
+                    {formatSeconds(row.length)}
+                  </Table.Cell>
+                  <Table.Cell className="flatlist-download">
+                    <Popup
+                      content={`Download this file from ${row.username}`}
+                      position="left center"
+                      trigger={
+                        <Icon
+                          color="grey"
+                          disabled={disabled || rowDownloading === row.key}
+                          link
+                          loading={rowDownloading === row.key}
+                          name={
+                            rowDownloading === row.key ? 'spinner' : 'download'
+                          }
+                          onClick={() => downloadRow(row)}
+                          size="small"
+                        />
+                      }
+                    />
+                  </Table.Cell>
+                  <Table.Cell className="flatlist-hide">
+                    <Popup
+                      content={`Hide every result from ${row.username}. They come back when the search is reloaded or run again -- nothing is remembered.`}
+                      position="left center"
+                      trigger={
+                        <Icon
+                          color="red"
+                          link
+                          name="close"
+                          onClick={() => onHideUser(row.username)}
+                          size="small"
+                        />
+                      }
+                    />
+                  </Table.Cell>
+                </Table.Row>
+              );
+            })}
+            {paddingBottom > 0 && (
+              <Table.Row>
+                <Table.Cell
+                  colSpan={8}
+                  style={{ height: paddingBottom, padding: 0 }}
+                />
+              </Table.Row>
+            )}
+          </Table.Body>
+        </Table>
+      </div>
       {selectedRows.length > 0 && (
         <div className="flatlist-actions">
           <Button
