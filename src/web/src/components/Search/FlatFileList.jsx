@@ -61,8 +61,25 @@ const FlatFileList = ({ disabled, onHideUser, rows }) => {
   );
 
   const selectedSize = selectedRows.reduce((total, row) => total + row.size, 0);
+
+  /*
+   * The header checkbox takes the rows on screen, not every row the filters
+   * match. Selecting hundreds of files that have never been drawn, from one
+   * click on a box next to a hundred of them, is not what the box appears to
+   * offer -- and the button beside it enqueues whatever it picked up.
+   *
+   * So it says what it did instead: indeterminate while only some of the page
+   * is picked, and where there are more rows behind the paging, an explicit
+   * offer to take those too. Without the indeterminate state the box unticks
+   * itself when the next page arrives, which looks like the selection was
+   * lost when nothing was.
+   */
+  const visibleSelected = visible.filter((row) => selected.has(row.key)).length;
   const allVisibleSelected =
-    visible.length > 0 && visible.every((row) => selected.has(row.key));
+    visible.length > 0 && visibleSelected === visible.length;
+  const someVisibleSelected =
+    visibleSelected > 0 && visibleSelected < visible.length;
+  const beyondPage = rows.length - visible.length;
 
   const toggle = (key, checked) =>
     setSelected((old) => {
@@ -130,6 +147,32 @@ const FlatFileList = ({ disabled, onHideUser, rows }) => {
       className="flatlist-segment"
       raised
     >
+      {allVisibleSelected && beyondPage > 0 && (
+        <div className="flatlist-selectall">
+          {`All ${visible.length} files on this page are selected.`}
+          <Button
+            basic
+            compact
+            onClick={() => setSelected(new Set(rows.map((row) => row.key)))}
+            size="tiny"
+          >
+            {`Select all ${rows.length}`}
+          </Button>
+        </div>
+      )}
+      {selectedRows.length > 0 && (
+        <div className="flatlist-selectall">
+          {`${selectedRows.length} file${selectedRows.length === 1 ? '' : 's'} selected.`}
+          <Button
+            basic
+            compact
+            onClick={() => setSelected(new Set())}
+            size="tiny"
+          >
+            Clear selection
+          </Button>
+        </div>
+      )}
       <Table
         className="flatlist"
         compact
@@ -139,11 +182,22 @@ const FlatFileList = ({ disabled, onHideUser, rows }) => {
         <Table.Header>
           <Table.Row>
             <Table.HeaderCell className="flatlist-selector">
-              <Checkbox
-                checked={allVisibleSelected}
-                disabled={disabled || visible.length === 0}
-                fitted
-                onChange={(_event, data) => toggleAllVisible(data.checked)}
+              <Popup
+                content={
+                  allVisibleSelected
+                    ? 'Deselect the files on this page'
+                    : `Select the ${visible.length} file${visible.length === 1 ? '' : 's'} on this page`
+                }
+                position="top left"
+                trigger={
+                  <Checkbox
+                    checked={allVisibleSelected}
+                    disabled={disabled || visible.length === 0}
+                    fitted
+                    indeterminate={someVisibleSelected}
+                    onChange={(_event, data) => toggleAllVisible(data.checked)}
+                  />
+                }
               />
             </Table.HeaderCell>
             <Table.HeaderCell className="flatlist-filename">
