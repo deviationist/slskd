@@ -968,6 +968,22 @@ Logging of HTTP requests is disabled by default.
 | `--url-base`               | `SLSKD_URL_BASE`               | The base url for web requests                       |
 | `--content-path`           | `SLSKD_CONTENT_PATH`           | The path to static web content                      |
 | `--http-logging`           | `SLSKD_HTTP_LOGGING`           | Determines whether HTTP requests are to be logged   |
+| `--ui-locale`              | `SLSKD_UI_LOCALE`              | The locale the web UI formats dates in              |
+
+The web UI renders every date and time in the locale given by `locale`, a BCP 47
+tag. This sets date order, separators and month names: `en-GB` gives
+`14/09/2026`, `en-US` gives `9/14/2026`, and `nb-NO` gives `14.09.2026` with
+Norwegian month names. There is no separate setting for date order, because
+`Intl` derives it from the locale and offers no control over it directly.
+
+Leave it blank to use the browser's own locale instead. Note that a browser
+takes its date order *and* its clock from its language setting, which is not
+the same as the operating system's date and time preferences — so a machine
+configured for 24-hour, day-first dates can still be shown `9/14/2026, 2:04 PM`
+by an `en-US` browser.
+
+The 24-hour clock is applied on top of whichever locale is in force, so setting
+`en-US` gives US date order and still `00`–`23`.
 
 #### **YAML**
 ```yaml
@@ -978,6 +994,7 @@ web:
   url_base: /
   content_path: wwwroot
   logging: false
+  locale: en-GB
 ```
 
 ## HTTPS

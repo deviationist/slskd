@@ -18,33 +18,54 @@ describe('formatBytes', () => {
 });
 
 describe('date and time formatting', () => {
-  // rendered in UTC so the assertions do not depend on the runner's zone
+  // rendered in UTC where the assertion names an exact string, so it does not
+  // depend on the zone the test runner happens to be in
   const afternoon = '2026-09-14T15:04:00Z';
   const justAfterMidnight = '2026-09-14T00:30:00Z';
 
-  const render = (locale, options) =>
-    new Date(afternoon).toLocaleString(locale, { ...options, timeZone: 'UTC' });
+  const inUtc = (options) =>
+    new Date(afternoon).toLocaleString(utils.locale(), {
+      ...options,
+      timeZone: 'UTC',
+    });
 
-  it('shows a 24-hour clock whichever locale the reader has', () => {
-    // the point of pinning it: a browser takes AM/PM from its language, which
-    // is not the reader's clock setting and is not reachable from the app
-    expect(render('en-US', utils.DATE_TIME_OPTIONS)).toContain('15:04');
-    expect(render('en-US', utils.DATE_TIME_OPTIONS)).not.toMatch(/[AP]M/u);
-    expect(render('en-GB', utils.DATE_TIME_OPTIONS)).not.toMatch(/[AP]M/u);
+  // the locale is module state, so a test that sets it must put it back
+  afterEach(() => utils.setLocale(undefined));
+
+  it('writes the day first and the clock as 00-23', () => {
+    // the 14th, deliberately: a day past 12 cannot be read as a month, so this
+    // fails rather than passes ambiguously if the order goes back to US
+    expect(inUtc(utils.DATE_TIME_OPTIONS)).toBe('14/09/2026, 15:04:00');
   });
 
-  it('leaves everything but the clock to the locale', () => {
-    // en-US writes the month first and en-GB the day: pinning the clock must
-    // not have quietly pinned the rest of the format with it
-    expect(render('en-US', utils.DATE_TIME_OPTIONS)).not.toBe(
-      render('en-GB', utils.DATE_TIME_OPTIONS),
+  it('does not follow the browser unless told to', () => {
+    // the reversal worth having a test for: date order and clock both come
+    // from the locale, so following the browser means accepting whatever its
+    // *language* implies -- 9/14/2026, 3:04 PM on an en-US one
+    expect(utils.locale()).toBe(utils.DEFAULT_LOCALE);
+    expect(utils.formatDate(afternoon)).toBe(
+      new Date(afternoon).toLocaleString(
+        utils.locale(),
+        utils.DATE_TIME_OPTIONS,
+      ),
     );
+    expect(utils.formatDate(afternoon)).not.toMatch(/[AP]M/u);
+  });
+
+  it('keeps month names in English', () => {
+    // en-GB rather than nb-NO, which gives the same day-first order and would
+    // also put 'sep.' in an otherwise English UI.
+    //
+    // 'Sept', not 'Sep': en-GB abbreviates September to four letters where
+    // en-US uses three, and September is the only month it does this to. It
+    // shows up on the graph's axis ticks and nowhere else.
+    expect(inUtc(utils.DAY_MONTH_OPTIONS)).toBe('14 Sept');
   });
 
   it('writes midnight as 00, not 24', () => {
     // 'h23' rather than `hour12: false`, which selects the h24 cycle in some
     // locales and renders the hour after midnight as 24:30
-    const out = new Date(justAfterMidnight).toLocaleTimeString('en-GB', {
+    const out = new Date(justAfterMidnight).toLocaleTimeString(utils.locale(), {
       ...utils.TIME_OPTIONS,
       timeZone: 'UTC',
     });
@@ -69,12 +90,60 @@ describe('date and time formatting', () => {
     }
   });
 
-  it('formats in the runtime locale rather than a named one', () => {
-    expect(utils.formatDate(afternoon)).toBe(
-      new Date(afternoon).toLocaleString(undefined, utils.DATE_TIME_OPTIONS),
-    );
+  it('takes the locale the deployment configured', () => {
+    utils.setLocale('en-US');
+
+    expect(
+      new Date(afternoon).toLocaleString(utils.locale(), {
+        ...utils.DATE_TIME_OPTIONS,
+        timeZone: 'UTC',
+      }),
+    ).toBe('9/14/2026, 15:04:00');
+  });
+
+  it('keeps the 24-hour clock whatever locale is configured', () => {
+    // the clock is applied on top of the locale rather than inherited from it,
+    // so choosing US date order does not bring AM/PM back with it
+    utils.setLocale('en-US');
+
+    expect(utils.formatDate(afternoon)).not.toMatch(/[AP]M/u);
+  });
+
+  it('follows the browser when the setting is deliberately blank', () => {
+    // blank is a choice, and a different one from unset: undefined is how Intl
+    // is told to use the browser's locale, so it cannot also mean "not yet
+    // configured" -- which is what the resolver exists to keep apart
+    utils.setLocale('');
+
+    expect(utils.locale()).toBeUndefined();
+  });
+
+  it('renders every shape through the one locale', () => {
+    // a formatter that forgot the locale argument falls back to the browser's,
+    // which is the bug this file exists to prevent
     expect(utils.formatTime(afternoon)).toBe(
-      new Date(afternoon).toLocaleTimeString(undefined, utils.TIME_OPTIONS),
+      new Date(afternoon).toLocaleTimeString(
+        utils.locale(),
+        utils.TIME_OPTIONS,
+      ),
+    );
+    expect(utils.formatDayTime(afternoon)).toBe(
+      new Date(afternoon).toLocaleString(
+        utils.locale(),
+        utils.DAY_TIME_OPTIONS,
+      ),
+    );
+    expect(utils.formatHourMinute(afternoon)).toBe(
+      new Date(afternoon).toLocaleTimeString(
+        utils.locale(),
+        utils.HOUR_MINUTE_OPTIONS,
+      ),
+    );
+    expect(utils.formatDayMonth(afternoon)).toBe(
+      new Date(afternoon).toLocaleDateString(
+        utils.locale(),
+        utils.DAY_MONTH_OPTIONS,
+      ),
     );
   });
 });

@@ -2188,6 +2188,30 @@ namespace slskd
             public string Socket { get; init; }
 
             /// <summary>
+            ///     Gets the BCP 47 locale the web UI formats dates and times in.
+            /// </summary>
+            /// <remarks>
+            ///     <para>
+            ///         Sets date order, separators and month names -- 'en-GB' gives 14/09/2026, 'en-US' 9/14/2026,
+            ///         'nb-NO' 14.09.2026 with Norwegian month names. Intl offers no separate control over date
+            ///         order, so naming a locale is the only way to choose one.
+            ///     </para>
+            ///     <para>
+            ///         Left blank, the browser's own locale is used, which takes its order and its clock from the
+            ///         browser's *language* -- a different setting from either, and one an operator whose system
+            ///         says otherwise cannot reach from here.
+            ///     </para>
+            ///     <para>
+            ///         The 24-hour clock is applied on top of whichever locale is in force, so setting 'en-US'
+            ///         gives US date order and still 00-23.
+            ///     </para>
+            /// </remarks>
+            [Argument(default, "ui-locale")]
+            [EnvironmentVariable("UI_LOCALE")]
+            [Description("BCP 47 locale the web UI formats dates in; blank follows the browser")]
+            public string Locale { get; init; } = "en-GB";
+
+            /// <summary>
             ///     Gets HTTPS options.
             /// </summary>
             [Validate]

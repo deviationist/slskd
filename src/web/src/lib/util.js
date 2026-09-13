@@ -51,26 +51,73 @@ export const formatWait = (seconds) => {
 };
 
 /*
- * Every date and time in the UI is rendered from this file, in the reader's own
- * locale -- which means passing no locale at all: `undefined` tells Intl to use
- * the browser's. Naming one, as the chat and room timestamps did with 'en',
- * shows every reader a US date order no matter what theirs is.
+ * Every date and time in the UI is rendered from this file, in one fixed
+ * presentation: day first, 24-hour. 14/09/2026, 03:00:21.
  *
- * The clock is the one thing not left to the locale. `hourCycle: 'h23'` pins
- * 00-23 everywhere, because a browser takes AM/PM from its *language*, which is
- * a different setting from the reader's clock: an operator whose system is set
- * to 24-hour is still shown 2:04 PM by an en-US browser, with nothing in reach
- * to change it. Everything else -- date order, separators, month names -- still
- * follows the locale.
+ * Both come from naming a locale, because Intl offers no separate control over
+ * either -- date order is not a property you can set, it is decided by the
+ * locale, and the clock likewise. So this is one decision, not two: the
+ * browser's locale is not consulted at all.
  *
- * 'h23' rather than `hour12: false`, which selects the h24 cycle in some
- * locales and writes midnight as 24:00. The two are mutually exclusive: set
- * `hour12` alongside this and it silently wins.
+ * That is a deliberate reversal of what this file did an hour ago, and worth
+ * stating rather than leaving as a puzzle. Following the browser sounds like
+ * the respectful default and is not, on a single-operator deployment: a browser
+ * takes its date order and its clock from its *language*, which is a different
+ * setting from either, and an operator whose system is set to 24-hour and to
+ * day-first is still shown 9/14/2026, 2:04 PM by an en-US browser -- with
+ * nothing anywhere in reach to change it.
  *
- * One constant, so making the clock a preference later is a change in one
- * place. The option bags are exported for the tests.
+ * Which locale is a deployment's choice, not this file's: `web.locale` in the
+ * server options, defaulting to 'en-GB' and settable to anything BCP 47 --
+ * 'en-US' for 9/14/2026, 'nb-NO' for 14.09.2026 with Norwegian month names.
+ * Blank means follow the browser after all, for anyone who wants that.
+ *
+ * It arrives over the options hub rather than being read here, so `setLocale`
+ * is how it gets in and `DEFAULT_LOCALE` is what is used until it does. The
+ * window is the moment between the app mounting and the hub's first message;
+ * the fallback matches the server's own default, so in practice nothing
+ * changes under the reader unless the deployment has set something else.
+ *
+ * 'h23' is applied on top of whichever locale is in force, rather than left to
+ * en-GB which would give it anyway. That is the point: the clock is the
+ * guarantee that survives a change of locale, including to 'en-US'. It is not
+ * `hour12: false`, which selects the h24 cycle in some locales and writes
+ * midnight as 24:00 -- the two are mutually exclusive and `hour12` wins
+ * silently.
+ *
+ * The option bags are exported for the tests.
  */
+export const DEFAULT_LOCALE = 'en-GB';
 export const HOUR_CYCLE = 'h23';
+
+/*
+ * Undefined is meaningful to Intl -- it means the browser's locale -- so it
+ * cannot double as "not configured yet". This holds the configured value, and
+ * `locale()` resolves what to actually pass.
+ */
+let configured;
+
+/**
+ * Sets the locale the UI formats in. Called with the server's `web.locale`.
+ * @param {string} value - A BCP 47 locale, or blank to follow the browser.
+ */
+export const setLocale = (value) => {
+  configured = value;
+};
+
+/**
+ * The locale to format in: the configured one, or the browser's if it is
+ * blank, or the default until the server has been heard from.
+ * @returns {string|undefined} What to pass to Intl.
+ */
+export const locale = () => {
+  if (configured === undefined) {
+    return DEFAULT_LOCALE;
+  }
+
+  // deliberately blank: undefined is how Intl is told to use the browser's
+  return configured === '' ? undefined : configured;
+};
 
 /**
  * A full date and time: the default wherever there is room for one.
@@ -124,23 +171,23 @@ export const DAY_MONTH_OPTIONS = {
 };
 
 export const formatDate = (date) => {
-  return new Date(date).toLocaleString(undefined, DATE_TIME_OPTIONS);
+  return new Date(date).toLocaleString(locale(), DATE_TIME_OPTIONS);
 };
 
 export const formatTime = (date) => {
-  return new Date(date).toLocaleTimeString(undefined, TIME_OPTIONS);
+  return new Date(date).toLocaleTimeString(locale(), TIME_OPTIONS);
 };
 
 export const formatDayTime = (date) => {
-  return new Date(date).toLocaleString(undefined, DAY_TIME_OPTIONS);
+  return new Date(date).toLocaleString(locale(), DAY_TIME_OPTIONS);
 };
 
 export const formatHourMinute = (date) => {
-  return new Date(date).toLocaleTimeString(undefined, HOUR_MINUTE_OPTIONS);
+  return new Date(date).toLocaleTimeString(locale(), HOUR_MINUTE_OPTIONS);
 };
 
 export const formatDayMonth = (date) => {
-  return new Date(date).toLocaleDateString(undefined, DAY_MONTH_OPTIONS);
+  return new Date(date).toLocaleDateString(locale(), DAY_MONTH_OPTIONS);
 };
 
 export const truncate = (text, maxLength) => {
