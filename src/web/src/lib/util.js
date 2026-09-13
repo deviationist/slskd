@@ -50,8 +50,44 @@ export const formatWait = (seconds) => {
   return `${(seconds / 60).toFixed(1)}m`;
 };
 
+/*
+ * Dates and times are rendered in the reader's own locale, which means passing
+ * no locale at all: `undefined` tells Intl to use the browser's, and that is
+ * the only setting that knows whether this reader reads 14:04 or 2:04 PM.
+ *
+ * Naming one -- as the chat and room timestamps did, hardcoded to 'en' -- shows
+ * every reader a US clock no matter what theirs is set to.
+ *
+ * The option bags are exported so a test can assert that they leave the choice
+ * of clock to the locale rather than quietly pinning one.
+ */
+
+/**
+ * The day and time, without a year: enough to place a message.
+ */
+export const DAY_TIME_OPTIONS = {
+  day: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+  month: 'numeric',
+};
+
 export const formatDate = (date) => {
   return new Date(date).toLocaleString();
+};
+
+/**
+ * A time of day on its own, for a column where the date is already known.
+ */
+export const formatTime = (date) => {
+  return new Date(date).toLocaleTimeString();
+};
+
+/**
+ * A timestamp beside a message, where the year is noise.
+ */
+export const formatDayTime = (date) => {
+  return new Date(date).toLocaleString(undefined, DAY_TIME_OPTIONS);
 };
 
 export const truncate = (text, maxLength) => {
