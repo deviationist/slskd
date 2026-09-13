@@ -1,3 +1,4 @@
+import { formatTime } from '../../../lib/util';
 import * as watchLibrary from '../../../lib/watches';
 import SearchStatusIcon from '../SearchStatusIcon';
 import SearchActionIcon from './SearchActionIcon';
@@ -59,7 +60,7 @@ const SearchListRow = ({ onRemove, onStop, search, watch = undefined }) => {
       </Table.Cell>
       <Table.Cell>{search.responseCount}</Table.Cell>
       <Table.Cell>
-        {search.endedAt ? new Date(search.endedAt).toLocaleTimeString() : '-'}
+        {search.endedAt ? formatTime(search.endedAt) : '-'}
       </Table.Cell>
       <Table.Cell>
         <SearchActionIcon
