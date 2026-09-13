@@ -1,4 +1,8 @@
-import { groupByUser, selectionState } from '../../lib/searches';
+import {
+  downloadStateOf,
+  groupByUser,
+  selectionState,
+} from '../../lib/searches';
 import * as transfers from '../../lib/transfers';
 import {
   formatAttributes,
@@ -59,7 +63,41 @@ const ROW_H = 37;
  * @param {object[]} params.rows - Flattened, already-filtered results.
  * @returns {object} The list.
  */
-const FlatFileList = ({ disabled, onHideUser, rows }) => {
+/**
+ * How a row that is already known to the transfer list should read.
+ *
+ * Semantic's own row states rather than colours of our own, so they follow the
+ * theme. `active` for in flight rather than `warning`: yellow beside a green
+ * says something went wrong, and nothing has.
+ */
+const MARKS = {
+  downloaded: {
+    colour: 'green',
+    icon: 'check circle',
+    row: 'positive',
+    tip: 'Already downloaded from this user',
+  },
+  downloading: {
+    colour: 'blue',
+    icon: 'download',
+    row: 'active',
+    tip: 'Downloading from this user now',
+  },
+  failed: {
+    colour: 'red',
+    icon: 'exclamation circle',
+    row: 'warning',
+    tip: 'A download of this file from this user did not finish',
+  },
+  have: {
+    colour: 'grey',
+    icon: 'check',
+    row: undefined,
+    tip: 'A file with this name and size has already been downloaded, from someone else',
+  },
+};
+
+const FlatFileList = ({ disabled, downloads, onHideUser, rows }) => {
   const [selected, setSelected] = useState(() => new Set());
   const [downloading, setDownloading] = useState(false);
   const [rowDownloading, setRowDownloading] = useState(undefined);
@@ -283,9 +321,15 @@ const FlatFileList = ({ disabled, onHideUser, rows }) => {
             )}
             {virtualRows.map((virtual) => {
               const row = rows[virtual.index];
+              const mark = MARKS[downloadStateOf({ index: downloads, row })];
 
               return (
-                <Table.Row key={row.key}>
+                <Table.Row
+                  active={mark?.row === 'active'}
+                  key={row.key}
+                  positive={mark?.row === 'positive'}
+                  warning={mark?.row === 'warning'}
+                >
                   <Table.Cell className="flatlist-selector">
                     <Checkbox
                       checked={selected.has(row.key)}
@@ -302,6 +346,18 @@ const FlatFileList = ({ disabled, onHideUser, rows }) => {
                     title={row.filename}
                   >
                     {row.locked && <Icon name="lock" />}
+                    {mark && (
+                      <Popup
+                        content={mark.tip}
+                        position="top left"
+                        trigger={
+                          <Icon
+                            color={mark.colour}
+                            name={mark.icon}
+                          />
+                        }
+                      />
+                    )}
                     {getFileName(row.filename)}
                   </Table.Cell>
                   <Table.Cell className="flatlist-user">

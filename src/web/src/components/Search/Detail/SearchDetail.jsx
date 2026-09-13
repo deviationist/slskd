@@ -2,8 +2,10 @@ import {
   filterResponse,
   flattenResponses,
   getResponses,
+  indexDownloads,
   parseFiltersFromString,
 } from '../../../lib/searches';
+import { getAll as getTransfers } from '../../../lib/transfers';
 import { sleep } from '../../../lib/util';
 import * as watchLibrary from '../../../lib/watches';
 import ErrorSegment from '../../Shared/ErrorSegment';
@@ -134,6 +136,7 @@ const SearchDetail = ({
   const [hideNoFreeSlots, setHideNoFreeSlots] = useState(false);
   const [foldResults, setFoldResults] = useState(false);
   const [flatResults, setFlatResults] = useState(readStoredFlat);
+  const [downloads, setDownloads] = useState(() => indexDownloads());
   const [resultFilters, setResultFilters] = useState('');
   const [displayCount, setDisplayCount] = useState(5);
 
@@ -232,6 +235,47 @@ const SearchDetail = ({
 
   const filteredCount = results?.length - sortedAndFilteredResults.length;
   const remainingCount = sortedAndFilteredResults.length - displayCount;
+  /*
+   * What has been downloaded, so a result can say that it already has been.
+   *
+   * Polled rather than pushed: there is no transfers hub, and the transfers
+   * page itself polls this endpoint every second. Five is the interval for a
+   * secondary signal on another page -- enough that a row lights up shortly
+   * after its download is enqueued from here, cheap enough not to matter.
+   *
+   * Only while the flat list is showing. The grouped view does not mark
+   * anything, so polling behind it would be a request a second for nothing.
+   */
+  useEffect(() => {
+    if (!flatResults) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    const poll = async () => {
+      try {
+        const users = await getTransfers({ direction: 'download' });
+
+        if (!cancelled) {
+          setDownloads(indexDownloads(users));
+        }
+      } catch {
+        // a failed poll leaves the last answer in place: marks going stale for
+        // five seconds is a better outcome than the list losing them entirely
+      }
+    };
+
+    poll();
+
+    const interval = window.setInterval(poll, 5_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [flatResults]);
+
   const loadWatch = async () => {
     try {
       const found = await watchLibrary.get({ id });
@@ -369,6 +413,7 @@ const SearchDetail = ({
         {loaded && flatResults && (
           <FlatFileList
             disabled={disabled}
+            downloads={downloads}
             onHideUser={(username) =>
               setHiddenResults([...hiddenResults, username])
             }

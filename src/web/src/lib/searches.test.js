@@ -453,3 +453,137 @@ describe('selectionState', () => {
     );
   });
 });
+
+describe('indexDownloads / downloadStateOf', () => {
+  const downloads = [
+    {
+      username: 'alice',
+      directories: [
+        {
+          files: [
+            {
+              username: 'alice',
+              filename: 'a\\got-it.flac',
+              size: 100,
+              state: 'Completed, Succeeded',
+            },
+            {
+              username: 'alice',
+              filename: 'a\\in-flight.flac',
+              size: 200,
+              state: 'InProgress',
+            },
+            {
+              username: 'alice',
+              filename: 'a\\queued.flac',
+              size: 300,
+              state: 'Queued, Remotely',
+            },
+            {
+              username: 'alice',
+              filename: 'a\\broke.flac',
+              size: 400,
+              state: 'Completed, Errored',
+            },
+          ],
+        },
+      ],
+    },
+  ];
+
+  const index = search.indexDownloads(downloads);
+  const state = (row) => search.downloadStateOf({ index, row });
+
+  it('knows a file it already took from that peer', () => {
+    expect(
+      state({ username: 'alice', filename: 'a\\got-it.flac', size: 100 }),
+    ).toBe('downloaded');
+  });
+
+  it('treats anything not yet finished as in flight', () => {
+    expect(
+      state({ username: 'alice', filename: 'a\\in-flight.flac', size: 200 }),
+    ).toBe('downloading');
+    expect(
+      state({ username: 'alice', filename: 'a\\queued.flac', size: 300 }),
+    ).toBe('downloading');
+  });
+
+  it('marks a download that ended without the file', () => {
+    // worth saying rather than hiding: the row is a second chance at the same
+    // file, not a repeat of a success
+    expect(
+      state({ username: 'alice', filename: 'a\\broke.flac', size: 400 }),
+    ).toBe('failed');
+  });
+
+  it('says nothing about a file it has never seen', () => {
+    expect(
+      state({ username: 'alice', filename: 'a\\new.flac', size: 500 }),
+    ).toBeUndefined();
+  });
+
+  it('recognises the same file offered by a different peer', () => {
+    // the useful case when searching again later: you took it from someone
+    // else last time, and the row from this peer is the same file
+    expect(
+      state({ username: 'bob', filename: 'z\\got-it.flac', size: 100 }),
+    ).toBe('have');
+  });
+
+  it('does not call it the same file on a matching name alone', () => {
+    // `Cover.jpg` and `01 - Intro.mp3` are not evidence of anything; the size
+    // is what stops every album's artwork lighting up at once
+    expect(
+      state({ username: 'bob', filename: 'z\\got-it.flac', size: 999 }),
+    ).toBeUndefined();
+  });
+
+  it('does not offer another peer a failed download as reassurance', () => {
+    expect(
+      state({ username: 'bob', filename: 'z\\broke.flac', size: 400 }),
+    ).toBeUndefined();
+  });
+
+  it('lets the exact match outrank the guess', () => {
+    // same name and size as the succeeded one, but this peer's own attempt
+    // failed -- the certain answer is the one worth showing
+    const conflicting = search.indexDownloads([
+      {
+        username: 'alice',
+        directories: [
+          {
+            files: [
+              {
+                username: 'alice',
+                filename: 'a\\x.flac',
+                size: 1,
+                state: 'Completed, Succeeded',
+              },
+              {
+                username: 'bob',
+                filename: 'b\\x.flac',
+                size: 1,
+                state: 'Completed, Cancelled',
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+
+    expect(
+      search.downloadStateOf({
+        index: conflicting,
+        row: { username: 'bob', filename: 'b\\x.flac', size: 1 },
+      }),
+    ).toBe('failed');
+  });
+
+  it('copes with an empty or absent list', () => {
+    expect(
+      search.downloadStateOf({ index: search.indexDownloads(), row: {} }),
+    ).toBeUndefined();
+    expect(search.downloadStateOf({ row: {} })).toBeUndefined();
+  });
+});

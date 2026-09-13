@@ -1,4 +1,5 @@
 import api from './api';
+import { getFileName } from './util';
 
 /**
  * Whether a phrase can be searched for.
@@ -324,4 +325,118 @@ export const selectionState = ({ rows = [], selected = new Set() }) => {
     // draws a tick instead
     some: count > 0 && count < rows.length,
   };
+};
+
+/*
+ * Which search results you have already asked for, and which you already have.
+ *
+ * Two questions, and they deserve different confidence. A transfer records the
+ * peer and the exact remote path, so "this row is that download" is a certainty
+ * -- same key on both sides. "I already have this track" is a guess: the only
+ * thing shared between a result from one peer and a file you took from another
+ * is the name, and names like `01 - Intro.mp3` and `Cover.jpg` are not
+ * evidence of anything.
+ *
+ * So the guess is qualified by size as well as name. Two files with the same
+ * name and byte count are the same file often enough to be worth saying, and
+ * the pairing is what stops every album's artwork lighting up at once.
+ *
+ * Both are only as complete as the transfer list: slskd keeps a download in it
+ * until it is cleared, so clearing the list is also forgetting that any of this
+ * was ever downloaded. There is no deeper record to consult -- which is worth
+ * knowing before reading an unmarked row as "not downloaded".
+ */
+
+/**
+ * A file's identity across peers: what it is called, and how big it is.
+ */
+/*
+ * Undefined where there is no name to take, rather than throwing. This runs per
+ * row on every render of a list of hundreds, and a search result is data from a
+ * stranger's client -- one malformed entry would otherwise take the page down.
+ */
+const signatureOf = ({ filename, size }) =>
+  filename === undefined || filename === null
+    ? undefined
+    : `${getFileName(filename)}\n${size}`;
+
+/**
+ * Sorts a transfer's state into the three that matter to a search result.
+ * @param {string} state - The transfer state.
+ * @returns {string} One of 'downloaded', 'failed' or 'downloading'.
+ */
+const outcomeOf = (state = '') => {
+  if (state === 'Completed, Succeeded') {
+    return 'downloaded';
+  }
+
+  // every other Completed is a way of not having the file: errored, cancelled,
+  // timed out, rejected. worth marking rather than hiding, since the row is
+  // then a second chance at the same file rather than a repeat of a success
+  if (state.startsWith('Completed')) {
+    return 'failed';
+  }
+
+  return 'downloading';
+};
+
+/**
+ * Indexes the downloads so a search row can be looked up in constant time.
+ * @param {object[]} users - The downloads API's response: users, directories, files.
+ * @returns {{byFile: Map<string, string>, bySignature: Map<string, string>}} The index.
+ */
+export const indexDownloads = (users = []) => {
+  const byFile = new Map();
+  const bySignature = new Map();
+
+  for (const user of users) {
+    for (const directory of user.directories ?? []) {
+      for (const file of directory.files ?? []) {
+        const outcome = outcomeOf(file.state);
+
+        byFile.set(
+          fileKey({ filename: file.filename, username: file.username }),
+          outcome,
+        );
+
+        // only successes: a failed download from one peer says nothing about
+        // whether the same file from another peer is worth having
+        const signature = signatureOf(file);
+
+        if (outcome === 'downloaded' && signature !== undefined) {
+          bySignature.set(signature, outcome);
+        }
+      }
+    }
+  }
+
+  return { byFile, bySignature };
+};
+
+/**
+ * What a search row should say about itself, given what has been downloaded.
+ * @param {object} params
+ * @param {object} params.row - A flattened search row.
+ * @param {object} params.index - The result of `indexDownloads`.
+ * @returns {string|undefined} 'downloaded', 'downloading', 'failed', 'have', or nothing.
+ */
+export const downloadStateOf = ({ row, index }) => {
+  if (!row || !index) {
+    return undefined;
+  }
+
+  // the exact file from the exact peer outranks the guess, always: it is the
+  // only one of the two that is certain, and it can say 'failed' where the
+  // guess would have said nothing at all
+  const exact = index.byFile.get(fileKey(row));
+
+  if (exact) {
+    return exact;
+  }
+
+  const signature = signatureOf(row);
+
+  return signature !== undefined && index.bySignature.has(signature)
+    ? 'have'
+    : undefined;
 };
