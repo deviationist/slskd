@@ -117,6 +117,62 @@ describe('describeNextRun', () => {
   });
 });
 
+describe('nextRun', () => {
+  const now = new Date('2026-09-13T12:00:00Z');
+
+  it('carries the moment alongside the relative phrase', () => {
+    const parts = watches.nextRun({
+      now,
+      watch: { enabled: true, nextRunAt: '2026-09-14T00:00:00Z' },
+    });
+
+    expect(parts.text).toBe('in 12 h');
+    expect(parts.dateTime).toBe('2026-09-14T00:00:00.000Z');
+    expect(parts.exact).toEqual(expect.any(String));
+  });
+
+  it('gives no moment for a paused watch', () => {
+    // there is no next run to name, and a dateTime here would be the moment it
+    // *would* have run, which is not a thing that is going to happen
+    const parts = watches.nextRun({
+      now,
+      watch: { enabled: false, nextRunAt: '2026-09-14T00:00:00Z' },
+    });
+
+    expect(parts.text).toBe('Paused');
+    expect(parts.dateTime).toBeUndefined();
+  });
+
+  it('gives no moment for a watch that is not scheduled', () => {
+    const parts = watches.nextRun({ now, watch: { enabled: true } });
+
+    expect(parts.text).toBe('Not scheduled');
+    expect(parts.dateTime).toBeUndefined();
+  });
+
+  it('omits the attribute rather than emitting an invalid one', () => {
+    // `dateTime` claims to be machine-readable; "Invalid Date" in it is a
+    // worse answer than the attribute being absent
+    const parts = watches.nextRun({
+      now,
+      watch: { enabled: true, nextRunAt: 'not a date' },
+    });
+
+    expect(parts.dateTime).toBeUndefined();
+    expect(parts.exact).toBeUndefined();
+  });
+
+  it('still names the moment for a run that is already due', () => {
+    const parts = watches.nextRun({
+      now,
+      watch: { enabled: true, nextRunAt: '2026-09-13T11:59:00Z' },
+    });
+
+    expect(parts.text).toBe('Due now');
+    expect(parts.dateTime).toBe('2026-09-13T11:59:00.000Z');
+  });
+});
+
 describe('watchBadge', () => {
   it('says nothing about a search that is not watched', () => {
     expect(watches.watchBadge({ watch: undefined })).toBeUndefined();
