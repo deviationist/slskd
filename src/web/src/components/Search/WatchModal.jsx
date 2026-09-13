@@ -167,8 +167,9 @@ export const WatchForm = ({
           />
           <div>
             <small>
-              Records what is here now without reporting it, so the first email
-              is the first genuinely new thing.
+              Records what this search finds without reporting it, so the first
+              email is the first genuinely new thing. A search still running is
+              recorded once it has finished.
             </small>
           </div>
         </Form.Field>
