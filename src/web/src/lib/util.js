@@ -51,25 +51,35 @@ export const formatWait = (seconds) => {
 };
 
 /*
- * Every date and time in the UI is rendered from this file, in the reader's own
- * locale -- which means passing no locale at all: `undefined` tells Intl to use
- * the browser's. Naming one, as the chat and room timestamps did with 'en',
- * shows every reader a US date order no matter what theirs is.
+ * Every date and time in the UI is rendered from this file, in one fixed
+ * presentation: day first, 24-hour. 14/09/2026, 03:00:21.
  *
- * The clock is the one thing not left to the locale. `hourCycle: 'h23'` pins
- * 00-23 everywhere, because a browser takes AM/PM from its *language*, which is
- * a different setting from the reader's clock: an operator whose system is set
- * to 24-hour is still shown 2:04 PM by an en-US browser, with nothing in reach
- * to change it. Everything else -- date order, separators, month names -- still
- * follows the locale.
+ * Both come from naming a locale, because Intl offers no separate control over
+ * either -- date order is not a property you can set, it is decided by the
+ * locale, and the clock likewise. So this is one decision, not two: the
+ * browser's locale is not consulted at all.
  *
- * 'h23' rather than `hour12: false`, which selects the h24 cycle in some
- * locales and writes midnight as 24:00. The two are mutually exclusive: set
- * `hour12` alongside this and it silently wins.
+ * That is a deliberate reversal of what this file did an hour ago, and worth
+ * stating rather than leaving as a puzzle. Following the browser sounds like
+ * the respectful default and is not, on a single-operator deployment: a browser
+ * takes its date order and its clock from its *language*, which is a different
+ * setting from either, and an operator whose system is set to 24-hour and to
+ * day-first is still shown 9/14/2026, 2:04 PM by an en-US browser -- with
+ * nothing anywhere in reach to change it.
  *
- * One constant, so making the clock a preference later is a change in one
- * place. The option bags are exported for the tests.
+ * 'en-GB' rather than 'nb-NO': both give day-first and 00-23, but nb-NO also
+ * brings Norwegian month names into an otherwise English UI. The date order was
+ * what was wanted, not a translation.
+ *
+ * 'h23' is still set explicitly rather than left to en-GB, which would give it
+ * anyway. It is the guarantee that survives a change of locale, and it is not
+ * `hour12: false`: that selects the h24 cycle in some locales and writes
+ * midnight as 24:00. The two are mutually exclusive and `hour12` wins silently.
+ *
+ * Two constants, so a preference later is a change in one place. The option
+ * bags are exported for the tests.
  */
+export const LOCALE = 'en-GB';
 export const HOUR_CYCLE = 'h23';
 
 /**
@@ -124,23 +134,23 @@ export const DAY_MONTH_OPTIONS = {
 };
 
 export const formatDate = (date) => {
-  return new Date(date).toLocaleString(undefined, DATE_TIME_OPTIONS);
+  return new Date(date).toLocaleString(LOCALE, DATE_TIME_OPTIONS);
 };
 
 export const formatTime = (date) => {
-  return new Date(date).toLocaleTimeString(undefined, TIME_OPTIONS);
+  return new Date(date).toLocaleTimeString(LOCALE, TIME_OPTIONS);
 };
 
 export const formatDayTime = (date) => {
-  return new Date(date).toLocaleString(undefined, DAY_TIME_OPTIONS);
+  return new Date(date).toLocaleString(LOCALE, DAY_TIME_OPTIONS);
 };
 
 export const formatHourMinute = (date) => {
-  return new Date(date).toLocaleTimeString(undefined, HOUR_MINUTE_OPTIONS);
+  return new Date(date).toLocaleTimeString(LOCALE, HOUR_MINUTE_OPTIONS);
 };
 
 export const formatDayMonth = (date) => {
-  return new Date(date).toLocaleDateString(undefined, DAY_MONTH_OPTIONS);
+  return new Date(date).toLocaleDateString(LOCALE, DAY_MONTH_OPTIONS);
 };
 
 export const truncate = (text, maxLength) => {
