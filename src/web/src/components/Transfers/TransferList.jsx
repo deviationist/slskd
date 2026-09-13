@@ -366,13 +366,13 @@ class TransferList extends Component {
                     {retrievalEnabled && (
                       <Table.HeaderCell className="transferlist-retrieve" />
                     )}
+                    <Table.HeaderCell className="transferlist-remove" />
                     <Table.HeaderCell className="transferlist-detail">
                       <Icon
                         name="info circle"
                         size="small"
                       />
                     </Table.HeaderCell>
-                    <Table.HeaderCell className="transferlist-remove" />
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
@@ -506,6 +506,9 @@ class TransferList extends Component {
                               ))}
                           </Table.Cell>
                         )}
+                        <Table.Cell className="transferlist-remove">
+                          {this.renderRemove(f)}
+                        </Table.Cell>
                         <Table.Cell className="transferlist-detail">
                           <Popup
                             className="transfer-details-popup"
@@ -523,12 +526,6 @@ class TransferList extends Component {
                             }
                             wide="very"
                           />
-                        </Table.Cell>
-                        {/* last, and behind the details icon: the one control
-                            here that destroys something does not sit against
-                            the one that fetches a file */}
-                        <Table.Cell className="transferlist-remove">
-                          {this.renderRemove(f)}
                         </Table.Cell>
                       </Table.Row>
                     ))}
