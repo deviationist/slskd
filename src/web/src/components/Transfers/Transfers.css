@@ -53,9 +53,6 @@
   min-width: 5px;
 }
 
-/* Last in the row, with the details icon between it and the retrieval one: the
-   only control here that destroys something does not share an edge with the one
-   that fetches a file. */
 .transferlist-remove {
   width: 5px;
   min-width: 5px;
