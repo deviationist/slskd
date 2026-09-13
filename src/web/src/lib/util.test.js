@@ -18,30 +18,63 @@ describe('formatBytes', () => {
 });
 
 describe('date and time formatting', () => {
-  // 15:04 UTC: a time that reads differently on a 12- and a 24-hour clock
-  const at = '2026-09-14T15:04:00Z';
+  // rendered in UTC so the assertions do not depend on the runner's zone
+  const afternoon = '2026-09-14T15:04:00Z';
+  const justAfterMidnight = '2026-09-14T00:30:00Z';
 
-  it('formats in the runtime locale rather than a named one', () => {
-    expect(utils.formatDayTime(at)).toBe(
-      new Date(at).toLocaleString(undefined, utils.DAY_TIME_OPTIONS),
+  const render = (locale, options) =>
+    new Date(afternoon).toLocaleString(locale, { ...options, timeZone: 'UTC' });
+
+  it('shows a 24-hour clock whichever locale the reader has', () => {
+    // the point of pinning it: a browser takes AM/PM from its language, which
+    // is not the reader's clock setting and is not reachable from the app
+    expect(render('en-US', utils.DATE_TIME_OPTIONS)).toContain('15:04');
+    expect(render('en-US', utils.DATE_TIME_OPTIONS)).not.toMatch(/[AP]M/u);
+    expect(render('en-GB', utils.DATE_TIME_OPTIONS)).not.toMatch(/[AP]M/u);
+  });
+
+  it('leaves everything but the clock to the locale', () => {
+    // en-US writes the month first and en-GB the day: pinning the clock must
+    // not have quietly pinned the rest of the format with it
+    expect(render('en-US', utils.DATE_TIME_OPTIONS)).not.toBe(
+      render('en-GB', utils.DATE_TIME_OPTIONS),
     );
   });
 
-  it('leaves the choice of clock to the locale', () => {
-    // the bug this replaces: chat and room timestamps were built with
-    // `new Intl.DateTimeFormat('en', ...)`, so a reader whose locale uses a
-    // 24-hour clock was shown AM/PM anyway. these two must disagree, or
-    // something in the options is pinning the clock instead of the locale
-    const us = new Date(at).toLocaleString('en-US', utils.DAY_TIME_OPTIONS);
-    const gb = new Date(at).toLocaleString('en-GB', utils.DAY_TIME_OPTIONS);
+  it('writes midnight as 00, not 24', () => {
+    // 'h23' rather than `hour12: false`, which selects the h24 cycle in some
+    // locales and renders the hour after midnight as 24:30
+    const out = new Date(justAfterMidnight).toLocaleTimeString('en-GB', {
+      ...utils.TIME_OPTIONS,
+      timeZone: 'UTC',
+    });
 
-    expect(us).not.toBe(gb);
-    expect(us).toMatch(/PM/u);
-    expect(gb).not.toMatch(/PM/u);
+    expect(out).toMatch(/^00:30/u);
   });
 
-  it('gives a time on its own, and a full date and time', () => {
-    expect(utils.formatTime(at)).toBe(new Date(at).toLocaleTimeString());
-    expect(utils.formatDate(at)).toBe(new Date(at).toLocaleString());
+  it('pins the same clock in every shape a moment is rendered in', () => {
+    const shapes = [
+      utils.DATE_TIME_OPTIONS,
+      utils.TIME_OPTIONS,
+      utils.DAY_TIME_OPTIONS,
+      utils.HOUR_MINUTE_OPTIONS,
+    ];
+
+    for (const options of shapes) {
+      expect(options.hourCycle).toBe(utils.HOUR_CYCLE);
+
+      // `hour12` and `hourCycle` are mutually exclusive and hour12 wins
+      // silently, so its presence would undo the line above without failing
+      expect(options).not.toHaveProperty('hour12');
+    }
+  });
+
+  it('formats in the runtime locale rather than a named one', () => {
+    expect(utils.formatDate(afternoon)).toBe(
+      new Date(afternoon).toLocaleString(undefined, utils.DATE_TIME_OPTIONS),
+    );
+    expect(utils.formatTime(afternoon)).toBe(
+      new Date(afternoon).toLocaleTimeString(undefined, utils.TIME_OPTIONS),
+    );
   });
 });

@@ -51,43 +51,96 @@ export const formatWait = (seconds) => {
 };
 
 /*
- * Dates and times are rendered in the reader's own locale, which means passing
- * no locale at all: `undefined` tells Intl to use the browser's, and that is
- * the only setting that knows whether this reader reads 14:04 or 2:04 PM.
+ * Every date and time in the UI is rendered from this file, in the reader's own
+ * locale -- which means passing no locale at all: `undefined` tells Intl to use
+ * the browser's. Naming one, as the chat and room timestamps did with 'en',
+ * shows every reader a US date order no matter what theirs is.
  *
- * Naming one -- as the chat and room timestamps did, hardcoded to 'en' -- shows
- * every reader a US clock no matter what theirs is set to.
+ * The clock is the one thing not left to the locale. `hourCycle: 'h23'` pins
+ * 00-23 everywhere, because a browser takes AM/PM from its *language*, which is
+ * a different setting from the reader's clock: an operator whose system is set
+ * to 24-hour is still shown 2:04 PM by an en-US browser, with nothing in reach
+ * to change it. Everything else -- date order, separators, month names -- still
+ * follows the locale.
  *
- * The option bags are exported so a test can assert that they leave the choice
- * of clock to the locale rather than quietly pinning one.
+ * 'h23' rather than `hour12: false`, which selects the h24 cycle in some
+ * locales and writes midnight as 24:00. The two are mutually exclusive: set
+ * `hour12` alongside this and it silently wins.
+ *
+ * One constant, so making the clock a preference later is a change in one
+ * place. The option bags are exported for the tests.
  */
+export const HOUR_CYCLE = 'h23';
+
+/**
+ * A full date and time: the default wherever there is room for one.
+ */
+export const DATE_TIME_OPTIONS = {
+  day: 'numeric',
+  hour: '2-digit',
+  hourCycle: HOUR_CYCLE,
+  minute: '2-digit',
+  month: 'numeric',
+  second: '2-digit',
+  year: 'numeric',
+};
+
+/**
+ * A time of day on its own, for a column where the date is already known.
+ */
+export const TIME_OPTIONS = {
+  hour: '2-digit',
+  hourCycle: HOUR_CYCLE,
+  minute: '2-digit',
+  second: '2-digit',
+};
 
 /**
  * The day and time, without a year: enough to place a message.
  */
 export const DAY_TIME_OPTIONS = {
   day: 'numeric',
-  hour: 'numeric',
+  hour: '2-digit',
+  hourCycle: HOUR_CYCLE,
   minute: '2-digit',
   month: 'numeric',
 };
 
+/**
+ * An axis tick, where seconds are noise and the date sits on the axis already.
+ */
+export const HOUR_MINUTE_OPTIONS = {
+  hour: '2-digit',
+  hourCycle: HOUR_CYCLE,
+  minute: '2-digit',
+};
+
+/**
+ * A date without a time, for an axis tick spanning more than a day.
+ */
+export const DAY_MONTH_OPTIONS = {
+  day: 'numeric',
+  month: 'short',
+};
+
 export const formatDate = (date) => {
-  return new Date(date).toLocaleString();
+  return new Date(date).toLocaleString(undefined, DATE_TIME_OPTIONS);
 };
 
-/**
- * A time of day on its own, for a column where the date is already known.
- */
 export const formatTime = (date) => {
-  return new Date(date).toLocaleTimeString();
+  return new Date(date).toLocaleTimeString(undefined, TIME_OPTIONS);
 };
 
-/**
- * A timestamp beside a message, where the year is noise.
- */
 export const formatDayTime = (date) => {
   return new Date(date).toLocaleString(undefined, DAY_TIME_OPTIONS);
+};
+
+export const formatHourMinute = (date) => {
+  return new Date(date).toLocaleTimeString(undefined, HOUR_MINUTE_OPTIONS);
+};
+
+export const formatDayMonth = (date) => {
+  return new Date(date).toLocaleDateString(undefined, DAY_MONTH_OPTIONS);
 };
 
 export const truncate = (text, maxLength) => {

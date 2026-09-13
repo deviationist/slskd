@@ -1,4 +1,10 @@
-import { formatBytes, formatSpeed, formatWait } from '../../lib/util';
+import {
+  formatBytes,
+  formatDayMonth,
+  formatHourMinute,
+  formatSpeed,
+  formatWait,
+} from '../../lib/util';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Area,
@@ -88,11 +94,7 @@ const Graph = ({ data = [], defaultSeries, height = 200, series = [] }) => {
     if (!xRange) return String;
     const isIntraday = xRange.max - xRange.min <= ONE_DAY_MS;
     if (isIntraday) {
-      return (timestamp) =>
-        new Date(timestamp).toLocaleTimeString(undefined, {
-          hour: '2-digit',
-          minute: '2-digit',
-        });
+      return (timestamp) => formatHourMinute(timestamp);
     }
 
     const spansYears =
@@ -100,10 +102,7 @@ const Graph = ({ data = [], defaultSeries, height = 200, series = [] }) => {
 
     return (timestamp) => {
       const d = new Date(timestamp);
-      const date = d.toLocaleDateString(undefined, {
-        day: 'numeric',
-        month: 'short',
-      });
+      const date = formatDayMonth(d);
       return spansYears ? `${date} '${String(d.getFullYear()).slice(2)}` : date;
     };
   }, [xRange]);

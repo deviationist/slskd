@@ -1,6 +1,7 @@
 import api from './api';
 import * as searches from './searches';
 import { validateSearchText } from './searches';
+import { formatDate } from './util';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -200,7 +201,7 @@ export const nextRun = ({ watch, now = new Date() }) => {
     return { text };
   }
 
-  return { dateTime: at.toISOString(), exact: at.toLocaleString(), text };
+  return { dateTime: at.toISOString(), exact: formatDate(at), text };
 };
 
 /**

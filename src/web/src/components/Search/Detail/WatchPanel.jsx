@@ -1,4 +1,4 @@
-import { formatBytes } from '../../../lib/util';
+import { formatBytes, formatDate } from '../../../lib/util';
 import * as library from '../../../lib/watches';
 import WatchModal from '../WatchModal';
 import React, { useEffect, useState } from 'react';
@@ -14,7 +14,7 @@ import {
   Table,
 } from 'semantic-ui-react';
 
-const when = (iso) => (iso ? new Date(iso).toLocaleString() : '-');
+const when = (iso) => (iso ? formatDate(iso) : '-');
 
 /**
  * The watch on a search: what it does, when it next runs, and what it has sent.
