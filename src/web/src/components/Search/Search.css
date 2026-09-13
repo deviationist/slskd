@@ -27,8 +27,16 @@
   margin-right: auto !important;
 }
 
+/* The toggles are spaced by position rather than by name. They used to be
+   listed class by class in each of the three breakpoints below, which meant a
+   new toggle needed four edits in three places to be spaced -- and got none
+   when it did not, which is exactly how "One List" arrived flush against
+   "Fold Results". A fifth needs no CSS at all now. */
+
 @media only screen and (min-width: 991px) {
-  .search-options-hide-no-slots, .search-options-hide-locked, .search-options-fold-results {
+  /* every toggle, including the first: the leading margin is what separates
+     the group from the sort dropdown beside it */
+  .search-option-toggles > .checkbox {
       margin-left: 1rem;
   }
 
@@ -48,7 +56,9 @@
     margin-top: 1rem;
   }
 
-  .search-options-hide-no-slots, .search-options-fold-results {
+  /* all but the first: the group is on its own line here, so the first toggle
+     has nothing to its left to be separated from */
+  .search-option-toggles > .checkbox + .checkbox {
     margin-left: 1rem;
   }
 }
@@ -58,8 +68,13 @@
     display: grid;
   }
 
-  .search-options-hide-no-slots, .search-options-fold-results {
+  /* stacked, so the separation is vertical and the horizontal one from the
+     wider breakpoints has to be undone */
+  .search-option-toggles > .checkbox + .checkbox {
     margin-top: 1rem;
+  }
+
+  .search-option-toggles > .checkbox {
     margin-left: 0px;
   }
 }
