@@ -5,8 +5,10 @@ import {
   formatBytes,
   formatSeconds,
   getFileName,
+  offsetWithin,
+  scrollParentOf,
 } from '../../lib/util';
-import { useWindowVirtualizer } from '@tanstack/react-virtual';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'react-toastify';
 import {
@@ -61,25 +63,35 @@ const FlatFileList = ({ disabled, onHideUser, rows }) => {
   const [selected, setSelected] = useState(() => new Set());
   const [downloading, setDownloading] = useState(false);
   const [rowDownloading, setRowDownloading] = useState(undefined);
+  const [scroller, setScroller] = useState(null);
   const [scrollMargin, setScrollMargin] = useState(0);
   const listRef = useRef(null);
 
   /*
-   * Where the table starts down the document. The virtualiser measures the
-   * window's scroll against it; without it, it believes the list begins at the
-   * top of the page and draws every row that far out of place.
+   * Which element the reader is actually scrolling, and how far down it this
+   * list begins.
    *
-   * Held in state and measured in a layout effect rather than read inline off
-   * the ref, which is null on the first render -- reading it there gives 0 for
-   * the whole life of the component unless something else happens to re-render
-   * it, which is the difference between a list that works and one that works
-   * only after you resize the window.
+   * Not the window. This app puts `overflow-y: auto` on a wrapper near the
+   * root and lets the page grow inside it, so `window.scrollY` stays at 0 no
+   * matter how far down the list you are -- a window virtualiser watching it
+   * renders the first screenful, never hears about the scroll, and leaves you
+   * looking at the blank spacer that holds the rest of the height. Measured,
+   * not assumed: the first attempt at this assumed the window and did exactly
+   * that.
    *
-   * Re-measured when the row count changes, because the panel above this one
-   * reports it and changes height when it goes from four digits to three.
+   * In a layout effect rather than read inline off the ref, which is null on
+   * the first render -- reading it there fixes both values at their defaults
+   * for the life of the component. Re-measured on resize and when the row
+   * count changes, since the summary above reports it and changes height
+   * between three digits and four.
    */
   useLayoutEffect(() => {
-    const measure = () => setScrollMargin(listRef.current?.offsetTop ?? 0);
+    const measure = () => {
+      const parent = scrollParentOf(listRef.current);
+
+      setScroller(parent);
+      setScrollMargin(offsetWithin(listRef.current, parent));
+    };
 
     measure();
     window.addEventListener('resize', measure);
@@ -87,9 +99,10 @@ const FlatFileList = ({ disabled, onHideUser, rows }) => {
     return () => window.removeEventListener('resize', measure);
   }, [rows.length]);
 
-  const virtualizer = useWindowVirtualizer({
+  const virtualizer = useVirtualizer({
     count: rows.length,
     estimateSize: () => ROW_H,
+    getScrollElement: () => scroller,
     overscan: 15,
     scrollMargin,
   });
