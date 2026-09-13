@@ -1,5 +1,6 @@
 import { activeRoomKey } from '../../config';
 import * as rooms from '../../lib/rooms';
+import { formatDayTime } from '../../lib/util';
 import PlaceholderSegment from '../Shared/PlaceholderSegment';
 import RoomMenu from './RoomMenu';
 import RoomUserList from './RoomUserList';
@@ -194,17 +195,7 @@ class Rooms extends Component {
     this.messageRef.current.focus();
   };
 
-  formatTimestamp = (timestamp) => {
-    const date = new Date(timestamp);
-    const dtfUS = new Intl.DateTimeFormat('en', {
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      month: 'numeric',
-    });
-
-    return dtfUS.format(date);
-  };
+  formatTimestamp = (timestamp) => formatDayTime(timestamp);
 
   sendMessage = async () => {
     const { active, message } = this.state;
