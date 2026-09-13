@@ -24,10 +24,13 @@ describe('date and time formatting', () => {
   const justAfterMidnight = '2026-09-14T00:30:00Z';
 
   const inUtc = (options) =>
-    new Date(afternoon).toLocaleString(utils.LOCALE, {
+    new Date(afternoon).toLocaleString(utils.locale(), {
       ...options,
       timeZone: 'UTC',
     });
+
+  // the locale is module state, so a test that sets it must put it back
+  afterEach(() => utils.setLocale(undefined));
 
   it('writes the day first and the clock as 00-23', () => {
     // the 14th, deliberately: a day past 12 cannot be read as a month, so this
@@ -35,13 +38,16 @@ describe('date and time formatting', () => {
     expect(inUtc(utils.DATE_TIME_OPTIONS)).toBe('14/09/2026, 15:04:00');
   });
 
-  it('does not follow the browser', () => {
+  it('does not follow the browser unless told to', () => {
     // the reversal worth having a test for: date order and clock both come
     // from the locale, so following the browser means accepting whatever its
     // *language* implies -- 9/14/2026, 3:04 PM on an en-US one
-    expect(utils.LOCALE).toBe('en-GB');
+    expect(utils.locale()).toBe(utils.DEFAULT_LOCALE);
     expect(utils.formatDate(afternoon)).toBe(
-      new Date(afternoon).toLocaleString(utils.LOCALE, utils.DATE_TIME_OPTIONS),
+      new Date(afternoon).toLocaleString(
+        utils.locale(),
+        utils.DATE_TIME_OPTIONS,
+      ),
     );
     expect(utils.formatDate(afternoon)).not.toMatch(/[AP]M/u);
   });
@@ -59,7 +65,7 @@ describe('date and time formatting', () => {
   it('writes midnight as 00, not 24', () => {
     // 'h23' rather than `hour12: false`, which selects the h24 cycle in some
     // locales and renders the hour after midnight as 24:30
-    const out = new Date(justAfterMidnight).toLocaleTimeString(utils.LOCALE, {
+    const out = new Date(justAfterMidnight).toLocaleTimeString(utils.locale(), {
       ...utils.TIME_OPTIONS,
       timeZone: 'UTC',
     });
@@ -84,24 +90,58 @@ describe('date and time formatting', () => {
     }
   });
 
+  it('takes the locale the deployment configured', () => {
+    utils.setLocale('en-US');
+
+    expect(
+      new Date(afternoon).toLocaleString(utils.locale(), {
+        ...utils.DATE_TIME_OPTIONS,
+        timeZone: 'UTC',
+      }),
+    ).toBe('9/14/2026, 15:04:00');
+  });
+
+  it('keeps the 24-hour clock whatever locale is configured', () => {
+    // the clock is applied on top of the locale rather than inherited from it,
+    // so choosing US date order does not bring AM/PM back with it
+    utils.setLocale('en-US');
+
+    expect(utils.formatDate(afternoon)).not.toMatch(/[AP]M/u);
+  });
+
+  it('follows the browser when the setting is deliberately blank', () => {
+    // blank is a choice, and a different one from unset: undefined is how Intl
+    // is told to use the browser's locale, so it cannot also mean "not yet
+    // configured" -- which is what the resolver exists to keep apart
+    utils.setLocale('');
+
+    expect(utils.locale()).toBeUndefined();
+  });
+
   it('renders every shape through the one locale', () => {
     // a formatter that forgot the locale argument falls back to the browser's,
     // which is the bug this file exists to prevent
     expect(utils.formatTime(afternoon)).toBe(
-      new Date(afternoon).toLocaleTimeString(utils.LOCALE, utils.TIME_OPTIONS),
+      new Date(afternoon).toLocaleTimeString(
+        utils.locale(),
+        utils.TIME_OPTIONS,
+      ),
     );
     expect(utils.formatDayTime(afternoon)).toBe(
-      new Date(afternoon).toLocaleString(utils.LOCALE, utils.DAY_TIME_OPTIONS),
+      new Date(afternoon).toLocaleString(
+        utils.locale(),
+        utils.DAY_TIME_OPTIONS,
+      ),
     );
     expect(utils.formatHourMinute(afternoon)).toBe(
       new Date(afternoon).toLocaleTimeString(
-        utils.LOCALE,
+        utils.locale(),
         utils.HOUR_MINUTE_OPTIONS,
       ),
     );
     expect(utils.formatDayMonth(afternoon)).toBe(
       new Date(afternoon).toLocaleDateString(
-        utils.LOCALE,
+        utils.locale(),
         utils.DAY_MONTH_OPTIONS,
       ),
     );

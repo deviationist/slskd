@@ -9,6 +9,7 @@ import * as relayAPI from '../lib/relay';
 import { connect, disconnect } from '../lib/server';
 import * as session from '../lib/session';
 import { isPassthroughEnabled } from '../lib/token';
+import { setLocale } from '../lib/util';
 import AppContext from './AppContext';
 import AppFooter from './AppFooter';
 import Browse from './Browse/Browse';
@@ -216,6 +217,9 @@ class App extends Component {
           });
 
           appHub.on('options', (options) => {
+            // before the setState, so the render it triggers already formats
+            // in the configured locale rather than one render behind it
+            setLocale(options?.web?.locale);
             this.setState({ applicationOptions: options });
           });
 

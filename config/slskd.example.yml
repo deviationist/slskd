@@ -162,6 +162,7 @@
 #   url_base: /
 #   content_path: wwwroot
 #   logging: false
+#   locale: en-GB
 #   authentication:
 #     disabled: false
 #     username: slskd
