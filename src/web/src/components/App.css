@@ -243,6 +243,14 @@ body {
     height: auto;
 }
 
+/* Sortable headers. Semantic styles `sorted` cells itself; this is only the
+   affordance on the ones not currently sorted, which otherwise look inert. */
+.flatlist thead th {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+
 /* The folder the file sits in. Given room to breathe in wide mode, where it is
    most of the reason to be in wide mode; still useful narrow, where it takes
    what is left after the fixed columns. */

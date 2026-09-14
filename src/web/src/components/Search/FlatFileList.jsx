@@ -3,7 +3,11 @@ import {
   downloadStateOf,
   folderOf,
   groupByUser,
+  nextSort,
   selectionState,
+  sortFromQuery,
+  sortRows,
+  sortToQuery,
 } from '../../lib/searches';
 import * as transfers from '../../lib/transfers';
 import {
@@ -17,6 +21,7 @@ import {
 import { useVirtualizer } from '@tanstack/react-virtual';
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useHistory, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import {
   Button,
@@ -99,10 +104,46 @@ const MARKS = {
   },
 };
 
-const FlatFileList = ({ disabled, downloads, rows }) => {
+/**
+ * The columns, in the order they are drawn, and what each one is called.
+ */
+const COLUMNS = [
+  { key: 'name', label: 'File', className: 'flatlist-filename' },
+  { key: 'folder', label: 'Folder', className: 'flatlist-folder' },
+  { key: 'user', label: 'User', className: 'flatlist-user' },
+  { key: 'size', label: 'Size', className: 'flatlist-size' },
+  { key: 'attributes', label: 'Attributes', className: 'flatlist-attributes' },
+  { key: 'length', label: 'Length', className: 'flatlist-length' },
+];
+
+const FlatFileList = ({ disabled, downloads, rows: unsorted }) => {
   const [selected, setSelected] = useState(() => new Set());
   const [downloading, setDownloading] = useState(false);
   const [rowDownloading, setRowDownloading] = useState(undefined);
+  /*
+   * The sort lives in the query string rather than in state or storage, so a
+   * sorted view can be linked to and survives a reload without a second place
+   * to keep it. Unknown columns are dropped on the way in -- the value comes
+   * from a url someone else may have written.
+   */
+  const location = useLocation();
+  const history = useHistory();
+  const { column, direction } = sortFromQuery(location.search);
+
+  const rows = useMemo(
+    () => sortRows({ column, direction, rows: unsorted }),
+    [column, direction, unsorted],
+  );
+
+  const sortBy = (key) => {
+    const next = nextSort({ column: key, current: column, direction });
+
+    history.replace({
+      pathname: location.pathname,
+      search: sortToQuery({ ...next, search: location.search }),
+    });
+  };
+
   const [footerSlot, setFooterSlot] = useState(null);
   const [scroller, setScroller] = useState(null);
   const [scrollMargin, setScrollMargin] = useState(0);
@@ -330,24 +371,24 @@ const FlatFileList = ({ disabled, downloads, rows }) => {
                   }
                 />
               </Table.HeaderCell>
-              <Table.HeaderCell className="flatlist-filename">
-                File
-              </Table.HeaderCell>
-              <Table.HeaderCell className="flatlist-folder">
-                Folder
-              </Table.HeaderCell>
-              <Table.HeaderCell className="flatlist-user">
-                User
-              </Table.HeaderCell>
-              <Table.HeaderCell className="flatlist-size">
-                Size
-              </Table.HeaderCell>
-              <Table.HeaderCell className="flatlist-attributes">
-                Attributes
-              </Table.HeaderCell>
-              <Table.HeaderCell className="flatlist-length">
-                Length
-              </Table.HeaderCell>
+              {COLUMNS.map((col) => (
+                <Table.HeaderCell
+                  className={col.className}
+                  key={col.key}
+                  onClick={() => sortBy(col.key)}
+                  // Semantic draws the arrow from this, and it doubles as the
+                  // announcement to a screen reader
+                  sorted={
+                    column === col.key
+                      ? direction === 'desc'
+                        ? 'descending'
+                        : 'ascending'
+                      : undefined
+                  }
+                >
+                  {col.label}
+                </Table.HeaderCell>
+              ))}
               <Table.HeaderCell className="flatlist-download" />
             </Table.Row>
           </Table.Header>

@@ -342,18 +342,31 @@ const SearchDetail = ({
             className="search-options"
             raised
           >
-            <Dropdown
-              button
-              className="search-options-sort icon"
-              floating
-              icon="sort"
-              labeled
-              onChange={(_event, { value }) => setResultSort(value)}
-              options={sortDropdownOptions}
-              text={
-                sortDropdownOptions.find((o) => o.value === resultSort).text
-              }
-            />
+            {/*
+             * The dropdown sorts whole peers, which is the only thing that
+             * can be sorted when the results are one card each. The flat list
+             * sorts files, from its own column headers -- so it is hidden
+             * there rather than left as a second control answering a
+             * different question about the same list.
+             *
+             * It still runs underneath: with no column chosen the rows arrive
+             * in the order it put the peers in, which is the same default the
+             * list has always had.
+             */}
+            {!flatResults && (
+              <Dropdown
+                button
+                className="search-options-sort icon"
+                floating
+                icon="sort"
+                labeled
+                onChange={(_event, { value }) => setResultSort(value)}
+                options={sortDropdownOptions}
+                text={
+                  sortDropdownOptions.find((o) => o.value === resultSort).text
+                }
+              />
+            )}
             <div className="search-option-toggles">
               <Checkbox
                 checked={hideLocked}

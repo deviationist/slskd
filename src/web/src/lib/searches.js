@@ -1,5 +1,5 @@
 import api from './api';
-import { getDirectoryName, getFileName } from './util';
+import { formatAttributes, getDirectoryName, getFileName } from './util';
 
 /**
  * Whether a phrase can be searched for.
@@ -490,4 +490,156 @@ export const describeSelection = ({ total = 0, selection }) => {
   return selection.all
     ? `${files}, all selected`
     : `${files}, ${selection.count} selected`;
+};
+
+/*
+ * Sorting the flat list.
+ *
+ * The dropdown above the results sorts *responses* -- whole peers, by upload
+ * speed or queue depth -- which is the only thing that can be sorted when the
+ * results are drawn as one card per peer. A table of files can be asked a
+ * different question, and the columns are where it is asked.
+ *
+ * Sorted from the values, never from what the cell shows: a length reads
+ * `6:09` and sorts as 369, a size reads `9.2 MB` and sorts as its bytes.
+ * Sorting the rendered text would put 10:00 before 6:09 and 9 MB before 80 KB.
+ */
+
+/**
+ * How each column is compared, and what it is compared on.
+ */
+export const SORT_COLUMNS = {
+  attributes: { kind: 'text', of: (row) => formatAttributes(row) },
+  folder: { kind: 'text', of: (row) => folderOf(row) },
+  length: { kind: 'number', of: (row) => row.length },
+  name: { kind: 'text', of: (row) => getFileName(row.filename ?? '') },
+  size: { kind: 'number', of: (row) => row.size },
+  user: { kind: 'text', of: (row) => row.username },
+};
+
+/*
+ * `numeric` so `track 2` comes before `track 10` rather than after it, which
+ * is what anyone sorting a list of tracks means by alphabetical. `base` so
+ * case and accents do not split names that read as the same.
+ */
+const collator = new Intl.Collator(undefined, {
+  numeric: true,
+  sensitivity: 'base',
+});
+
+/**
+ * Whether a value is one the column can order at all.
+ */
+const missing = (value, kind) =>
+  value === undefined ||
+  value === null ||
+  value === '' ||
+  (kind === 'number' && Number.isNaN(Number(value)));
+
+/**
+ * The rows in the order a column asks for.
+ *
+ * A row the column cannot answer for sorts last in *both* directions rather
+ * than at whichever end is smallest. Sorting by length to find the longest
+ * track and being handed a screen of files whose length nobody reported is not
+ * an answer to the question.
+ * @param {object} params
+ * @param {object[]} params.rows - The rows.
+ * @param {string} params.column - A key of SORT_COLUMNS, or anything else for no sort.
+ * @param {string} params.direction - 'asc' or 'desc'.
+ * @returns {object[]} A new, sorted array; the input order where the column is unknown.
+ */
+export const sortRows = ({ rows = [], column, direction = 'asc' }) => {
+  const spec = SORT_COLUMNS[column];
+
+  if (!spec) {
+    return rows;
+  }
+
+  const sign = direction === 'desc' ? -1 : 1;
+
+  // a copy: the caller's array is memoised upstream and sorting in place would
+  // quietly reorder it for everything else reading the same reference
+  return [...rows].sort((a, b) => {
+    const left = spec.of(a);
+    const right = spec.of(b);
+    const leftMissing = missing(left, spec.kind);
+    const rightMissing = missing(right, spec.kind);
+
+    if (leftMissing || rightMissing) {
+      return leftMissing && rightMissing ? 0 : leftMissing ? 1 : -1;
+    }
+
+    if (spec.kind === 'number') {
+      return sign * (Number(left) - Number(right));
+    }
+
+    return sign * collator.compare(String(left), String(right));
+  });
+};
+
+/**
+ * What clicking a column header should do next.
+ *
+ * A new column starts ascending. The same column again turns around. A third
+ * click gives up on it, because a sort that cannot be undone leaves no way
+ * back to the order the results arrived in -- which is itself meaningful here,
+ * being the peers ranked by whatever the dropdown last chose.
+ * @param {object} params
+ * @param {string} params.column - The column that was clicked.
+ * @param {string} params.current - The column currently sorted on, if any.
+ * @param {string} params.direction - Its direction.
+ * @returns {{column: string|undefined, direction: string|undefined}} The next state.
+ */
+export const nextSort = ({ column, current, direction }) => {
+  if (column !== current) {
+    return { column, direction: 'asc' };
+  }
+
+  if (direction === 'asc') {
+    return { column, direction: 'desc' };
+  }
+
+  return { column: undefined, direction: undefined };
+};
+
+/**
+ * Reads the sort out of a query string, ignoring anything it does not know.
+ * @param {string} search - `location.search`.
+ * @returns {{column: string|undefined, direction: string}} The sort.
+ */
+export const sortFromQuery = (search) => {
+  const params = new URLSearchParams(search ?? '');
+  const column = params.get('sort');
+  const direction = params.get('dir') === 'desc' ? 'desc' : 'asc';
+
+  // an unknown column is dropped rather than honoured: the parameter comes
+  // from a url someone else wrote, and a typo should not empty the list
+  return SORT_COLUMNS[column]
+    ? { column, direction }
+    : { column: undefined, direction: 'asc' };
+};
+
+/**
+ * Writes the sort into a query string, leaving every other parameter alone.
+ * @param {object} params
+ * @param {string} params.search - The current `location.search`.
+ * @param {string} params.column - The column, or nothing to clear it.
+ * @param {string} params.direction - The direction.
+ * @returns {string} The new query string, with a leading '?' or empty.
+ */
+export const sortToQuery = ({ search, column, direction }) => {
+  const params = new URLSearchParams(search ?? '');
+
+  if (column) {
+    params.set('sort', column);
+    params.set('dir', direction === 'desc' ? 'desc' : 'asc');
+  } else {
+    params.delete('sort');
+    params.delete('dir');
+  }
+
+  const next = params.toString();
+
+  return next ? `?${next}` : '';
 };
