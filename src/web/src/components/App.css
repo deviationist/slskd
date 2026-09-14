@@ -520,10 +520,22 @@ body {
     margin: 0;
 }
 
-/* Semantic gives a button with an icon in it square padding -- 7px on every
-   side, sized for an icon-only button. With a label attached to the right, the
-   word ends up against the seam. Only the right side needs the room. */
-.footer-slot .ui.labeled.button > .ui.button {
+/* Semantic gives a button containing an icon square padding, sized for an
+   icon-only button -- so with a label attached to the right, the word ends up
+   against the seam between the two. Only the right side needs the room.
+
+   Everywhere that shape appears: the search cards' Download, the flat list's,
+   and Browse's selection button. `button.ui.button` rather than `.ui.button`
+   because the sort dropdown also carries `labeled` in its class and is a div
+   -- matching it would pad a menu instead.
+
+   Two values because the two start from different places: 11px normally, and
+   7px where the button is also `tiny compact`, as it is in the footer. */
+.ui.right.labeled.button > button.ui.button {
+    padding-right: 18px;
+}
+
+.footer-slot .ui.right.labeled.button > button.ui.button {
     padding-right: 14px;
 }
 
