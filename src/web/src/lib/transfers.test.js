@@ -1047,3 +1047,98 @@ describe('the transfers table sorts', () => {
     ]);
   });
 });
+
+describe('filterTransfers', () => {
+  const users = [
+    {
+      username: 'alice',
+      directories: [
+        {
+          directory: 'a\\Album',
+          files: [
+            {
+              id: '1',
+              username: 'alice',
+              filename: 'a\\Album\\one.flac',
+              state: 'InProgress',
+            },
+            {
+              id: '2',
+              username: 'alice',
+              filename: 'a\\Album\\two.mp3',
+              state: 'Completed, Errored',
+            },
+          ],
+        },
+      ],
+    },
+    {
+      username: 'bob',
+      directories: [
+        {
+          directory: 'b',
+          files: [
+            {
+              id: '3',
+              username: 'bob',
+              filename: 'b\\three.flac',
+              state: 'Queued, Remotely',
+            },
+          ],
+        },
+      ],
+    },
+  ];
+
+  const ids = (query) =>
+    transfers
+      .filterTransfers({ query, users })
+      .flatMap((u) => u.directories.flatMap((d) => d.files.map((f) => f.id)));
+
+  it('returns everything for an empty query', () => {
+    expect(transfers.filterTransfers({ users })).toBe(users);
+    expect(ids('   ')).toEqual(['1', '2', '3']);
+  });
+
+  it('matches the filename', () => {
+    expect(ids('flac')).toEqual(['1', '3']);
+  });
+
+  it('matches the peer, so one peer’s queue needs no control of its own', () => {
+    expect(ids('bob')).toEqual(['3']);
+  });
+
+  it('matches the state, so the failures need none either', () => {
+    expect(ids('errored')).toEqual(['2']);
+  });
+
+  it('requires every term', () => {
+    expect(ids('album flac')).toEqual(['1']);
+    expect(ids('album nothing')).toEqual([]);
+  });
+
+  it('excludes a term with a leading dash', () => {
+    expect(ids('flac -bob')).toEqual(['1']);
+    expect(ids('-flac')).toEqual(['2']);
+  });
+
+  it('is case insensitive', () => {
+    expect(ids('FLAC')).toEqual(['1', '3']);
+  });
+
+  it('drops the folders and peers left holding nothing', () => {
+    // what makes one filter serve both views: the cards show only the peers
+    // with a match, and the table flattens whatever survived
+    const kept = transfers.filterTransfers({ query: 'bob', users });
+
+    expect(kept).toHaveLength(1);
+    expect(kept[0].username).toBe('bob');
+    expect(kept[0].directories).toHaveLength(1);
+  });
+
+  it('leaves the caller’s transfers alone', () => {
+    transfers.filterTransfers({ query: 'flac', users });
+
+    expect(users[0].directories[0].files).toHaveLength(2);
+  });
+});

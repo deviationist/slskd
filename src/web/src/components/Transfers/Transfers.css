@@ -163,3 +163,20 @@
     align-items: center;
     margin-right: 12px;
 }
+
+/* Between the sort and the action buttons, taking the middle of the header
+   rather than a line of its own -- the segment is a fixed 78px and a second
+   row would not fit in it. Capped so it does not crowd the buttons on a wide
+   window. */
+.transfers-header-filter {
+  display: inline-flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 420px;
+  margin-left: 1em;
+}
+
+.transfers-header-filter .ui.input {
+  width: 100%;
+}

@@ -828,3 +828,62 @@ export const TRANSFER_SORT_COLUMNS = {
   state: { kind: 'text', of: (row) => row.state },
   user: { kind: 'text', of: (row) => row.username },
 };
+
+/**
+ * The transfers a query matches, in the shape the page already holds them.
+ *
+ * Filters *files*, then drops the folders and peers left holding none -- so
+ * the same answer serves both views: the cards show only the peers with a
+ * match, and the table flattens what survives. One filter rather than one per
+ * view, which is what stops the two disagreeing about what a query means.
+ *
+ * Space-separated terms, all of which must match, and a term with a leading
+ * `-` must not. The same shape as the searches page's filter box, minus the
+ * typed operators: `minbitrate:` has nothing to say about a transfer.
+ *
+ * Matched against the peer, the whole remote path and the state -- so `errored`
+ * finds the failures and a username finds one peer's queue, without either
+ * needing its own control.
+ * @param {object} params
+ * @param {object[]} params.users - The transfers API's response.
+ * @param {string} params.query - What was typed.
+ * @returns {object[]} The same shape, with what does not match removed.
+ */
+export const filterTransfers = ({ users = [], query = '' }) => {
+  const terms = String(query).toLowerCase().split(/\s+/u).filter(Boolean);
+
+  if (terms.length === 0) {
+    return users;
+  }
+
+  const include = terms.filter((t) => !t.startsWith('-'));
+  const exclude = terms
+    .filter((t) => t.startsWith('-'))
+    .map((t) => t.slice(1))
+    .filter(Boolean);
+
+  const matches = (file, username) => {
+    const hay =
+      `${username} ${file.filename ?? ''} ${file.state ?? ''}`.toLowerCase();
+
+    return (
+      include.every((t) => hay.includes(t)) &&
+      !exclude.some((t) => hay.includes(t))
+    );
+  };
+
+  return users
+    .map((user) => ({
+      ...user,
+      directories: (user.directories ?? [])
+        .map((directory) => {
+          const files = (directory.files ?? []).filter((file) =>
+            matches(file, file.username ?? user.username),
+          );
+
+          return { ...directory, fileCount: files.length, files };
+        })
+        .filter((directory) => directory.files.length > 0),
+    }))
+    .filter((user) => user.directories.length > 0);
+};

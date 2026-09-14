@@ -63,6 +63,7 @@ const Transfers = ({ direction, server }) => {
   const [transfers, setTransfers] = useState([]);
   const [storedSort, setStoredSort] = useState(() => readStoredSort(direction));
   const [flat, setFlat] = useState(() => readStoredFlat(direction));
+  const [filter, setFilter] = useState('');
 
   const [retrying, setRetrying] = useState(false);
   const [cancelling, setCancelling] = useState(false);
@@ -139,9 +140,19 @@ const Transfers = ({ direction, server }) => {
   // one that deletes nothing -- see `removalDeletesFile`
   const deleteFileOnRemoval = options?.transfers?.download?.deleteFileOnRemoval;
 
+  /*
+   * Filtered before grouped, so the cards and the table answer the same
+   * question -- and before sorted, since sorting what was thrown away is work
+   * for nothing.
+   */
+  const matching = useMemo(
+    () => transfersLibrary.filterTransfers({ query: filter, users: transfers }),
+    [filter, transfers],
+  );
+
   const sorted = useMemo(
-    () => transfersLibrary.sortTransfers(transfers, sort),
-    [sort, transfers],
+    () => transfersLibrary.sortTransfers(matching, sort),
+    [matching, sort],
   );
 
   /*
@@ -269,8 +280,10 @@ const Transfers = ({ direction, server }) => {
       <TransfersHeader
         cancelling={cancelling}
         direction={direction}
+        filter={filter}
         flat={flat}
         onCancelAll={cancelAll}
+        onFilterChange={setFilter}
         onFlatChange={(next) => {
           setFlat(next);
           storeFlat(direction, next);
@@ -284,9 +297,13 @@ const Transfers = ({ direction, server }) => {
         sort={sort}
         transfers={transfers}
       />
-      {transfers.length === 0 ? (
+      {sorted.length === 0 ? (
         <PlaceholderSegment
-          caption={`No ${direction}s to display`}
+          caption={
+            filter
+              ? `No ${direction}s match '${filter}'`
+              : `No ${direction}s to display`
+          }
           icon={direction}
         />
       ) : flat ? (
