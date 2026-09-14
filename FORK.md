@@ -113,6 +113,59 @@ and always has. The capability to delete a downloaded file exists — the files 
 `remote_file_management` — but it lives in a separate browser under System, so
 getting rid of a download and its file is two operations in two places.
 
+### Search watches
+
+A search that re-runs on a schedule, keeps what is new since its last run, and
+mails it. Built over 2026-09-12/13; the plan and the reasons the shape changed
+while it was built are in `PLAN-search-watches.md`. Configured under
+`searches.watches.*` — `enabled`, `minimum_interval`, `gap`, `limit`,
+`download_limit` and `timezone`.
+
+| Branch | What it does | Upstream |
+|---|---|---|
+| `pr/feat-mail-integration` | Gives slskd a way to send mail at all: an adapter interface with an SMTP implementation, `mail.*` options, and both SMTP fields marked `[Secret]` so they do not come back out through the options API. Its own branch because sending mail is a capability the rest of the fork happens to be the first user of, not part of watching a search. | Nothing upstream asks for it directly; it is the prerequisite for anything that reports on its own. |
+| `pr/feat-search-watches` | The feature: schema and migration, the watch service and scheduler, a C# port of the UI's result filter, the event, the API and the UI. A watch stores an RRULE and **the zone it was created in** — so an existing watch keeps the zone it had until it is saved again, and changing `searches.watches.timezone` governs new ones only. What counts as *new* is recorded per watch, so a run reports what the previous one did not see rather than everything it finds. | No upstream issue asks for this exactly. [#1315](https://github.com/slskd/slskd/issues/1315) is adjacent — people already schedule searches from outside and complain it clogs the Search screen, which is an argument for re-running in place rather than accumulating rows. |
+| `feature/watch-existing-search`, `feature/watch-from-dashboard`, `feature/watch-modal-editable-search` | The three other doors into the same modal: a search already in the list can be made recurring without re-running it, the dashboard's search bar can start one, and the phrase can be corrected while the watch is being created rather than after. | Ours. |
+| `feature/watch-auto-enqueue`, `feature/seed-when-the-search-has-results` | A watch can queue what it finds instead of waiting to be read, capped by `download_limit` — the cap is the whole safety argument, since an unattended watch on a common phrase would otherwise fill a disk while its operator read the mail about it. Seeding takes the results the search **already has**, which is what a watch created alongside its own search needs; seeding from what it *had* found meant seeding from nothing. | Ours. |
+| `feature/global-ignore-list`, `feature/ignore-from-email` | A file can be ignored by every watch rather than only the one that found it, and the mail that reported a file carries a link that ignores it — the decision is made where it is read. | Ours. |
+| `feature/next-run-time-element`, `fix/watch-timestamps-serialize-as-utc` | "next run in 12 h" is a `<time>` carrying the real instant, so the moment is readable rather than inferred. The second is why it could be trusted: the API served watch timestamps with no zone, because SQLite loses `DateTimeKind`, so a browser read UTC as local and every watch was two hours out. Fixed with a model-wide value converter in `SearchDbContext` rather than per-column. | Ours; the converter is the sort of thing upstream would want if it stored instants this way. |
+
+Nine `fix/watch-*` branches follow these and are not itemised — form fields that
+rendered as labels only, a modal that lost focus to the searches page behind it,
+a close icon outside its header, native selects, a watch accepted with no
+phrase, the file casing in a notification. They are in the log.
+
+### The table view
+
+The search results and the downloads, as one row per file with the peer as a
+column. Built 2026-09-13/14.
+
+**The card view stays.** Its value is per-folder context — the folder headers
+and *Search for Additional Files in This Directory* — and grouping is
+incompatible with ordering, which is what the table is for. Neither is a
+migration path away from the other, and the asymmetry between them is the
+design rather than a gap. Fold Results is hidden in table view for that reason.
+
+| Branch | What it does | Upstream |
+|---|---|---|
+| `feature/flat-file-list` | The list itself: `lib/searches.js` flattens the grouped responses to rows, the toggle is remembered (`slskd-search-flat-results`), and the checkboxes, download, delete and info controls all carry over. Selection across a flat list needed a real indeterminate master, since "all" and "some" are different answers once every file is in one list. | Ours. |
+| `feature/virtualise-flat-list` | `@tanstack/react-virtual` in place of *Show 100 more* — the results were always fully loaded, so the pagination was hiding what was already in memory. **The window is not the scroll container:** this app scrolls `div.ui.segment.pushable.app`, so `useWindowVirtualizer` renders a list that goes blank on scroll. `scrollParentOf` in `lib/util.js` finds the real one. The card view keeps its *Show More*, which pages *responses* rather than files. | Ours, though the virtualiser is generic. |
+| `feature/sortable-columns`, `fix/quiet-sort-affordance` | Ordering from the column headers, written to the query string so an ordering is a link. Length and Size sort on the underlying seconds and bytes, not their formatted text; File, Path, User and Attributes sort alphabetically, which for Attributes is really *grouping* — the point is to bring the same encodings together. The sort marker shows under the pointer and on the active column only; a marker on every header was noise. | Ours. |
+| `feature/peer-columns-and-visibility` | Upload speed, free upload slots and queue length as sortable columns, and a picker deciding which columns show (`slskd-search-columns`, `slskd-transfers-columns-<direction>`). All on by default except those three. The picker is a `Popup`, not a `Dropdown`: Semantic's dropdown closes from a native document listener that React's `stopPropagation` cannot reach, which swallowed every tick. | Ours. |
+| `feature/mark-downloaded-results`, `feature/retrieve-or-redownload` | A search result says whether it is downloading or already downloaded, and a row for a file we already have offers to **fetch it to the browser** rather than download it a second time — unless the file has since gone from disk, in which case it offers the download again and says why. The decision is `rowActionOf` in `lib/searches.js`, with tests. | Not contributable as-is: it reads this fork's `Transfer.LocalFilename` and depends on `remote_file_retrieval`. |
+| `feature/wide-layout-and-folder` | A *Wide* toggle (`slskd-wide`) taking the view to 2400px, and the file's **full folder path** in a column renamed Path — the width is what makes the path affordable. | Ours. |
+| `feature/downloads-table-view`, `feature/row-state-attribute`, `feature/player-in-table-view` | The same table on the Downloads page: virtualised, sortable, filterable (space-separated AND terms, `-term` excludes, matching peer, full path and state), with the selection actions gated on the same `isStateRetryable`/`isStateCancellable`/`isStateRemovable`/`isRetrievable` rules the card view uses. Rows are tagged `data-filename`, `data-username` and `data-state` — **the scripts injected into this page must read identity from those attributes**, because the column picker can hide the cells they used to read. The bulk bar is portalled into `#footer-action-slot`: `.pushable.app` carries a transform, which breaks `position: fixed` for everything under it. | Ours. |
+
+### Time, locale, and the rest
+
+| Branch | What it does | Upstream |
+|---|---|---|
+| `pr/fix-hardcoded-locale-timestamps` | Chat and room timestamps were formatted `en-US` regardless of the reader. | Fixes upstream behaviour. |
+| `feature/24-hour-timestamps`, `feature/day-first-dates` | Every clock in the UI reads 00-23 (`hourCycle: 'h23'`, which unlike `hour12: false` cannot produce a 24:07), and the locale is a setting — `web.locale`, `en-GB` by default. Date order is not a separate knob because Intl derives order, separators and month names together from the locale; blank follows the browser's *language*, which is how an operator on a 24-hour OS still gets AM/PM. | Ours, on top of the fix above. |
+| `feature/expose-toast-to-injected-scripts` | Hands the toast API to the scripts injected into the page, so an injected control reports the way the app does. | Ours — for `media-bridge`. |
+| `pr/fix-grouped-button-border`, `pr/fix-popup-dark-theme`, `pr/fix-footer-favicon-url-base`, `pr/fix-search-detail-header-height` | Four small upstream fixes: the first button of a group losing its left border in the dark theme, the popup unreadable in it, the footer logo resolved against the current route rather than the url base, and a search detail header that would not grow with its phrase. | All four fix upstream behaviour; each diff is exactly that. |
+| `feature/explain-hide-result`, `feature/confirm-removal-with-enter`, `feature/confirm-bulk-removal` | The red cross on a result card says what it does; a removal confirms with Enter as it already cancels with Escape; a selection asks before it deletes files, as a single row already did. | Ours, the last one because the prompt is worded from `delete_file_on_removal`. |
+
 ## Our image
 
 Built from `main` and pushed to the homelab registry:
