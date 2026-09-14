@@ -439,7 +439,11 @@ const FlatFileList = ({ disabled, downloads, rows: unsorted }) => {
               </Table.HeaderCell>
               {shown.map((col) => (
                 <Table.HeaderCell
-                  className={col.className}
+                  // the class the sort affordance keys on. The selector and
+                  // the action column are headers too and neither sorts, so a
+                  // rule on `th` alone put a marker and a pointer cursor on a
+                  // checkbox that does nothing when clicked
+                  className={`${col.className} flatlist-sortable`}
                   key={col.key}
                   onClick={() => sortBy(col.key)}
                   // Semantic draws the arrow from this, and it doubles as the
