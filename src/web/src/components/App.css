@@ -520,6 +520,16 @@ body {
     margin: 0;
 }
 
+/* Inside a Button.Group there are `or` dividers between the buttons, and one
+   is a 4px element whose visible circle is drawn by a ::before 21px across --
+   so it reaches about 9px into the padding of the button either side of it.
+   At the 10px above that left roughly a pixel between the circle and the
+   words, on both sides of every divider. */
+.footer-slot .ui.buttons .ui.button {
+    padding-left: 16px;
+    padding-right: 16px;
+}
+
 /* Semantic gives a button containing an icon square padding, sized for an
    icon-only button -- so with a label attached to the right, the word ends up
    against the seam between the two. Only the right side needs the room.
