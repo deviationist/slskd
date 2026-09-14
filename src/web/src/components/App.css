@@ -230,11 +230,61 @@ body {
     white-space: nowrap;
 }
 
+/* media-bridge injects a play button and a quality badge into `.flatlist-cell`,
+   and the filename has to be the only thing that gives way to them.
+
+   The flex is on that inner element rather than on the cell, which is what the
+   first attempt got wrong: a `<td>` that is not `table-cell` leaves the table's
+   column layout, so `max-width: 0` stopped being the shrink hint it is here and
+   became a real constraint -- the column collapsed to 18px and the space it
+   should have taken was drawn as nothing.
+
+   Nothing is reserved by measurement either, which was the second attempt: the
+   controls are 143px on this window and half the column on a narrow one, so any
+   fixed reserve is wrong at some width. Flex asks them how much they need. */
 .flatlist-filename {
     max-width: 0;
     overflow: hidden;
+}
+
+.flatlist-cell {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+}
+
+.flatlist-name {
+    min-width: 0;
+    overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* The injected controls and the status icons keep their size; only the name
+   shrinks. */
+.flatlist-cell > .mbp-row-play,
+.flatlist-cell > .mbp-row-copy,
+.flatlist-cell > .mbp-badge,
+.flatlist-cell > i.icon {
+    flex: 0 0 auto;
+
+    /* `gap` is what spaces this row. Each of these brings a margin of its own
+       -- 10px after the play button, 3.5px after an icon, 8px before the copy
+       -- sized for a row with no gap, which the card view is and this is not,
+       and it lands on top of the gap rather than instead of it.
+
+       Named individually rather than `> *`: at one class that tied with
+       `.mbp-row-play` and lost to the injected stylesheet, which loads later. */
+    margin: 0;
+}
+
+/* Semantic's icon box is 1em tall and inherits the table's 20px line-height,
+   so the glyph sits low inside its own box. The box itself was never the
+   problem -- measured, every flex item here centres to within 0.1px; it is the
+   glyph within the box that does not. */
+.flatlist-cell > i.icon {
+    line-height: 1;
 }
 
 /* The spacers carry the scroll height and must not inherit the row height
