@@ -243,10 +243,58 @@ body {
     height: auto;
 }
 
-/* The folder the file sits in. Given room to breathe in wide mode, where it is
-   most of the reason to be in wide mode; still useful narrow, where it takes
-   what is left after the fixed columns. */
-.flatlist-folder {
+/* Sortable headers.
+
+   Semantic draws the arrow on the sorted column once the table is `sortable`,
+   and nothing at all on the others -- so a first-time reader has no way to
+   know the headers do anything. These are the missing halves: a faint marker
+   on every unsorted column, and a stronger one under the pointer. */
+.flatlist thead th {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+
+/* Prefixed with Semantic's own classes to outweigh
+   `.ui.sortable.table thead th:after`, which sets `display: none` and an empty
+   content on every unsorted header. Measured: at two classes these rules lost
+   and nothing was drawn, which is what made the headers look inert.
+
+   `font-family: inherit` because that same rule switches to the Icons font for
+   Semantic's own glyphs, and this marker is an ordinary character. */
+.ui.sortable.table.flatlist thead th:not(.sorted)::after {
+    content: '↕';
+    display: inline-block;
+    font-family: inherit;
+    margin-left: 6px;
+    opacity: 0.3;
+    font-size: 0.9em;
+}
+
+.ui.sortable.table.flatlist thead th:not(.sorted):hover::after {
+    opacity: 0.8;
+}
+
+/* Semantic dims its arrow to 0.8. On the one column that is actually sorted it
+   should be the least ambiguous thing in the row. Only the opacity is set here
+   -- the glyph stays Semantic's, so ascending and descending keep pointing the
+   way they always did. */
+.ui.sortable.table.flatlist thead th.sorted::after {
+    opacity: 1;
+}
+
+/* The pointing label's arrow is a rotated square, and Semantic gives it a 1px
+   border on two sides in the text colour -- which draws a dark hairline across
+   the corner of an otherwise solid shape. Measured: border-width 0 0 1px 1px,
+   rgba(0,0,0,.87). The square already reads as an arrow from its fill. */
+.ui.pointing.label:before {
+    border: none;
+}
+
+/* The folder path, whole. Given room to breathe in wide mode, where it is most
+   of the reason to be in wide mode; still useful narrow, where it takes what is
+   left after the fixed columns and truncates. */
+.flatlist-path {
     max-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -292,8 +340,19 @@ body {
 }
 
 /* How many files are listed, how many are picked, and a way to unpick them. */
-/* How many files are listed, how many are picked, and a way to unpick them. */
+/* How many files are listed, how many are picked, and a way to unpick them.
+
+   The floor is what stops the table jumping. Clear selection appears only when
+   something is selected, and it is taller than the text beside it -- 26px
+   against 20px -- so without this the bar grows by 6px the moment a row is
+   ticked and the whole list steps down with it.
+
+   min-height rather than height: the bar wraps on a narrow screen, and a fixed
+   height would crop the second line rather than let it through. 34px is the
+   tall state as measured -- the button plus the padding below it -- so it must
+   move if either does. */
 .flatlist-summary {
+    min-height: 34px;
     padding-bottom: 8px;
     display: flex;
     align-items: center;

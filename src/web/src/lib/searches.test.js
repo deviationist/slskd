@@ -588,43 +588,29 @@ describe('indexDownloads / downloadStateOf', () => {
   });
 });
 
-describe('folderOf', () => {
-  it('takes the folder the file is actually in', () => {
+describe('pathOf', () => {
+  it('gives the whole folder path, not just the last segment', () => {
+    // where a file came from says as much as what it sits next to: the same
+    // album under `incoming` is a different thing from one filed properly
     expect(
-      search.folderOf({
+      search.pathOf({
         filename: '@@abc\\Music\\FLAC\\Artist - Album (2003)\\01.flac',
       }),
-    ).toBe('Artist - Album (2003)');
-  });
-
-  it('takes the last segment, not the first', () => {
-    // the end of someone else's library path is the part that says anything;
-    // the start is their drive letter and their username
-    expect(
-      search.folderOf({
-        filename: 'C:\\shared\\music\\Aphex Twin - SAW\\a.mp3',
-      }),
-    ).toBe('Aphex Twin - SAW');
+    ).toBe('@@abc\\Music\\FLAC\\Artist - Album (2003)');
   });
 
   it('handles forward slashes too', () => {
-    expect(search.folderOf({ filename: '/home/x/Some Album/track.flac' })).toBe(
-      'Some Album',
+    expect(search.pathOf({ filename: '/home/x/Some Album/track.flac' })).toBe(
+      '/home/x/Some Album',
     );
   });
 
   it('is empty for a file with no folder', () => {
     // getDirectoryName returns the whole path when there is no separator, and
-    // that is the filename -- showing it in a Folder column would be a lie
-    expect(search.folderOf({ filename: 'loose.mp3' })).toBe('');
-    expect(search.folderOf({ filename: '' })).toBe('');
-    expect(search.folderOf({})).toBe('');
-  });
-
-  it('ignores a trailing separator rather than returning nothing', () => {
-    expect(search.folderOf({ filename: 'a\\Album\\\\track.mp3' })).toBe(
-      'Album',
-    );
+    // that is the filename -- showing it in a Path column would be a lie
+    expect(search.pathOf({ filename: 'loose.mp3' })).toBe('');
+    expect(search.pathOf({ filename: '' })).toBe('');
+    expect(search.pathOf({})).toBe('');
   });
 });
 
@@ -660,5 +646,195 @@ describe('describeSelection', () => {
   it('copes with no selection state at all', () => {
     expect(search.describeSelection({ total: 3 })).toBe('3 files');
     expect(search.describeSelection({})).toBe('0 files');
+  });
+});
+
+describe('sortRows', () => {
+  const rows = [
+    {
+      filename: 'a\\track 10.mp3',
+      size: 900,
+      length: 600,
+      bitRate: 320,
+      username: 'carol',
+    },
+    {
+      filename: 'a\\track 2.mp3',
+      size: 80_000,
+      length: 369,
+      bitRate: 128,
+      username: 'alice',
+    },
+    {
+      filename: 'b\\track 3.mp3',
+      size: 5_000,
+      length: 60,
+      bitRate: 320,
+      username: 'bob',
+    },
+  ];
+
+  const order = (column, direction = 'asc') =>
+    search.sortRows({ column, direction, rows }).map((r) => r.username);
+
+  it('sorts length as seconds, not as the text it renders', () => {
+    // 6:09 is 369 and 10:00 is 600; sorted as text, "10:00" precedes "6:09"
+    expect(order('length')).toEqual(['bob', 'alice', 'carol']);
+  });
+
+  it('sorts size as bytes, not as the text it renders', () => {
+    // 80000 renders smaller than 900 does not; "9.2 MB" vs "80 KB" as text is
+    // the wrong order and the reason this reads the raw value
+    expect(order('size')).toEqual(['carol', 'bob', 'alice']);
+  });
+
+  it('turns around for descending', () => {
+    expect(order('length', 'desc')).toEqual(['carol', 'alice', 'bob']);
+    expect(order('size', 'desc')).toEqual(['alice', 'bob', 'carol']);
+  });
+
+  it('sorts names alphabetically, with numbers read as numbers', () => {
+    // "track 2" before "track 10", which is what anyone sorting tracks means
+    // by alphabetical; a plain string compare puts "track 10" first
+    const names = search
+      .sortRows({ column: 'name', direction: 'asc', rows })
+      .map((r) => r.filename.split('\\').pop());
+
+    expect(names).toEqual(['track 2.mp3', 'track 3.mp3', 'track 10.mp3']);
+  });
+
+  it('groups equal attributes together', () => {
+    // the point of sorting this column: all the 320s in one place
+    const grouped = search
+      .sortRows({ column: 'attributes', direction: 'asc', rows })
+      .map((r) => r.bitRate);
+
+    expect(grouped).toEqual([128, 320, 320]);
+  });
+
+  it('sorts by user and by folder alphabetically', () => {
+    expect(order('user')).toEqual(['alice', 'bob', 'carol']);
+    expect(order('path')).toEqual(['carol', 'alice', 'bob']);
+  });
+
+  it('puts rows the column cannot answer for last, whichever way it is sorted', () => {
+    // sorting by length to find the longest and being handed the ones whose
+    // length nobody reported is not an answer to the question
+    const withGaps = [
+      { filename: 'x\\a.mp3', length: 100, username: 'has' },
+      { filename: 'x\\b.mp3', username: 'none' },
+      { filename: 'x\\c.mp3', length: 200, username: 'also' },
+    ];
+
+    expect(
+      search
+        .sortRows({ column: 'length', direction: 'asc', rows: withGaps })
+        .map((r) => r.username),
+    ).toEqual(['has', 'also', 'none']);
+    expect(
+      search
+        .sortRows({ column: 'length', direction: 'desc', rows: withGaps })
+        .map((r) => r.username),
+    ).toEqual(['also', 'has', 'none']);
+  });
+
+  it('leaves the order alone for a column it does not know', () => {
+    expect(
+      search.sortRows({ column: 'nonsense', rows }).map((r) => r.username),
+    ).toEqual(['carol', 'alice', 'bob']);
+  });
+
+  it('does not sort the caller’s array in place', () => {
+    // the rows are memoised upstream; sorting in place would reorder them for
+    // everything else holding the same reference
+    const original = [...rows];
+
+    search.sortRows({ column: 'size', direction: 'desc', rows });
+
+    expect(rows).toEqual(original);
+  });
+});
+
+describe('nextSort', () => {
+  it('starts a new column ascending', () => {
+    expect(
+      search.nextSort({ column: 'size', current: 'name', direction: 'desc' }),
+    ).toEqual({
+      column: 'size',
+      direction: 'asc',
+    });
+  });
+
+  it('turns the same column around', () => {
+    expect(
+      search.nextSort({ column: 'size', current: 'size', direction: 'asc' }),
+    ).toEqual({
+      column: 'size',
+      direction: 'desc',
+    });
+  });
+
+  it('gives up on the third click', () => {
+    // without this there is no way back to the order the results arrived in,
+    // which is itself meaningful -- the peers as the dropdown ranked them
+    expect(
+      search.nextSort({ column: 'size', current: 'size', direction: 'desc' }),
+    ).toEqual({
+      column: undefined,
+      direction: undefined,
+    });
+  });
+});
+
+describe('sortFromQuery / sortToQuery', () => {
+  it('round-trips a sort', () => {
+    const query = search.sortToQuery({
+      column: 'size',
+      direction: 'desc',
+      search: '',
+    });
+
+    expect(query).toBe('?sort=size&dir=desc');
+    expect(search.sortFromQuery(query)).toEqual({
+      column: 'size',
+      direction: 'desc',
+    });
+  });
+
+  it('ignores a column it does not know', () => {
+    // the parameter comes from a url someone else wrote; a typo should not
+    // empty the list or throw
+    expect(search.sortFromQuery('?sort=drop%20table&dir=desc')).toEqual({
+      column: undefined,
+      direction: 'asc',
+    });
+  });
+
+  it('defaults an unknown direction to ascending', () => {
+    expect(search.sortFromQuery('?sort=user&dir=sideways').direction).toBe(
+      'asc',
+    );
+  });
+
+  it('leaves other parameters alone', () => {
+    expect(
+      search.sortToQuery({
+        column: 'user',
+        direction: 'asc',
+        search: '?ignore=abc',
+      }),
+    ).toBe('?ignore=abc&sort=user&dir=asc');
+  });
+
+  it('clears the sort without emptying the query', () => {
+    expect(
+      search.sortToQuery({
+        column: undefined,
+        search: '?ignore=abc&sort=user&dir=asc',
+      }),
+    ).toBe('?ignore=abc');
+    expect(
+      search.sortToQuery({ column: undefined, search: '?sort=user' }),
+    ).toBe('');
   });
 });
