@@ -370,9 +370,17 @@ export const indexDownloads = (users = []) => {
       for (const file of directory.files ?? []) {
         const outcome = outcomeOf(file.state);
 
+        // the transfer's id and whether its file is still there, not just the
+        // outcome: a row that has been downloaded offers to fetch the file to
+        // the browser, and that needs the id -- or to fetch it again, and that
+        // needs to know the first attempt's file has gone
         byFile.set(
           fileKey({ filename: file.filename, username: file.username }),
-          outcome,
+          {
+            id: file.id,
+            localFileExists: file.localFileExists,
+            outcome,
+          },
         );
 
         // only successes: a failed download from one peer says nothing about
@@ -380,7 +388,7 @@ export const indexDownloads = (users = []) => {
         const signature = signatureOf(file);
 
         if (outcome === 'downloaded' && signature !== undefined) {
-          bySignature.set(signature, outcome);
+          bySignature.set(signature, { outcome });
         }
       }
     }
@@ -407,7 +415,7 @@ export const downloadStateOf = ({ row, index }) => {
   const exact = index.byFile.get(fileKey(row));
 
   if (exact) {
-    return exact;
+    return exact.outcome;
   }
 
   const signature = signatureOf(row);
@@ -511,3 +519,45 @@ export const COLUMNS = [
  * The columns shown to someone who has never touched the setting.
  */
 export const DEFAULT_COLUMNS = defaultColumns(COLUMNS);
+
+/**
+ * What the action on a search row should offer, and why.
+ *
+ * Three answers, and the difference between the last two is the whole point:
+ * a file this peer already gave us is worth *fetching to the browser* rather
+ * than asking for again, but only while it is still on disk. Once it is gone
+ * -- moved into the library, cleared out -- the only thing left to offer is
+ * asking the peer again.
+ *
+ * `retrieve` needs the transfer's id, which is why the index carries it.
+ * @param {object} params
+ * @param {object} params.row - A flattened search row.
+ * @param {object} params.index - The result of `indexDownloads`.
+ * @param {boolean} params.retrievalEnabled - Whether the server allows fetching a file out.
+ * @returns {{kind: string, id?: string, tip: string}} What to draw and what it does.
+ */
+export const rowActionOf = ({ row, index, retrievalEnabled = false }) => {
+  const entry = index?.byFile?.get(fileKey(row ?? {}));
+
+  if (entry?.outcome === 'downloaded') {
+    if (retrievalEnabled && entry.localFileExists) {
+      return {
+        id: entry.id,
+        kind: 'retrieve',
+        tip: 'Already downloaded — fetch the file to this browser',
+      };
+    }
+
+    return {
+      kind: 'redownload',
+      // said plainly, because the row is marked as downloaded and the button
+      // appearing to disagree with the mark is worth explaining rather than
+      // leaving as a puzzle
+      tip: entry.localFileExists
+        ? 'Already downloaded — download it again'
+        : 'Downloaded before, but the file is gone — download it again',
+    };
+  }
+
+  return { kind: 'enqueue', tip: `Download this file from ${row?.username}` };
+};

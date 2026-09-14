@@ -3,6 +3,7 @@ import {
   downloadStateOf,
   groupByUser,
   pathOf,
+  rowActionOf,
   SORT_COLUMNS,
 } from '../../lib/searches';
 import {
@@ -52,6 +53,49 @@ import {
  * is a drift the eye catches only at the bottom of a long list.
  */
 const ROW_H = 37;
+
+/**
+ * What a row offers: fetch the file the server already has, or ask the peer.
+ *
+ * Its own component because the list is at the linter's complexity ceiling,
+ * and because the choice between the two is `rowActionOf`'s -- this draws the
+ * answer and nothing else.
+ * @param {object} params
+ * @param {object} params.action - The result of `rowActionOf`.
+ * @param {boolean} params.busy - Whether this row is already working.
+ * @param {boolean} params.disabled - Whether the page forbids acting at all.
+ * @param {Function} params.onDownload - Asks the peer for the file.
+ * @param {Function} params.onRetrieve - Fetches the server's copy to the browser.
+ * @returns {object} The control.
+ */
+const RowAction = ({ action, busy, disabled, onDownload, onRetrieve }) => (
+  <Popup
+    content={action.tip}
+    position="left center"
+    trigger={
+      <Icon
+        /* the retrieval is a different act from asking the
+                               peer, and looks it: a file coming off the server
+                               rather than off the network */
+        color={action.kind === 'retrieve' ? 'blue' : 'grey'}
+        disabled={disabled || busy}
+        link
+        loading={busy}
+        name={
+          busy
+            ? 'spinner'
+            : action.kind === 'retrieve'
+              ? 'cloud download'
+              : 'download'
+        }
+        onClick={() =>
+          action.kind === 'retrieve' ? onRetrieve() : onDownload()
+        }
+        size="small"
+      />
+    }
+  />
+);
 
 /**
  * The results as one row per file, rather than one card per user.
@@ -139,7 +183,12 @@ const storeColumns = (columns) => {
   }
 };
 
-const FlatFileList = ({ disabled, downloads, rows: unsorted }) => {
+const FlatFileList = ({
+  disabled,
+  downloads,
+  retrievalEnabled,
+  rows: unsorted,
+}) => {
   const [selected, setSelected] = useState(() => new Set());
   const [downloading, setDownloading] = useState(false);
   const [rowDownloading, setRowDownloading] = useState(undefined);
@@ -281,6 +330,28 @@ const FlatFileList = ({ disabled, downloads, rows: unsorted }) => {
    * there is one place that decides what is sent -- a second hand-built body
    * here is how the two drift into disagreeing about it.
    */
+  /*
+   * Fetch the file the server already has, rather than asking the peer for it
+   * again. Only offered where the first download's file is still on disk --
+   * `rowActionOf` is what decides that, and it carries the transfer's id.
+   */
+  const retrieveRow = async (row, id) => {
+    setRowDownloading(row.key);
+
+    try {
+      await transfers.retrieveFile({
+        filename: getFileName(row.filename),
+        id,
+        username: row.username,
+      });
+    } catch (error) {
+      console.error(error);
+      toast.error(transfers.describeRetrievalError(error));
+    } finally {
+      setRowDownloading(undefined);
+    }
+  };
+
   const downloadRow = async (row) => {
     setRowDownloading(row.key);
 
@@ -481,6 +552,11 @@ const FlatFileList = ({ disabled, downloads, rows: unsorted }) => {
             {virtualRows.map((virtual) => {
               const row = rows[virtual.index];
               const mark = MARKS[downloadStateOf({ index: downloads, row })];
+              const action = rowActionOf({
+                index: downloads,
+                retrievalEnabled,
+                row,
+              });
 
               return (
                 <Table.Row
@@ -607,22 +683,12 @@ const FlatFileList = ({ disabled, downloads, rows: unsorted }) => {
                     </Table.Cell>
                   )}
                   <Table.Cell className="flatlist-download">
-                    <Popup
-                      content={`Download this file from ${row.username}`}
-                      position="left center"
-                      trigger={
-                        <Icon
-                          color="grey"
-                          disabled={disabled || rowDownloading === row.key}
-                          link
-                          loading={rowDownloading === row.key}
-                          name={
-                            rowDownloading === row.key ? 'spinner' : 'download'
-                          }
-                          onClick={() => downloadRow(row)}
-                          size="small"
-                        />
-                      }
+                    <RowAction
+                      action={action}
+                      busy={rowDownloading === row.key}
+                      disabled={disabled}
+                      onDownload={() => downloadRow(row)}
+                      onRetrieve={() => retrieveRow(row, action.id)}
                     />
                   </Table.Cell>
                 </Table.Row>

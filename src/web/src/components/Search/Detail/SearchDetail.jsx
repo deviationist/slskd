@@ -8,6 +8,7 @@ import {
 import { getAll as getTransfers } from '../../../lib/transfers';
 import { sleep } from '../../../lib/util';
 import * as watchLibrary from '../../../lib/watches';
+import AppContext from '../../AppContext';
 import ErrorSegment from '../../Shared/ErrorSegment';
 import LoaderSegment from '../../Shared/LoaderSegment';
 import Switch from '../../Shared/Switch';
@@ -16,7 +17,7 @@ import Response from '../Response';
 import WatchModal from '../WatchModal';
 import SearchDetailHeader from './SearchDetailHeader';
 import WatchPanel from './WatchPanel';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
 import { Button, Checkbox, Dropdown, Input, Segment } from 'semantic-ui-react';
 
@@ -105,6 +106,176 @@ const storeFlat = (flat) => {
   }
 };
 
+/**
+ * What has been downloaded, so a result can say that it already has been.
+ *
+ * Polled rather than pushed: there is no transfers hub, and the transfers page
+ * itself polls this endpoint every second. Five is the interval for a
+ * secondary signal on another page -- enough that a row lights up shortly
+ * after its download is enqueued from here, cheap enough not to matter.
+ *
+ * Only while the flat list is showing. The grouped view marks nothing, so
+ * polling behind it would be a request a second for nothing.
+ * @param {boolean} active - Whether the list that uses this is on screen.
+ * @returns {object} The index, empty until the first answer arrives.
+ */
+const useDownloads = (active) => {
+  const [downloads, setDownloads] = useState(() => indexDownloads());
+
+  useEffect(() => {
+    if (!active) {
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    const poll = async () => {
+      try {
+        const users = await getTransfers({ direction: 'download' });
+
+        if (!cancelled) {
+          setDownloads(indexDownloads(users));
+        }
+      } catch {
+        // a failed poll leaves the last answer in place: marks going stale for
+        // five seconds is a better outcome than the list losing them entirely
+      }
+    };
+
+    poll();
+
+    const interval = window.setInterval(poll, 5_000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [active]);
+
+  return downloads;
+};
+
+/**
+ * The controls above the results: how they are sorted, what is hidden, and
+ * which of the two views is drawn.
+ *
+ * Its own component because the page around it was at the linter's complexity
+ * ceiling and this is where most of its branches were.
+ * @param {object} params
+ * @param {boolean} params.flatResults - Whether the table view is on.
+ * @param {boolean} params.foldResults - Whether the cards start folded.
+ * @param {boolean} params.hideLocked - Whether locked results are hidden.
+ * @param {boolean} params.hideNoFreeSlots - Whether peers with no free slot are hidden.
+ * @param {string} params.resultFilters - The filter box's contents.
+ * @param {string} params.resultSort - Which peer ordering is chosen.
+ * @param {Function} params.setFlatResults - Switches between the two views.
+ * @param {Function} params.setFoldResults - Folds or unfolds the cards.
+ * @param {Function} params.setHideLocked - Shows or hides locked results.
+ * @param {Function} params.setHideNoFreeSlots - Shows or hides peers with no free slot.
+ * @param {Function} params.setResultFilters - Sets the filter.
+ * @param {Function} params.setResultSort - Sets the peer ordering.
+ * @returns {object} The options segment.
+ */
+const SearchOptions = ({
+  flatResults,
+  foldResults,
+  hideLocked,
+  hideNoFreeSlots,
+  resultFilters,
+  resultSort,
+  setFlatResults,
+  setFoldResults,
+  setHideLocked,
+  setHideNoFreeSlots,
+  setResultFilters,
+  setResultSort,
+}) => (
+  <Segment
+    className="search-options"
+    raised
+  >
+    <div className="search-options-row">
+      <div className="search-option-toggles">
+        <Checkbox
+          checked={hideLocked}
+          className="search-options-hide-locked"
+          label="Hide Locked Results"
+          onChange={() => setHideLocked(!hideLocked)}
+          toggle
+        />
+        <Checkbox
+          checked={hideNoFreeSlots}
+          className="search-options-hide-no-slots"
+          label="Hide Results with No Free Slots"
+          onChange={() => setHideNoFreeSlots(!hideNoFreeSlots)}
+          toggle
+        />
+        <Checkbox
+          checked={foldResults}
+          className="search-options-fold-results"
+          // folding is a property of a per-user card, and the flat list
+          // has none. left visible rather than hidden so the controls do
+          // not move around under the pointer when the view changes
+          disabled={flatResults}
+          label="Fold Results"
+          onChange={() => setFoldResults(!foldResults)}
+          toggle
+        />
+        <Checkbox
+          checked={flatResults}
+          className="search-options-flat-results"
+          label="Table View"
+          onChange={() => {
+            setFlatResults(!flatResults);
+            storeFlat(!flatResults);
+          }}
+          toggle
+        />
+      </div>
+      {/*
+       * The dropdown sorts whole peers, which is the only thing that
+       * can be sorted when the results are one card each. The flat list
+       * sorts files, from its own column headers -- so it is hidden
+       * there rather than left as a second control answering a
+       * different question about the same list.
+       *
+       * It still runs underneath: with no column chosen the rows arrive
+       * in the order it put the peers in, which is the same default the
+       * list has always had.
+       */}
+      {!flatResults && (
+        <Dropdown
+          button
+          className="search-options-sort icon"
+          floating
+          icon="sort"
+          labeled
+          onChange={(_event, { value }) => setResultSort(value)}
+          options={sortDropdownOptions}
+          text={sortDropdownOptions.find((o) => o.value === resultSort).text}
+        />
+      )}
+    </div>
+    <Input
+      action={
+        Boolean(resultFilters) && {
+          color: 'red',
+          icon: 'x',
+          onClick: () => setResultFilters(''),
+        }
+      }
+      className="search-filter"
+      label={{ content: 'Filter', icon: 'filter' }}
+      onChange={(_event, data) => setResultFilters(data.value)}
+      placeholder="
+                  lackluster container -bothersome iscbr|isvbr islossless|islossy 
+                  minbitrate:320 minbitdepth:24 minfilesize:10 minfilesinfolder:8 minlength:5000
+                "
+      value={resultFilters}
+    />
+  </Segment>
+);
+
 const SearchDetail = ({
   creating,
   disabled,
@@ -117,6 +288,14 @@ const SearchDetail = ({
 }) => {
   const { fileCount, id, isComplete, lockedFileCount, responseCount, state } =
     search;
+
+  /*
+   * Whether the server will hand a finished file back to the browser. Arrives
+   * over the options hub, so it is false until that connects -- which errs
+   * towards not offering something that would not work.
+   */
+  const { options } = useContext(AppContext) ?? {};
+  const retrievalEnabled = options?.remoteFileRetrieval === true;
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(undefined);
@@ -136,7 +315,7 @@ const SearchDetail = ({
   const [hideNoFreeSlots, setHideNoFreeSlots] = useState(false);
   const [foldResults, setFoldResults] = useState(false);
   const [flatResults, setFlatResults] = useState(readStoredFlat);
-  const [downloads, setDownloads] = useState(() => indexDownloads());
+  const downloads = useDownloads(flatResults);
   const [resultFilters, setResultFilters] = useState('');
   const [displayCount, setDisplayCount] = useState(5);
 
@@ -235,47 +414,6 @@ const SearchDetail = ({
 
   const filteredCount = results?.length - sortedAndFilteredResults.length;
   const remainingCount = sortedAndFilteredResults.length - displayCount;
-  /*
-   * What has been downloaded, so a result can say that it already has been.
-   *
-   * Polled rather than pushed: there is no transfers hub, and the transfers
-   * page itself polls this endpoint every second. Five is the interval for a
-   * secondary signal on another page -- enough that a row lights up shortly
-   * after its download is enqueued from here, cheap enough not to matter.
-   *
-   * Only while the flat list is showing. The grouped view does not mark
-   * anything, so polling behind it would be a request a second for nothing.
-   */
-  useEffect(() => {
-    if (!flatResults) {
-      return undefined;
-    }
-
-    let cancelled = false;
-
-    const poll = async () => {
-      try {
-        const users = await getTransfers({ direction: 'download' });
-
-        if (!cancelled) {
-          setDownloads(indexDownloads(users));
-        }
-      } catch {
-        // a failed poll leaves the last answer in place: marks going stale for
-        // five seconds is a better outcome than the list losing them entirely
-      }
-    };
-
-    poll();
-
-    const interval = window.setInterval(poll, 5_000);
-
-    return () => {
-      cancelled = true;
-      window.clearInterval(interval);
-    };
-  }, [flatResults]);
-
   const loadWatch = async () => {
     try {
       const found = await watchLibrary.get({ id });
@@ -338,97 +476,26 @@ const SearchDetail = ({
           watch={watch}
         />
         {loaded && (
-          <Segment
-            className="search-options"
-            raised
-          >
-            <div className="search-options-row">
-              <div className="search-option-toggles">
-                <Checkbox
-                  checked={hideLocked}
-                  className="search-options-hide-locked"
-                  label="Hide Locked Results"
-                  onChange={() => setHideLocked(!hideLocked)}
-                  toggle
-                />
-                <Checkbox
-                  checked={hideNoFreeSlots}
-                  className="search-options-hide-no-slots"
-                  label="Hide Results with No Free Slots"
-                  onChange={() => setHideNoFreeSlots(!hideNoFreeSlots)}
-                  toggle
-                />
-                <Checkbox
-                  checked={foldResults}
-                  className="search-options-fold-results"
-                  // folding is a property of a per-user card, and the flat list
-                  // has none. left visible rather than hidden so the controls do
-                  // not move around under the pointer when the view changes
-                  disabled={flatResults}
-                  label="Fold Results"
-                  onChange={() => setFoldResults(!foldResults)}
-                  toggle
-                />
-                <Checkbox
-                  checked={flatResults}
-                  className="search-options-flat-results"
-                  label="Table View"
-                  onChange={() => {
-                    setFlatResults(!flatResults);
-                    storeFlat(!flatResults);
-                  }}
-                  toggle
-                />
-              </div>
-              {/*
-               * The dropdown sorts whole peers, which is the only thing that
-               * can be sorted when the results are one card each. The flat list
-               * sorts files, from its own column headers -- so it is hidden
-               * there rather than left as a second control answering a
-               * different question about the same list.
-               *
-               * It still runs underneath: with no column chosen the rows arrive
-               * in the order it put the peers in, which is the same default the
-               * list has always had.
-               */}
-              {!flatResults && (
-                <Dropdown
-                  button
-                  className="search-options-sort icon"
-                  floating
-                  icon="sort"
-                  labeled
-                  onChange={(_event, { value }) => setResultSort(value)}
-                  options={sortDropdownOptions}
-                  text={
-                    sortDropdownOptions.find((o) => o.value === resultSort).text
-                  }
-                />
-              )}
-            </div>
-            <Input
-              action={
-                Boolean(resultFilters) && {
-                  color: 'red',
-                  icon: 'x',
-                  onClick: () => setResultFilters(''),
-                }
-              }
-              className="search-filter"
-              label={{ content: 'Filter', icon: 'filter' }}
-              onChange={(_event, data) => setResultFilters(data.value)}
-              placeholder="
-                lackluster container -bothersome iscbr|isvbr islossless|islossy 
-                minbitrate:320 minbitdepth:24 minfilesize:10 minfilesinfolder:8 minlength:5000
-              "
-              value={resultFilters}
-            />
-          </Segment>
+          <SearchOptions
+            flatResults={flatResults}
+            foldResults={foldResults}
+            hideLocked={hideLocked}
+            hideNoFreeSlots={hideNoFreeSlots}
+            resultFilters={resultFilters}
+            resultSort={resultSort}
+            setFlatResults={setFlatResults}
+            setFoldResults={setFoldResults}
+            setHideLocked={setHideLocked}
+            setHideNoFreeSlots={setHideNoFreeSlots}
+            setResultFilters={setResultFilters}
+            setResultSort={setResultSort}
+          />
         )}
         {loaded && flatResults && (
           <FlatFileList
             disabled={disabled}
             downloads={downloads}
+            retrievalEnabled={retrievalEnabled}
             rows={flatRows}
           />
         )}
