@@ -99,6 +99,7 @@ const SelectionActions = ({
   retrievalEnabled,
   rows,
 }) => {
+  const [archiving, setArchiving] = useState(false);
   /*
    * Which actions a selection actually offers, weighed exactly as the card
    * view weighs them -- the flat list showing three buttons that the cards
@@ -125,6 +126,8 @@ const SelectionActions = ({
    * takes a username and its own ids.
    */
   const archive = async () => {
+    setArchiving(true);
+
     const byUser = new Map();
 
     for (const row of retrievable) {
@@ -140,6 +143,8 @@ const SelectionActions = ({
         toast.error(transfersLibrary.describeArchiveError(error));
       }
     }
+
+    setArchiving(false);
   };
 
   return (
@@ -183,14 +188,22 @@ const SelectionActions = ({
         {(allRetryable || anyCancellable || allRemovable) &&
           retrievalEnabled &&
           retrievable.length > 0 && <Button.Or />}
+        {/*
+         * Blue and busy-aware, as the card view's is. The same action looking
+         * like a different one is what makes two views feel like two
+         * products.
+         */}
         {retrievalEnabled && retrievable.length > 0 && (
           <Popup
             content={transfersLibrary.describeRetrieval(retrievable.length)}
             position="top right"
             trigger={
               <Button
+                color="blue"
                 content="Download"
+                disabled={archiving}
                 icon="download"
+                loading={archiving}
                 onClick={archive}
               />
             }
