@@ -211,17 +211,6 @@ const SearchOptions = ({
           toggle
         />
         <Checkbox
-          checked={foldResults}
-          className="search-options-fold-results"
-          // folding is a property of a per-user card, and the flat list
-          // has none. left visible rather than hidden so the controls do
-          // not move around under the pointer when the view changes
-          disabled={flatResults}
-          label="Fold Results"
-          onChange={() => setFoldResults(!foldResults)}
-          toggle
-        />
-        <Checkbox
           checked={flatResults}
           className="search-options-flat-results"
           label="Table View"
@@ -231,6 +220,24 @@ const SearchOptions = ({
           }}
           toggle
         />
+        {/*
+         * Folding is a property of a per-user card and the table has none, so
+         * it goes away entirely rather than sitting there disabled.
+         *
+         * After Table View, not before it, which is what makes that safe: a
+         * control that vanishes drags everything to its right along with it,
+         * and the one thing that must not move is the switch you would use to
+         * bring it back.
+         */}
+        {!flatResults && (
+          <Checkbox
+            checked={foldResults}
+            className="search-options-fold-results"
+            label="Fold Results"
+            onChange={() => setFoldResults(!foldResults)}
+            toggle
+          />
+        )}
       </div>
       {/*
        * The dropdown sorts whole peers, which is the only thing that
