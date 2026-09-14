@@ -520,6 +520,13 @@ body {
     margin: 0;
 }
 
+/* Semantic gives a button with an icon in it square padding -- 7px on every
+   side, sized for an icon-only button. With a label attached to the right, the
+   word ends up against the seam. Only the right side needs the room. */
+.footer-slot .ui.labeled.button > .ui.button {
+    padding-right: 14px;
+}
+
 .showmore-button {
     padding: 20px !important;
     max-width: 1200px !important;
