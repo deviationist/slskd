@@ -323,6 +323,11 @@ const WatchPanel = ({ onWatchChanged, searchId, searchText, watch }) => {
         </Modal.Actions>
       </Modal>
       <Modal
+        /* the same close icon the watch modal has, and the same class, which
+           is what pulls it inside the header rather than leaving it white on
+           the dimmer above the corner */
+        className="watch-modal"
+        closeIcon
         onClose={() => setShowingLog(false)}
         open={showingLog}
         size="large"
