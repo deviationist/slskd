@@ -230,16 +230,28 @@ body {
     white-space: nowrap;
 }
 
-/* A row rather than a line of text: media-bridge injects a play button at the
-   start of this cell and a quality badge at the end, and both have to survive
-   the truncation that the filename between them does not. Only the name
-   shrinks -- the two controls keep their size and stay visible however long
-   the filename is. */
+/* media-bridge injects a play button and a quality badge into `.flatlist-cell`,
+   and the filename has to be the only thing that gives way to them.
+
+   The flex is on that inner element rather than on the cell, which is what the
+   first attempt got wrong: a `<td>` that is not `table-cell` leaves the table's
+   column layout, so `max-width: 0` stopped being the shrink hint it is here and
+   became a real constraint -- the column collapsed to 18px and the space it
+   should have taken was drawn as nothing.
+
+   Nothing is reserved by measurement either, which was the second attempt: the
+   controls are 143px on this window and half the column on a narrow one, so any
+   fixed reserve is wrong at some width. Flex asks them how much they need. */
 .flatlist-filename {
     max-width: 0;
+    overflow: hidden;
+}
+
+.flatlist-cell {
     display: flex;
     align-items: center;
     gap: 6px;
+    min-width: 0;
 }
 
 .flatlist-name {
@@ -249,11 +261,12 @@ body {
     white-space: nowrap;
 }
 
-/* The injected controls are flex items now and would otherwise be squeezed
-   along with the name. */
-.flatlist-filename > .mbp-row-play,
-.flatlist-filename > .mbp-badge,
-.flatlist-filename > i.icon {
+/* The injected controls and the status icons keep their size; only the name
+   shrinks. */
+.flatlist-cell > .mbp-row-play,
+.flatlist-cell > .mbp-row-copy,
+.flatlist-cell > .mbp-badge,
+.flatlist-cell > i.icon {
     flex: 0 0 auto;
 }
 

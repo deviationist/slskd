@@ -431,29 +431,33 @@ const FlatFileList = ({ disabled, downloads, rows: unsorted }) => {
                     // names differ only past where the column ends
                     title={row.filename}
                   >
-                    {row.locked && <Icon name="lock" />}
-                    {mark && (
-                      <Popup
-                        content={mark.tip}
-                        position="top left"
-                        trigger={
-                          <Icon
-                            color={mark.colour}
-                            name={mark.icon}
-                          />
-                        }
-                      />
-                    )}
                     {/*
-                     * In its own element so the cell can lay out as a row:
-                     * media-bridge injects a play button before this and a
-                     * quality badge after it, and with the name as a bare
-                     * text node the badge is whatever the truncation leaves
-                     * of it -- which is nothing, on a path of any length.
+                     * An inner element, and media-bridge injects its play
+                     * button and quality badge into *this* rather than into
+                     * the cell. The layout has to be flex so the filename is
+                     * the only thing that shrinks -- and a `<td>` that is not
+                     * `table-cell` leaves the table's column layout, taking
+                     * the column's width with it. So the cell stays a cell
+                     * and this does the arranging.
                      */}
-                    <span className="flatlist-name">
-                      {getFileName(row.filename)}
-                    </span>
+                    <div className="flatlist-cell">
+                      {row.locked && <Icon name="lock" />}
+                      {mark && (
+                        <Popup
+                          content={mark.tip}
+                          position="top left"
+                          trigger={
+                            <Icon
+                              color={mark.colour}
+                              name={mark.icon}
+                            />
+                          }
+                        />
+                      )}
+                      <span className="flatlist-name">
+                        {getFileName(row.filename)}
+                      </span>
+                    </div>
                   </Table.Cell>
                   <Table.Cell
                     className="flatlist-path"
