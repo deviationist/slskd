@@ -154,3 +154,12 @@
 .transfer-details td:first-child {
   white-space: nowrap;
 }
+
+/* The Table View toggle sits inside the header's button group, so it needs the
+   vertical centring the buttons get from their own layout and a little air
+   before the first of them. */
+.transfers-header-flat {
+    display: inline-flex !important;
+    align-items: center;
+    margin-right: 12px;
+}

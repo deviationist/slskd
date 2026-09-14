@@ -6,7 +6,7 @@ import {
 import { Div, Nbsp } from '../Shared';
 import ShrinkableDropdownButton from '../Shared/ShrinkableDropdownButton';
 import React, { useMemo, useState } from 'react';
-import { Dropdown, Icon, Segment } from 'semantic-ui-react';
+import { Checkbox, Dropdown, Icon, Segment } from 'semantic-ui-react';
 
 const getRetryableFiles = ({ files, retryOption }) => {
   switch (retryOption) {
@@ -66,7 +66,9 @@ const getRemovableFiles = ({ files, removeOption }) => {
 const TransfersHeader = ({
   cancelling = false,
   direction,
+  flat,
   onCancelAll,
+  onFlatChange,
   onRemoveAll,
   onRetryAll,
   onSortChange,
@@ -111,7 +113,7 @@ const TransfersHeader = ({
       </div>
       <Div
         className="transfers-header-sort"
-        hidden={empty}
+        hidden={empty || flat}
       >
         <Dropdown
           button
@@ -130,6 +132,23 @@ const TransfersHeader = ({
         className="transfers-header-buttons"
         hidden={empty}
       >
+        {/*
+         * A second way to read the same transfers: one row per file, with the
+         * peer and the folder as columns, sortable. The card view answers
+         * "what is this peer sending me"; this answers "what is in the
+         * queue". Remembered per direction, like the sort.
+         *
+         * Beside the actions rather than beside the sort, because it is the
+         * control an operator reaches for, and the sort it replaces is hidden
+         * while it is on.
+         */}
+        <Checkbox
+          checked={flat}
+          className="transfers-header-flat"
+          label="Table View"
+          onChange={() => onFlatChange(!flat)}
+          toggle
+        />
         <ShrinkableDropdownButton
           color="green"
           disabled={working || empty || !server.isConnected}

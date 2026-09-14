@@ -308,11 +308,21 @@ body {
     cursor: pointer;
 }
 
-/* Semantic puts `cursor: pointer` on every header of a sortable table. The
-   checkbox and the action column are headers and neither sorts, so the pointer
-   was promising a click that does nothing. */
+/* Semantic puts `cursor: pointer` on every header of a sortable table, and
+   lights every one of them on hover. The checkbox and the action column are
+   headers and neither sorts, so both were promising a click that does nothing.
+
+   The hover is restored to the resting values rather than removed, and to the
+   theme's variables rather than to Semantic's own hover colours -- those are
+   hardcoded `#0000000d` on `#000c`, so undoing them with literals would be
+   right in one theme and wrong in the other. */
 .ui.sortable.table.flatlist thead th:not(.flatlist-sortable) {
     cursor: default;
+}
+
+.ui.sortable.table.flatlist thead th:not(.flatlist-sortable):hover {
+    background: var(--smui-table-header-background, #f9fafb);
+    color: var(--smui-table-header-color, #000000de);
 }
 
 /* Prefixed with Semantic's own classes to outweigh
@@ -401,6 +411,13 @@ body {
     margin-left: auto !important;
 }
 
+/* The selection's actions, in the footer's slot. */
+.flatlist-bulk {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 /* One switch per line, so the list reads as a set of independent choices
    rather than a menu where picking one means not picking the others. */
 .flatlist-columns-menu {
@@ -414,6 +431,20 @@ body {
 .flatlist-download {
     width: 40px;
     text-align: center !important;
+}
+
+/* One column for everything a row can be told to do -- retrieve, remove,
+   details -- rather than a column each. Three single-icon columns cost three
+   lots of cell padding and read as three unrelated things. */
+.flatlist-actions {
+    width: 96px;
+}
+
+.flatlist-actions-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
 }
 
 /* Semantic gives .ui.checkbox `vertical-align: initial`, which is baseline, so

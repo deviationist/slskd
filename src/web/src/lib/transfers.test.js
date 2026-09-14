@@ -1,3 +1,4 @@
+import * as tables from './tables';
 import * as transfers from './transfers';
 
 describe('summariseDeletions', () => {
@@ -838,7 +839,9 @@ describe('planSelectionRemoval', () => {
   });
 
   it('names the paths the server will delete', () => {
-    const plan = transfers.planSelectionRemoval({ files: [download('/a.flac')] });
+    const plan = transfers.planSelectionRemoval({
+      files: [download('/a.flac')],
+    });
 
     expect(plan.filenames).toEqual(['/a.flac']);
     expect(plan.header).toBe('Delete this file?');
@@ -874,4 +877,173 @@ describe('planSelectionRemoval', () => {
 
     expect(plan.confirm).toBe(false);
   });
-})
+});
+
+describe('flattenTransfers', () => {
+  const users = [
+    {
+      username: 'alice',
+      directories: [
+        {
+          directory: 'a\\Album',
+          files: [
+            {
+              id: '1',
+              username: 'alice',
+              filename: 'a\\Album\\one.flac',
+              size: 10,
+              state: 'InProgress',
+            },
+            {
+              id: '2',
+              username: 'alice',
+              filename: 'a\\Album\\two.flac',
+              size: 20,
+              state: 'Completed, Succeeded',
+            },
+          ],
+        },
+        {
+          directory: 'a\\Other',
+          files: [
+            {
+              id: '3',
+              username: 'alice',
+              filename: 'a\\Other\\three.mp3',
+              size: 5,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      username: 'bob',
+      directories: [
+        {
+          directory: 'b',
+          files: [
+            { id: '4', username: 'bob', filename: 'b\\four.mp3', size: 1 },
+          ],
+        },
+      ],
+    },
+  ];
+
+  it('puts every transfer from every folder and peer in one list', () => {
+    expect(transfers.flattenTransfers(users).map((r) => r.id)).toEqual([
+      '1',
+      '2',
+      '3',
+      '4',
+    ]);
+  });
+
+  it('carries the folder down onto each row', () => {
+    // a flat table has no header above the rows to put it in
+    expect(transfers.flattenTransfers(users).map((r) => r.directory)).toEqual([
+      'a\\Album',
+      'a\\Album',
+      'a\\Other',
+      'b',
+    ]);
+  });
+
+  it('keys on the transfer id rather than building one', () => {
+    // unlike a search result, a transfer is already unique across peers: two
+    // peers sending the same path are two transfers with two ids
+    const rows = transfers.flattenTransfers(users);
+
+    expect(rows.map((r) => r.key)).toEqual(['1', '2', '3', '4']);
+    expect(new Set(rows.map((r) => r.key)).size).toBe(4);
+  });
+
+  it('falls back to the user when a file does not name one', () => {
+    expect(
+      transfers.flattenTransfers([
+        {
+          username: 'carol',
+          directories: [
+            { directory: 'c', files: [{ id: '9', filename: 'c\\x.mp3' }] },
+          ],
+        },
+      ])[0].username,
+    ).toBe('carol');
+  });
+
+  it('copes with a user or folder that has nothing in it', () => {
+    expect(transfers.flattenTransfers([{ username: 'empty' }])).toEqual([]);
+    expect(
+      transfers.flattenTransfers([
+        { username: 'e', directories: [{ directory: 'd' }] },
+      ]),
+    ).toEqual([]);
+    expect(transfers.flattenTransfers()).toEqual([]);
+  });
+});
+
+describe('the transfers table sorts', () => {
+  const rows = transfers.flattenTransfers([
+    {
+      username: 'zoe',
+      directories: [
+        {
+          directory: 'z',
+          files: [
+            {
+              id: '1',
+              filename: 'z\\b.flac',
+              size: 900,
+              state: 'InProgress',
+              averageSpeed: 10,
+              attempts: 1,
+            },
+            {
+              id: '2',
+              filename: 'z\\a.flac',
+              size: 10,
+              state: 'Completed, Errored',
+              averageSpeed: 90,
+              attempts: 3,
+            },
+          ],
+        },
+      ],
+    },
+  ]);
+
+  const order = (column, direction = 'asc') =>
+    tables
+      .sortRows({
+        column,
+        columns: transfers.TRANSFER_SORT_COLUMNS,
+        direction,
+        rows,
+      })
+      .map((r) => r.id);
+
+  it('orders by size, speed and attempts numerically', () => {
+    expect(order('size')).toEqual(['2', '1']);
+    expect(order('speed')).toEqual(['1', '2']);
+    expect(order('attempts', 'desc')).toEqual(['2', '1']);
+  });
+
+  it('orders by name and folder alphabetically', () => {
+    expect(order('name')).toEqual(['2', '1']);
+  });
+
+  it('gathers the failures together rather than ranking progress', () => {
+    // a finished transfer and one that never started are 100 and 0 with
+    // nothing in between, so the useful thing this column does is group
+    expect(order('state')).toEqual(['2', '1']);
+  });
+
+  it('shows everything but speed and attempts by default', () => {
+    expect(tables.defaultColumns(transfers.TRANSFER_COLUMNS)).toEqual([
+      'name',
+      'path',
+      'user',
+      'state',
+      'size',
+    ]);
+  });
+});

@@ -1,6 +1,6 @@
 import { apiBaseUrl } from '../config';
 import api from './api';
-import { downloadFile } from './util';
+import { downloadFile, getFileName } from './util';
 
 export const getAll = async ({ direction }) => {
   const response = (
@@ -758,4 +758,73 @@ export const sortTransfers = (transfers = [], sort = DEFAULT_SORT) => {
     })
     .sort(compare)
     .map((user) => user.value);
+};
+
+/*
+ * The transfers as one row per file.
+ *
+ * The page's own shape is user -> directory -> files, which is the right shape
+ * for the question "what is this peer sending me" and the wrong one for "what
+ * is the biggest thing in the queue". Flattening is what lets the second be
+ * asked; the grouped view stays for the first.
+ */
+
+/**
+ * Every file in every directory of every user, as one list.
+ *
+ * Keyed on the transfer's own id, which is already unique across peers -- so
+ * unlike the search list there is nothing to construct, and two peers sending
+ * the same path are two rows that cannot be confused for one.
+ * @param {object[]} users - The transfers API's response.
+ * @returns {object[]} One row per transfer, carrying its peer and folder.
+ */
+export const flattenTransfers = (users = []) =>
+  users.flatMap((user) =>
+    (user.directories ?? []).flatMap((directory) =>
+      (directory.files ?? []).map((file) => ({
+        ...file,
+        directory: directory.directory,
+        key: file.id,
+
+        // the API repeats the username on the file; the user is the fallback
+        // for a shape that does not
+        username: file.username ?? user.username,
+      })),
+    ),
+  );
+
+/**
+ * Every column the flat transfers table has, in the order they are drawn.
+ */
+export const TRANSFER_COLUMNS = [
+  { key: 'name', label: 'File', className: 'flatlist-filename' },
+  { key: 'path', label: 'Path', className: 'flatlist-path' },
+  { key: 'user', label: 'User', className: 'flatlist-user' },
+  { key: 'state', label: 'Progress', className: 'flatlist-progress' },
+  { key: 'size', label: 'Size', className: 'flatlist-size' },
+  { key: 'speed', label: 'Speed', className: 'flatlist-speed', optional: true },
+  {
+    key: 'attempts',
+    label: 'Attempts',
+    className: 'flatlist-attempts',
+    optional: true,
+  },
+];
+
+/**
+ * What each of those columns is compared on.
+ *
+ * Progress sorts on the state's text rather than on percent complete: the
+ * useful thing that column does is gather the failures together, and a
+ * finished transfer and one that never started are both at 100 and 0 with
+ * nothing in between to order.
+ */
+export const TRANSFER_SORT_COLUMNS = {
+  attempts: { kind: 'number', of: (row) => row.attempts },
+  name: { kind: 'text', of: (row) => getFileName(row.filename ?? '') },
+  path: { kind: 'text', of: (row) => row.directory },
+  size: { kind: 'number', of: (row) => row.size },
+  speed: { kind: 'number', of: (row) => row.averageSpeed },
+  state: { kind: 'text', of: (row) => row.state },
+  user: { kind: 'text', of: (row) => row.username },
 };
