@@ -254,6 +254,7 @@ const FlatTransferList = ({
   const [selected, setSelected] = useState(() => new Set());
   const [columns, setColumns] = useState(() => readStoredColumns(direction));
   const [confirming, setConfirming] = useState(null);
+  const [confirmingSelection, setConfirmingSelection] = useState(null);
   const [removing, setRemoving] = useState(null);
   const [retrieving, setRetrieving] = useState(null);
   const [unavailable, setUnavailable] = useState(() => new Set());
@@ -408,6 +409,44 @@ const FlatTransferList = ({
     }
 
     remove(row);
+  };
+
+  /*
+   * The same question the card view asks over a selection, from the same
+   * place. It is the more destructive of the two paths -- a selection can
+   * carry a folder's worth of files where a row carries one -- so the table
+   * view having a dialog for the row and none for the selection had it
+   * exactly the wrong way round.
+   *
+   * Where nothing would be deleted it does not ask. A dialog raised over a
+   * harmless action is one that gets dismissed unread, which is how the one
+   * that matters gets clicked through.
+   */
+  const askThenRemoveAll = (rowsToRemove) => {
+    const plan = transfersLibrary.planSelectionRemoval({
+      deleteFileOnRemoval,
+      files: rowsToRemove,
+    });
+
+    if (plan.confirm) {
+      setConfirmingSelection({ plan, rows: rowsToRemove });
+      return;
+    }
+
+    onRemoveAll(rowsToRemove);
+  };
+
+  const removeAllConfirmed = async () => {
+    const pending = confirmingSelection;
+
+    setConfirmingSelection(null);
+    setRemoving('selection');
+
+    try {
+      await onRemoveAll(pending.rows);
+    } finally {
+      setRemoving(null);
+    }
   };
 
   const act = (row) => {
@@ -607,7 +646,7 @@ const FlatTransferList = ({
         createPortal(
           <SelectionActions
             onCancelAll={onCancelAll}
-            onRemoveAll={onRemoveAll}
+            onRemoveAll={askThenRemoveAll}
             onRetryAll={onRetryAll}
             retrievalEnabled={retrievalEnabled}
             rows={selectedRows}
@@ -820,6 +859,14 @@ const FlatTransferList = ({
           onCancel={() => setConfirming(null)}
           onConfirm={() => remove(confirming)}
           plan={removalPlan}
+        />
+      )}
+      {confirmingSelection && (
+        <ConfirmRemovalModal
+          busy={removing === 'selection'}
+          onCancel={() => setConfirmingSelection(null)}
+          onConfirm={removeAllConfirmed}
+          plan={confirmingSelection.plan}
         />
       )}
     </Segment>
