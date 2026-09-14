@@ -4,6 +4,7 @@ import AppContext from '../AppContext';
 import { LoaderSegment, PlaceholderSegment } from '../Shared';
 import FlatTransferList from './FlatTransferList';
 import TransferGroup from './TransferGroup';
+import { ConfirmRemovalModal } from './TransferList';
 import TransfersHeader from './TransfersHeader';
 import React, { useContext, useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-toastify';
@@ -68,6 +69,7 @@ const Transfers = ({ direction, server }) => {
   const [retrying, setRetrying] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [removing, setRemoving] = useState(false);
+  const [confirmingRemoval, setConfirmingRemoval] = useState(null);
 
   const fetch = async () => {
     try {
@@ -271,6 +273,42 @@ const Transfers = ({ direction, server }) => {
     }
   };
 
+  /*
+   * The question every bulk removal on this page has to answer first: is this
+   * about to delete files, and if so which.
+   *
+   * It lives here because `removeAll` does, and both of its callers -- the
+   * header's *Remove All*, which can take every completed transfer on the
+   * page, and the table view's selection -- were reaching it unguarded while
+   * the card view had asked all along. One implementation rather than one per
+   * caller: the card view's own selection keeps its copy only because it
+   * removes through `TransferGroup`, not through here.
+   *
+   * Where nothing would be deleted it does not ask. A dialog raised over a
+   * harmless action is one that gets dismissed unread, which is how the one
+   * that matters gets clicked through.
+   */
+  const askThenRemoveAll = (transfersToRemove) => {
+    const plan = transfersLibrary.planSelectionRemoval({
+      deleteFileOnRemoval,
+      files: transfersToRemove,
+    });
+
+    if (!plan.confirm) {
+      removeAll(transfersToRemove);
+      return;
+    }
+
+    setConfirmingRemoval({ files: transfersToRemove, plan });
+  };
+
+  const removeAllConfirmed = async () => {
+    const pending = confirmingRemoval;
+
+    setConfirmingRemoval(null);
+    await removeAll(pending.files);
+  };
+
   if (connecting) {
     return <LoaderSegment />;
   }
@@ -288,7 +326,7 @@ const Transfers = ({ direction, server }) => {
           setFlat(next);
           storeFlat(direction, next);
         }}
-        onRemoveAll={removeAll}
+        onRemoveAll={askThenRemoveAll}
         onRetryAll={retryAll}
         onSortChange={changeSort}
         removing={removing}
@@ -312,7 +350,7 @@ const Transfers = ({ direction, server }) => {
           direction={direction}
           onCancelAll={cancelAll}
           onPlaceInQueueRequested={placeInQueue}
-          onRemoveAll={removeAll}
+          onRemoveAll={askThenRemoveAll}
           onRemoveRequested={remove}
           onRetryAll={retryAll}
           onRetryRequested={retry}
@@ -335,6 +373,14 @@ const Transfers = ({ direction, server }) => {
             user={user}
           />
         ))
+      )}
+      {confirmingRemoval && (
+        <ConfirmRemovalModal
+          busy={removing}
+          onCancel={() => setConfirmingRemoval(null)}
+          onConfirm={removeAllConfirmed}
+          plan={confirmingRemoval.plan}
+        />
       )}
     </>
   );
