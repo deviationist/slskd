@@ -131,7 +131,7 @@ export const ConfirmRemovalModal = ({ busy, onCancel, onConfirm, plan }) => {
   );
 };
 
-const getColor = (state) => {
+export const getColor = (state) => {
   switch (state) {
     case 'InProgress':
       return { color: 'blue' };
@@ -149,8 +149,8 @@ const getColor = (state) => {
   }
 };
 
-const isRetryableState = (state) => getColor(state).color === 'red';
-const isQueuedState = (state) => state.includes('Queued');
+export const isRetryableState = (state) => getColor(state).color === 'red';
+export const isQueuedState = (state) => state.includes('Queued');
 
 /* Whether this row has a file the server can hand back.
  *

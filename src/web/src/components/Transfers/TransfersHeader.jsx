@@ -6,7 +6,7 @@ import {
 import { Div, Nbsp } from '../Shared';
 import ShrinkableDropdownButton from '../Shared/ShrinkableDropdownButton';
 import React, { useMemo, useState } from 'react';
-import { Dropdown, Icon, Segment } from 'semantic-ui-react';
+import { Checkbox, Dropdown, Icon, Input, Segment } from 'semantic-ui-react';
 
 const getRetryableFiles = ({ files, retryOption }) => {
   switch (retryOption) {
@@ -66,7 +66,11 @@ const getRemovableFiles = ({ files, removeOption }) => {
 const TransfersHeader = ({
   cancelling = false,
   direction,
+  filter = '',
+  flat,
   onCancelAll,
+  onFilterChange,
+  onFlatChange,
   onRemoveAll,
   onRetryAll,
   onSortChange,
@@ -111,7 +115,7 @@ const TransfersHeader = ({
       </div>
       <Div
         className="transfers-header-sort"
-        hidden={empty}
+        hidden={empty || flat}
       >
         <Dropdown
           button
@@ -127,9 +131,50 @@ const TransfersHeader = ({
         />
       </Div>
       <Div
+        className="transfers-header-filter"
+        hidden={empty}
+      >
+        {/*
+         * Matched against the peer, the whole remote path and the state, so
+         * `errored` finds the failures and a username finds one peer's queue
+         * without either needing a control of its own. Applied before the
+         * grouping, so both views answer the same question.
+         */}
+        <Input
+          action={
+            Boolean(filter) && {
+              color: 'red',
+              icon: 'x',
+              onClick: () => onFilterChange(''),
+            }
+          }
+          label={{ content: 'Filter', icon: 'filter' }}
+          onChange={(_, data) => onFilterChange(data.value)}
+          placeholder="flac -bob errored"
+          value={filter}
+        />
+      </Div>
+      <Div
         className="transfers-header-buttons"
         hidden={empty}
       >
+        {/*
+         * A second way to read the same transfers: one row per file, with the
+         * peer and the folder as columns, sortable. The card view answers
+         * "what is this peer sending me"; this answers "what is in the
+         * queue". Remembered per direction, like the sort.
+         *
+         * Beside the actions rather than beside the sort, because it is the
+         * control an operator reaches for, and the sort it replaces is hidden
+         * while it is on.
+         */}
+        <Checkbox
+          checked={flat}
+          className="transfers-header-flat"
+          label="Table View"
+          onChange={() => onFlatChange(!flat)}
+          toggle
+        />
         <ShrinkableDropdownButton
           color="green"
           disabled={working || empty || !server.isConnected}

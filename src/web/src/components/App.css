@@ -308,11 +308,21 @@ body {
     cursor: pointer;
 }
 
-/* Semantic puts `cursor: pointer` on every header of a sortable table. The
-   checkbox and the action column are headers and neither sorts, so the pointer
-   was promising a click that does nothing. */
+/* Semantic puts `cursor: pointer` on every header of a sortable table, and
+   lights every one of them on hover. The checkbox and the action column are
+   headers and neither sorts, so both were promising a click that does nothing.
+
+   The hover is restored to the resting values rather than removed, and to the
+   theme's variables rather than to Semantic's own hover colours -- those are
+   hardcoded `#0000000d` on `#000c`, so undoing them with literals would be
+   right in one theme and wrong in the other. */
 .ui.sortable.table.flatlist thead th:not(.flatlist-sortable) {
     cursor: default;
+}
+
+.ui.sortable.table.flatlist thead th:not(.flatlist-sortable):hover {
+    background: var(--smui-table-header-background, #f9fafb);
+    color: var(--smui-table-header-color, #000000de);
 }
 
 /* Prefixed with Semantic's own classes to outweigh
@@ -387,6 +397,19 @@ body {
     width: 100px;
 }
 
+/* Both of these had no width, and a column with none takes what is left --
+   measured, attempts was 205px for a single digit and progress 328px, which
+   between them squeezed the filename and the path to 45px each. Sized to their
+   contents so the space goes where the reading happens. */
+.flatlist-progress {
+    width: 170px;
+}
+
+.flatlist-attempts {
+    width: 80px;
+    text-align: center !important;
+}
+
 .flatlist-queue {
     width: 70px;
 }
@@ -399,6 +422,18 @@ body {
 /* Pushed to the end of the summary bar, away from the count and the clear. */
 .flatlist-columns {
     margin-left: auto !important;
+}
+
+/* The selection's actions, in the footer's slot.
+
+   The footer is inverted and Semantic only lights its `.item` children, so a
+   raw element in it inherits `rgba(0,0,0,.87)` -- near-black on the footer's
+   near-black, which is why the count was invisible rather than merely dim. */
+.flatlist-bulk {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: rgba(255, 255, 255, 0.9);
 }
 
 /* One switch per line, so the list reads as a set of independent choices
@@ -414,6 +449,20 @@ body {
 .flatlist-download {
     width: 40px;
     text-align: center !important;
+}
+
+/* One column for everything a row can be told to do -- retrieve, remove,
+   details -- rather than a column each. Three single-icon columns cost three
+   lots of cell padding and read as three unrelated things. */
+.flatlist-actions {
+    width: 96px;
+}
+
+.flatlist-actions-row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
 }
 
 /* Semantic gives .ui.checkbox `vertical-align: initial`, which is baseline, so
@@ -469,6 +518,25 @@ body {
 .footer-slot .ui.button {
     padding: 6px 10px;
     margin: 0;
+}
+
+/* Semantic gives a button containing an icon square padding, sized for an
+   icon-only button -- so with a label attached to the right, the word ends up
+   against the seam between the two. Only the right side needs the room.
+
+   Everywhere that shape appears: the search cards' Download, the flat list's,
+   and Browse's selection button. `button.ui.button` rather than `.ui.button`
+   because the sort dropdown also carries `labeled` in its class and is a div
+   -- matching it would pad a menu instead.
+
+   Two values because the two start from different places: 11px normally, and
+   7px where the button is also `tiny compact`, as it is in the footer. */
+.ui.right.labeled.button > button.ui.button {
+    padding-right: 18px;
+}
+
+.footer-slot .ui.right.labeled.button > button.ui.button {
+    padding-right: 14px;
 }
 
 .showmore-button {

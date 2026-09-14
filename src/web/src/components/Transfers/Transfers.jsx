@@ -2,6 +2,7 @@ import './Transfers.css';
 import * as transfersLibrary from '../../lib/transfers';
 import AppContext from '../AppContext';
 import { LoaderSegment, PlaceholderSegment } from '../Shared';
+import FlatTransferList from './FlatTransferList';
 import TransferGroup from './TransferGroup';
 import TransfersHeader from './TransfersHeader';
 import React, { useContext, useEffect, useMemo, useState } from 'react';
@@ -21,6 +22,31 @@ const sortStorageKey = (direction) => `slskd-transfers-${direction}-sort`;
  * blocked, and this runs on the first render of the page: an exception here
  * would cost the whole list rather than a preference.
  */
+/*
+ * Whether this direction is read as one table or as a card per peer.
+ *
+ * Per direction, like the sort: downloads are a queue you are waiting on and
+ * uploads one someone else is, so a choice about one says nothing about the
+ * other.
+ */
+const flatKey = (direction) => `slskd-transfers-flat-${direction}`;
+
+const readStoredFlat = (direction) => {
+  try {
+    return window.localStorage.getItem(flatKey(direction)) === 'true';
+  } catch {
+    return false;
+  }
+};
+
+const storeFlat = (direction, flat) => {
+  try {
+    window.localStorage.setItem(flatKey(direction), String(flat));
+  } catch {
+    // a preference that cannot be saved is still a preference for this tab
+  }
+};
+
 const readStoredSort = (direction) => {
   try {
     return window.localStorage.getItem(sortStorageKey(direction));
@@ -36,6 +62,8 @@ const Transfers = ({ direction, server }) => {
   const [connecting, setConnecting] = useState(true);
   const [transfers, setTransfers] = useState([]);
   const [storedSort, setStoredSort] = useState(() => readStoredSort(direction));
+  const [flat, setFlat] = useState(() => readStoredFlat(direction));
+  const [filter, setFilter] = useState('');
 
   const [retrying, setRetrying] = useState(false);
   const [cancelling, setCancelling] = useState(false);
@@ -112,10 +140,36 @@ const Transfers = ({ direction, server }) => {
   // one that deletes nothing -- see `removalDeletesFile`
   const deleteFileOnRemoval = options?.transfers?.download?.deleteFileOnRemoval;
 
-  const sorted = useMemo(
-    () => transfersLibrary.sortTransfers(transfers, sort),
-    [sort, transfers],
+  /*
+   * Filtered before grouped, so the cards and the table answer the same
+   * question -- and before sorted, since sorting what was thrown away is work
+   * for nothing.
+   */
+  const matching = useMemo(
+    () => transfersLibrary.filterTransfers({ query: filter, users: transfers }),
+    [filter, transfers],
   );
+
+  const sorted = useMemo(
+    () => transfersLibrary.sortTransfers(matching, sort),
+    [matching, sort],
+  );
+
+  /*
+   * Asking a peer where we are in its queue, which is what clicking a queued
+   * row does. The card view has its own copy of this inside TransferGroup; the
+   * flat list has no card to hold one, so it lives here with the other actions.
+   */
+  const placeInQueue = async (file) => {
+    try {
+      await transfersLibrary.getPlaceInQueue({
+        id: file.id,
+        username: file.username,
+      });
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   const retry = async ({ file, suppressStateChange = false }) => {
     const { filename, size, username } = file;
@@ -226,7 +280,14 @@ const Transfers = ({ direction, server }) => {
       <TransfersHeader
         cancelling={cancelling}
         direction={direction}
+        filter={filter}
+        flat={flat}
         onCancelAll={cancelAll}
+        onFilterChange={setFilter}
+        onFlatChange={(next) => {
+          setFlat(next);
+          storeFlat(direction, next);
+        }}
         onRemoveAll={removeAll}
         onRetryAll={retryAll}
         onSortChange={changeSort}
@@ -236,10 +297,27 @@ const Transfers = ({ direction, server }) => {
         sort={sort}
         transfers={transfers}
       />
-      {transfers.length === 0 ? (
+      {sorted.length === 0 ? (
         <PlaceholderSegment
-          caption={`No ${direction}s to display`}
+          caption={
+            filter
+              ? `No ${direction}s match '${filter}'`
+              : `No ${direction}s to display`
+          }
           icon={direction}
+        />
+      ) : flat ? (
+        <FlatTransferList
+          deleteFileOnRemoval={deleteFileOnRemoval}
+          direction={direction}
+          onCancelAll={cancelAll}
+          onPlaceInQueueRequested={placeInQueue}
+          onRemoveAll={removeAll}
+          onRemoveRequested={remove}
+          onRetryAll={retryAll}
+          onRetryRequested={retry}
+          retrievalEnabled={retrievalEnabled}
+          users={sorted}
         />
       ) : (
         sorted.map((user) => (

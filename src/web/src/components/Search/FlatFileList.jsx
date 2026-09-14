@@ -1,17 +1,20 @@
 import {
   COLUMNS,
-  describeSelection,
   downloadStateOf,
   groupByUser,
+  pathOf,
+  SORT_COLUMNS,
+} from '../../lib/searches';
+import {
+  describeSelection,
   nextSort,
   parseColumns,
-  pathOf,
   selectionState,
   sortFromQuery,
   sortRows,
   sortToQuery,
   withColumn,
-} from '../../lib/searches';
+} from '../../lib/tables';
 import * as transfers from '../../lib/transfers';
 import {
   formatAttributes,
@@ -119,9 +122,12 @@ const COLUMNS_KEY = 'slskd-search-columns';
 
 const readStoredColumns = () => {
   try {
-    return parseColumns(window.localStorage.getItem(COLUMNS_KEY));
+    return parseColumns({
+      all: COLUMNS,
+      stored: window.localStorage.getItem(COLUMNS_KEY),
+    });
   } catch {
-    return parseColumns(null);
+    return parseColumns({ all: COLUMNS, stored: null });
   }
 };
 
@@ -145,10 +151,11 @@ const FlatFileList = ({ disabled, downloads, rows: unsorted }) => {
    */
   const location = useLocation();
   const history = useHistory();
-  const { column, direction } = sortFromQuery(location.search);
+  const { column, direction } = sortFromQuery(location.search, SORT_COLUMNS);
 
   const rows = useMemo(
-    () => sortRows({ column, direction, rows: unsorted }),
+    () =>
+      sortRows({ column, columns: SORT_COLUMNS, direction, rows: unsorted }),
     [column, direction, unsorted],
   );
 
@@ -166,7 +173,7 @@ const FlatFileList = ({ disabled, downloads, rows: unsorted }) => {
   const show = (key) => columns.includes(key);
 
   const setColumn = (key, on) => {
-    const next = withColumn({ columns, key, on });
+    const next = withColumn({ all: COLUMNS, columns, key, on });
 
     setColumns(next);
     storeColumns(next);
@@ -478,6 +485,15 @@ const FlatFileList = ({ disabled, downloads, rows: unsorted }) => {
               return (
                 <Table.Row
                   active={mark?.row === 'active'}
+                  /*
+                   * The row's identity, for the scripts media-bridge injects
+                   * into this page. They used to read the peer and the folder
+                   * out of the cells, which stopped being safe the moment a
+                   * column could be hidden -- hide User and the play button
+                   * attaches to a file it cannot name.
+                   */
+                  data-filename={row.filename}
+                  data-username={row.username}
                   key={row.key}
                   positive={mark?.row === 'positive'}
                   warning={mark?.row === 'warning'}

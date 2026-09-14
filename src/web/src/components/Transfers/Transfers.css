@@ -1,8 +1,14 @@
+/* The children are 48px wrappers holding 36px controls, and without this they
+   stretch and their contents sit at the top of them -- measured, the sort
+   dropdown and the action buttons were 6px above the centre while the filter
+   input, which centres itself, was on it. Centring the row lines all of them
+   up from one place. */
 .transfers-header-segment {
   margin-top: 15px !important;
   height: 78px !important;
   padding-top: 14px !important;
   display: flex;
+  align-items: center;
 }
 
 .transfers-segment-icon {
@@ -114,8 +120,19 @@
   word-wrap: break-word !important;
 }
 
+/* A row that does not wrap. Adding the Table View toggle to this group pushed
+   the last button onto a second line, which made the wrapper 72px tall and
+   left everything in it sitting 18px above the header's centre -- the fixed
+   78px header has no room for two rows.
+
+   The filter beside it is `flex: 1 1 auto; min-width: 0`, so it is what gives
+   way when the window narrows rather than these. */
 .transfers-header-buttons {
-  display: inline;
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  gap: 8px;
   margin-left: auto;
 }
 
@@ -153,4 +170,30 @@
 
 .transfer-details td:first-child {
   white-space: nowrap;
+}
+
+/* The Table View toggle sits inside the header's button group, so it needs the
+   vertical centring the buttons get from their own layout and a little air
+   before the first of them. */
+.transfers-header-flat {
+    display: inline-flex !important;
+    align-items: center;
+    margin-right: 12px;
+}
+
+/* Between the sort and the action buttons, taking the middle of the header
+   rather than a line of its own -- the segment is a fixed 78px and a second
+   row would not fit in it. Capped so it does not crowd the buttons on a wide
+   window. */
+.transfers-header-filter {
+  display: inline-flex;
+  align-items: center;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 320px;
+  margin-left: 1em;
+}
+
+.transfers-header-filter .ui.input {
+  width: 100%;
 }
