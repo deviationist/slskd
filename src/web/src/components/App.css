@@ -267,12 +267,16 @@ body {
     display: inline-block;
     font-family: inherit;
     margin-left: 6px;
-    opacity: 0.3;
     font-size: 0.9em;
+
+    /* Invisible rather than absent: it still occupies its space, so the label
+       beside it does not shift sideways when the pointer arrives, and a column
+       does not change width on the way to being sorted. */
+    opacity: 0;
 }
 
 .ui.sortable.table.flatlist thead th:not(.sorted):hover::after {
-    opacity: 0.8;
+    opacity: 0.55;
 }
 
 /* Semantic dims its arrow to 0.8. On the one column that is actually sorted it
