@@ -671,6 +671,13 @@ const FlatTransferList = ({
                    * attaches to a file it cannot name.
                    */
                   data-filename={row.filename}
+                  /*
+                   * The state too, for the same reason: media-bridge decides
+                   * from it whether a row can be sent into the ingress chain,
+                   * and reading it from the Progress cell would make that
+                   * depend on a column the operator can switch off.
+                   */
+                  data-state={row.state}
                   data-username={row.username}
                   key={row.key}
                 >
