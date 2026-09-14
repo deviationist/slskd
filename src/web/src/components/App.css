@@ -397,6 +397,19 @@ body {
     width: 100px;
 }
 
+/* Both of these had no width, and a column with none takes what is left --
+   measured, attempts was 205px for a single digit and progress 328px, which
+   between them squeezed the filename and the path to 45px each. Sized to their
+   contents so the space goes where the reading happens. */
+.flatlist-progress {
+    width: 170px;
+}
+
+.flatlist-attempts {
+    width: 80px;
+    text-align: center !important;
+}
+
 .flatlist-queue {
     width: 70px;
 }
