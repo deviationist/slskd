@@ -79,6 +79,129 @@ const storeColumns = (direction, columns) => {
 };
 
 /**
+ * What a selection can be told to do, and only what it can.
+ *
+ * Its own component because the list around it was at the linter's complexity
+ * ceiling, and because these four conditions are the whole of it -- everything
+ * here is one question asked four ways.
+ * @param {object} params
+ * @param {Function} params.onCancelAll - Cancels the selection.
+ * @param {Function} params.onRemoveAll - Removes the selection.
+ * @param {Function} params.onRetryAll - Retries the selection.
+ * @param {boolean} params.retrievalEnabled - Whether files can be fetched to the browser.
+ * @param {object[]} params.rows - The selected rows.
+ * @returns {object} The bar, or nothing when nothing is selected.
+ */
+const SelectionActions = ({
+  onCancelAll,
+  onRemoveAll,
+  onRetryAll,
+  retrievalEnabled,
+  rows,
+}) => {
+  /*
+   * Which actions a selection actually offers, weighed exactly as the card
+   * view weighs them -- the flat list showing three buttons that the cards
+   * would have hidden is the two views disagreeing about the same selection.
+   *
+   * Retry and Remove want *every* row to qualify; Cancel wants any. Retrieval
+   * is offered as soon as something in the selection has a file, since the
+   * rest is not a reason to withhold the ones that do.
+   */
+  const allRetryable =
+    rows.length > 0 &&
+    rows.every((f) => transfersLibrary.isStateRetryable(f.state));
+  const anyCancellable = rows.some((f) =>
+    transfersLibrary.isStateCancellable(f.state),
+  );
+  const allRemovable =
+    rows.length > 0 &&
+    rows.every((f) => transfersLibrary.isStateRemovable(f.state));
+  const retrievable = rows.filter((f) => transfersLibrary.isRetrievable(f));
+
+  /*
+   * One archive per peer. The card's version cannot need this -- a card is one
+   * peer -- but a selection here crosses them, and the retrieval endpoint
+   * takes a username and its own ids.
+   */
+  const archive = async () => {
+    const byUser = new Map();
+
+    for (const row of retrievable) {
+      byUser.set(row.username, [...(byUser.get(row.username) ?? []), row.id]);
+    }
+
+    for (const [username, ids] of byUser) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        await transfersLibrary.retrieveArchive({ ids, username });
+      } catch (error) {
+        console.error(error);
+        toast.error(transfersLibrary.describeArchiveError(error));
+      }
+    }
+  };
+
+  return (
+    <div className="flatlist-bulk">
+      <span>{`${rows.length} selected`}</span>
+      {/*
+       * A Button.Group with the same dividers the card view uses, not
+       * loose buttons. Three reasons, and the third is the one that
+       * settles it: the actions read as one control rather than three;
+       * the two views look like the same page; and the ingress button
+       * media-bridge injects looks for a `.ui.buttons` to append itself
+       * to, with an `.or` before it.
+       */}
+      <Button.Group size="tiny">
+        {allRetryable && (
+          <Button
+            color="green"
+            content="Retry"
+            icon="redo"
+            onClick={() => onRetryAll(rows)}
+          />
+        )}
+        {allRetryable && anyCancellable && <Button.Or />}
+        {anyCancellable && (
+          <Button
+            color="red"
+            content="Cancel"
+            icon="x"
+            onClick={() => onCancelAll(rows)}
+          />
+        )}
+        {(allRetryable || anyCancellable) && allRemovable && <Button.Or />}
+        {allRemovable && (
+          <Button
+            color="red"
+            content="Remove"
+            icon="trash alternate"
+            onClick={() => onRemoveAll(rows)}
+          />
+        )}
+        {(allRetryable || anyCancellable || allRemovable) &&
+          retrievalEnabled &&
+          retrievable.length > 0 && <Button.Or />}
+        {retrievalEnabled && retrievable.length > 0 && (
+          <Popup
+            content={transfersLibrary.describeRetrieval(retrievable.length)}
+            position="top right"
+            trigger={
+              <Button
+                content="Download"
+                icon="download"
+                onClick={archive}
+              />
+            }
+          />
+        )}
+      </Button.Group>
+    </div>
+  );
+};
+
+/**
  * The transfers as one row per file, rather than one card per peer.
  *
  * The card view answers "what is this peer sending me"; this one answers "what
@@ -469,40 +592,13 @@ const FlatTransferList = ({
       {selectedRows.length > 0 &&
         footerSlot &&
         createPortal(
-          <div className="flatlist-bulk">
-            <span>{`${selectedRows.length} selected`}</span>
-            {/*
-             * The same colours the header gives these three actions -- green
-             * to retry, red to cancel, red to remove. A default button here
-             * is light grey on the footer's near-black and reads as something
-             * that failed to load rather than as a control.
-             */}
-            <Button
-              color="green"
-              compact
-              content="Retry"
-              disabled={direction === 'upload'}
-              icon="redo"
-              onClick={() => onRetryAll(selectedRows)}
-              size="tiny"
-            />
-            <Button
-              color="red"
-              compact
-              content="Cancel"
-              icon="x"
-              onClick={() => onCancelAll(selectedRows)}
-              size="tiny"
-            />
-            <Button
-              color="red"
-              compact
-              content="Remove"
-              icon="trash alternate"
-              onClick={() => onRemoveAll(selectedRows)}
-              size="tiny"
-            />
-          </div>,
+          <SelectionActions
+            onCancelAll={onCancelAll}
+            onRemoveAll={onRemoveAll}
+            onRetryAll={onRetryAll}
+            retrievalEnabled={retrievalEnabled}
+            rows={selectedRows}
+          />,
           footerSlot,
         )}
       <div ref={listRef}>
@@ -566,7 +662,18 @@ const FlatTransferList = ({
               });
 
               return (
-                <Table.Row key={row.key}>
+                <Table.Row
+                  /*
+                   * The row's identity, for the scripts media-bridge injects
+                   * into this page. They used to read the peer and the folder
+                   * out of the cells, which stopped being safe the moment a
+                   * column could be hidden -- hide User and the play button
+                   * attaches to a file it cannot name.
+                   */
+                  data-filename={row.filename}
+                  data-username={row.username}
+                  key={row.key}
+                >
                   <Table.Cell className="flatlist-selector">
                     <Checkbox
                       checked={selected.has(row.key)}

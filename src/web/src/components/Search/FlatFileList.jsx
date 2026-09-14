@@ -485,6 +485,15 @@ const FlatFileList = ({ disabled, downloads, rows: unsorted }) => {
               return (
                 <Table.Row
                   active={mark?.row === 'active'}
+                  /*
+                   * The row's identity, for the scripts media-bridge injects
+                   * into this page. They used to read the peer and the folder
+                   * out of the cells, which stopped being safe the moment a
+                   * column could be hidden -- hide User and the play button
+                   * attaches to a file it cannot name.
+                   */
+                  data-filename={row.filename}
+                  data-username={row.username}
                   key={row.key}
                   positive={mark?.row === 'positive'}
                   warning={mark?.row === 'warning'}
