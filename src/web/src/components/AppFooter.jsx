@@ -60,6 +60,20 @@ const AppFooter = ({
           {uploadActive} active &middot; {uploadQueued} queued
         </span>
       </Menu.Item>
+      {/*
+       * Somewhere for a page to put an action that has to stay reachable while
+       * its own content scrolls. The footer is the one strip that is always on
+       * screen and already has room; a page-owned bar floating over the
+       * content has to win a stacking contest with this one and then lose the
+       * same space again to anything else that wants the bottom edge.
+       *
+       * Empty collapses to nothing, so the footer is unchanged until something
+       * fills it.
+       */}
+      <div
+        className="footer-slot"
+        id="footer-action-slot"
+      />
       <Menu.Menu position="right">
         <Menu.Item
           as="a"

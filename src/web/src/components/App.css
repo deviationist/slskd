@@ -301,30 +301,24 @@ body {
     flex-wrap: wrap;
 }
 
-/* The download for a selection, floating above the page so it is reachable
-   from anywhere in a list thousands of rows long.
-
-   `fixed`, after two attempts at `sticky` that could not have worked. Sticky
-   resolves against the nearest ancestor with a non-visible overflow, and this
-   app has `overflow-y: hidden` on the pusher between the list and the element
-   that actually scrolls -- so a sticky bar is measured against a box that
-   never scrolls and simply travels with the page, whichever edge it is pinned
-   to. Fixed answers to the viewport and nothing else.
-
-   Only rendered while something is selected, so it is never furniture. */
-.flatlist-floating {
-    position: fixed;
-    bottom: 24px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 100;
-    padding: 10px 14px;
-    border-radius: 6px;
+/* Where a page hangs an action that must outlive its own scrolling. Pushed to
+   the right of the transfer stats, left of the logo, and gone entirely when
+   nothing has filled it. */
+.footer-slot {
     display: flex;
     align-items: center;
-    gap: 10px;
-    background: var(--smui-segment-background, #fff);
-    box-shadow: 0 2px 14px rgba(0, 0, 0, 0.35);
+    margin-left: auto;
+    padding-right: 10px;
+}
+
+.footer-slot:empty {
+    display: none;
+}
+
+/* The footer is 41px; a default button does not fit in it. */
+.footer-slot .ui.button {
+    padding: 6px 10px;
+    margin: 0;
 }
 
 .showmore-button {

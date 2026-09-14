@@ -103,6 +103,7 @@ const FlatFileList = ({ disabled, downloads, rows }) => {
   const [selected, setSelected] = useState(() => new Set());
   const [downloading, setDownloading] = useState(false);
   const [rowDownloading, setRowDownloading] = useState(undefined);
+  const [footerSlot, setFooterSlot] = useState(null);
   const [scroller, setScroller] = useState(null);
   const [scrollMargin, setScrollMargin] = useState(0);
   const listRef = useRef(null);
@@ -138,6 +139,15 @@ const FlatFileList = ({ disabled, downloads, rows }) => {
 
     return () => window.removeEventListener('resize', measure);
   }, [rows.length]);
+
+  /*
+   * The footer's slot, looked up after the DOM is committed rather than during
+   * render, when it may not exist yet. Null until then, and the action simply
+   * is not drawn -- which is the right answer for the one frame it costs.
+   */
+  useLayoutEffect(() => {
+    setFooterSlot(document.querySelector('#footer-action-slot'));
+  }, []);
 
   const virtualizer = useVirtualizer({
     count: rows.length,
@@ -263,33 +273,34 @@ const FlatFileList = ({ disabled, downloads, rows }) => {
         )}
       </div>
       {/*
-       * Through a portal, because neither `fixed` nor `sticky` can work where
-       * this component sits. Semantic's Sidebar.Pushable carries a transform
-       * -- an identity one, but a transform all the same -- which makes it the
-       * containing block for fixed descendants, and it is also the element
-       * that scrolls. So a bar left in place is positioned against the
-       * scrolled content and travels with it, however it is pinned. Rendering
-       * into the body escapes that ancestor entirely.
+       * Into the footer, which is the one strip always on screen and has room
+       * to spare. It is also a portal for a second reason: this component sits
+       * inside Semantic's Sidebar.Pushable, which carries a transform -- an
+       * identity one, but a transform all the same -- making it the containing
+       * block for fixed descendants and the element that scrolls. Anything
+       * pinned in place here travels with the content instead of staying put,
+       * `fixed` and `sticky` alike.
        */}
       {selectedRows.length > 0 &&
+        footerSlot &&
         createPortal(
-          <div className="flatlist-floating">
-            <Button
-              color="green"
-              content="Download"
-              disabled={disabled || downloading}
-              icon="download"
-              label={{
-                as: 'a',
-                basic: false,
-                content: `${selectedRows.length} file${selectedRows.length === 1 ? '' : 's'}, ${formatBytes(selectedSize)}`,
-              }}
-              labelPosition="right"
-              loading={downloading}
-              onClick={download}
-            />
-          </div>,
-          document.body,
+          <Button
+            color="green"
+            compact
+            content="Download"
+            disabled={disabled || downloading}
+            icon="download"
+            label={{
+              as: 'a',
+              basic: false,
+              content: `${selectedRows.length} file${selectedRows.length === 1 ? '' : 's'}, ${formatBytes(selectedSize)}`,
+            }}
+            labelPosition="right"
+            loading={downloading}
+            onClick={download}
+            size="tiny"
+          />,
+          footerSlot,
         )}
       <div ref={listRef}>
         <Table

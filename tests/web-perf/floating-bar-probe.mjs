@@ -15,7 +15,10 @@
  *                         an identity transform, which still makes it the
  *                         containing block for fixed descendants
  *
- * Now a portal to document.body, which leaves that ancestor behind.
+ * Now a portal into the footer's own slot. That leaves the transformed
+ * ancestor behind and, unlike a bar of our own floating over the page, does not
+ * have to win a stacking contest with the footer (z-index 1000) or hold ground
+ * that a player bar will want.
  *
  *   node tests/web-perf/floating-bar-probe.mjs http://<container-ip>:5030/searches/<id>
  */
