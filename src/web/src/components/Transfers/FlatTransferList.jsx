@@ -471,14 +471,23 @@ const FlatTransferList = ({
         createPortal(
           <div className="flatlist-bulk">
             <span>{`${selectedRows.length} selected`}</span>
+            {/*
+             * The same colours the header gives these three actions -- green
+             * to retry, red to cancel, red to remove. A default button here
+             * is light grey on the footer's near-black and reads as something
+             * that failed to load rather than as a control.
+             */}
             <Button
+              color="green"
               compact
               content="Retry"
+              disabled={direction === 'upload'}
               icon="redo"
               onClick={() => onRetryAll(selectedRows)}
               size="tiny"
             />
             <Button
+              color="red"
               compact
               content="Cancel"
               icon="x"
@@ -486,10 +495,10 @@ const FlatTransferList = ({
               size="tiny"
             />
             <Button
+              color="red"
               compact
               content="Remove"
               icon="trash alternate"
-              negative
               onClick={() => onRemoveAll(selectedRows)}
               size="tiny"
             />

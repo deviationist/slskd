@@ -424,11 +424,16 @@ body {
     margin-left: auto !important;
 }
 
-/* The selection's actions, in the footer's slot. */
+/* The selection's actions, in the footer's slot.
+
+   The footer is inverted and Semantic only lights its `.item` children, so a
+   raw element in it inherits `rgba(0,0,0,.87)` -- near-black on the footer's
+   near-black, which is why the count was invisible rather than merely dim. */
 .flatlist-bulk {
     display: flex;
     align-items: center;
     gap: 8px;
+    color: rgba(255, 255, 255, 0.9);
 }
 
 /* One switch per line, so the list reads as a set of independent choices
