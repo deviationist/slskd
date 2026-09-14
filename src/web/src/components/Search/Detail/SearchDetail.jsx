@@ -342,67 +342,69 @@ const SearchDetail = ({
             className="search-options"
             raised
           >
-            {/*
-             * The dropdown sorts whole peers, which is the only thing that
-             * can be sorted when the results are one card each. The flat list
-             * sorts files, from its own column headers -- so it is hidden
-             * there rather than left as a second control answering a
-             * different question about the same list.
-             *
-             * It still runs underneath: with no column chosen the rows arrive
-             * in the order it put the peers in, which is the same default the
-             * list has always had.
-             */}
-            {!flatResults && (
-              <Dropdown
-                button
-                className="search-options-sort icon"
-                floating
-                icon="sort"
-                labeled
-                onChange={(_event, { value }) => setResultSort(value)}
-                options={sortDropdownOptions}
-                text={
-                  sortDropdownOptions.find((o) => o.value === resultSort).text
-                }
-              />
-            )}
-            <div className="search-option-toggles">
-              <Checkbox
-                checked={hideLocked}
-                className="search-options-hide-locked"
-                label="Hide Locked Results"
-                onChange={() => setHideLocked(!hideLocked)}
-                toggle
-              />
-              <Checkbox
-                checked={hideNoFreeSlots}
-                className="search-options-hide-no-slots"
-                label="Hide Results with No Free Slots"
-                onChange={() => setHideNoFreeSlots(!hideNoFreeSlots)}
-                toggle
-              />
-              <Checkbox
-                checked={foldResults}
-                className="search-options-fold-results"
-                // folding is a property of a per-user card, and the flat list
-                // has none. left visible rather than hidden so the controls do
-                // not move around under the pointer when the view changes
-                disabled={flatResults}
-                label="Fold Results"
-                onChange={() => setFoldResults(!foldResults)}
-                toggle
-              />
-              <Checkbox
-                checked={flatResults}
-                className="search-options-flat-results"
-                label="Table View"
-                onChange={() => {
-                  setFlatResults(!flatResults);
-                  storeFlat(!flatResults);
-                }}
-                toggle
-              />
+            <div className="search-options-row">
+              <div className="search-option-toggles">
+                <Checkbox
+                  checked={hideLocked}
+                  className="search-options-hide-locked"
+                  label="Hide Locked Results"
+                  onChange={() => setHideLocked(!hideLocked)}
+                  toggle
+                />
+                <Checkbox
+                  checked={hideNoFreeSlots}
+                  className="search-options-hide-no-slots"
+                  label="Hide Results with No Free Slots"
+                  onChange={() => setHideNoFreeSlots(!hideNoFreeSlots)}
+                  toggle
+                />
+                <Checkbox
+                  checked={foldResults}
+                  className="search-options-fold-results"
+                  // folding is a property of a per-user card, and the flat list
+                  // has none. left visible rather than hidden so the controls do
+                  // not move around under the pointer when the view changes
+                  disabled={flatResults}
+                  label="Fold Results"
+                  onChange={() => setFoldResults(!foldResults)}
+                  toggle
+                />
+                <Checkbox
+                  checked={flatResults}
+                  className="search-options-flat-results"
+                  label="Table View"
+                  onChange={() => {
+                    setFlatResults(!flatResults);
+                    storeFlat(!flatResults);
+                  }}
+                  toggle
+                />
+              </div>
+              {/*
+               * The dropdown sorts whole peers, which is the only thing that
+               * can be sorted when the results are one card each. The flat list
+               * sorts files, from its own column headers -- so it is hidden
+               * there rather than left as a second control answering a
+               * different question about the same list.
+               *
+               * It still runs underneath: with no column chosen the rows arrive
+               * in the order it put the peers in, which is the same default the
+               * list has always had.
+               */}
+              {!flatResults && (
+                <Dropdown
+                  button
+                  className="search-options-sort icon"
+                  floating
+                  icon="sort"
+                  labeled
+                  onChange={(_event, { value }) => setResultSort(value)}
+                  options={sortDropdownOptions}
+                  text={
+                    sortDropdownOptions.find((o) => o.value === resultSort).text
+                  }
+                />
+              )}
             </div>
             <Input
               action={

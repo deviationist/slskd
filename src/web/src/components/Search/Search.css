@@ -33,6 +33,19 @@
    when it did not, which is exactly how "One List" arrived flush against
    "Fold Results". A fifth needs no CSS at all now. */
 
+/* Toggles on the left, the sort on the right. One row, so the sort ends up
+   against the edge rather than wherever the toggles happen to end. */
+.search-options-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.search-options-row .search-options-sort {
+  margin-left: auto;
+}
+
 @media only screen and (min-width: 991px) {
   /* every toggle, including the first: the leading margin is what separates
      the group from the sort dropdown beside it */
