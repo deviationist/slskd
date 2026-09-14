@@ -444,7 +444,16 @@ const FlatFileList = ({ disabled, downloads, rows: unsorted }) => {
                         }
                       />
                     )}
-                    {getFileName(row.filename)}
+                    {/*
+                     * In its own element so the cell can lay out as a row:
+                     * media-bridge injects a play button before this and a
+                     * quality badge after it, and with the name as a bare
+                     * text node the badge is whatever the truncation leaves
+                     * of it -- which is nothing, on a path of any length.
+                     */}
+                    <span className="flatlist-name">
+                      {getFileName(row.filename)}
+                    </span>
                   </Table.Cell>
                   <Table.Cell
                     className="flatlist-path"
