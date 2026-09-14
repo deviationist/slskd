@@ -1,9 +1,9 @@
 import {
   describeSelection,
   downloadStateOf,
-  folderOf,
   groupByUser,
   nextSort,
+  pathOf,
   selectionState,
   sortFromQuery,
   sortRows,
@@ -109,7 +109,7 @@ const MARKS = {
  */
 const COLUMNS = [
   { key: 'name', label: 'File', className: 'flatlist-filename' },
-  { key: 'folder', label: 'Folder', className: 'flatlist-folder' },
+  { key: 'path', label: 'Path', className: 'flatlist-path' },
   { key: 'user', label: 'User', className: 'flatlist-user' },
   { key: 'size', label: 'Size', className: 'flatlist-size' },
   { key: 'attributes', label: 'Attributes', className: 'flatlist-attributes' },
@@ -349,6 +349,10 @@ const FlatFileList = ({ disabled, downloads, rows: unsorted }) => {
           compact
           selectable
           size="small"
+          // without this Semantic renders no sort arrow at all: its styles for
+          // a sorted column live under `.ui.sortable.table`, so the `sorted`
+          // prop below was setting a class nothing was listening to
+          sortable
         >
           <Table.Header>
             <Table.Row>
@@ -443,12 +447,12 @@ const FlatFileList = ({ disabled, downloads, rows: unsorted }) => {
                     {getFileName(row.filename)}
                   </Table.Cell>
                   <Table.Cell
-                    className="flatlist-folder"
-                    // the whole path, since the column shows only the last
-                    // segment of it and the rest is often where it came from
+                    className="flatlist-path"
+                    // the filename too, since the column stops at the folder
+                    // and truncates even that on a narrow window
                     title={row.filename}
                   >
-                    {folderOf(row)}
+                    {pathOf(row)}
                   </Table.Cell>
                   <Table.Cell className="flatlist-user">
                     <Popup

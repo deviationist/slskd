@@ -442,18 +442,18 @@ export const downloadStateOf = ({ row, index }) => {
 };
 
 /**
- * The folder a search result sits in, as much of it as is worth reading.
+ * The folder a search result sits in: the whole path, minus the filename.
  *
- * The full remote path is often three or four levels of someone else's
- * library -- `@@abcde\\Music\\FLAC\\Artist - Album (2003)` -- and the part
- * that says anything is the end of it. Truncating from the left would hide
- * exactly that, so this takes the last segment and leaves the whole path to
- * the cell's title.
+ * All of it, not just the last segment. Someone else's library says where a
+ * file came from as much as what it is next to -- `@@abcde\\Music\\FLAC\\Artist
+ * - Album (2003)` is a different thing from the same album under `incoming`.
+ * The column has the width for it now, and truncates from the end when it
+ * does not.
  * @param {object} params
  * @param {string} params.filename - The full remote path.
- * @returns {string} The containing folder's own name, or '' if there is none.
+ * @returns {string} The directory, or '' where the file has none.
  */
-export const folderOf = ({ filename }) => {
+export const pathOf = ({ filename }) => {
   if (!filename) {
     return '';
   }
@@ -461,12 +461,8 @@ export const folderOf = ({ filename }) => {
   const directory = getDirectoryName(filename);
 
   // getDirectoryName hands back the whole path when there is no separator in
-  // it -- a file at the root of a share -- and that is a filename, not a folder
-  if (directory === filename) {
-    return '';
-  }
-
-  return directory.split(/[/\\]/u).filter(Boolean).pop() ?? '';
+  // it -- a file at the root of a share -- and that is a filename, not a path
+  return directory === filename ? '' : directory;
 };
 
 /**
@@ -510,7 +506,7 @@ export const describeSelection = ({ total = 0, selection }) => {
  */
 export const SORT_COLUMNS = {
   attributes: { kind: 'text', of: (row) => formatAttributes(row) },
-  folder: { kind: 'text', of: (row) => folderOf(row) },
+  path: { kind: 'text', of: (row) => pathOf(row) },
   length: { kind: 'number', of: (row) => row.length },
   name: { kind: 'text', of: (row) => getFileName(row.filename ?? '') },
   size: { kind: 'number', of: (row) => row.size },

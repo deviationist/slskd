@@ -396,7 +396,7 @@ const SearchDetail = ({
               <Checkbox
                 checked={flatResults}
                 className="search-options-flat-results"
-                label="One List"
+                label="Table View"
                 onChange={() => {
                   setFlatResults(!flatResults);
                   storeFlat(!flatResults);
