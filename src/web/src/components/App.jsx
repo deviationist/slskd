@@ -269,6 +269,36 @@ class App extends Component {
     return localStorage.getItem('slskd-theme');
   };
 
+  /*
+   * Whether the content is allowed past the 1200px it is otherwise held to.
+   *
+   * Kept beside the theme, and for the same reason: it is a preference about
+   * how this browser draws the app rather than anything the server has an
+   * opinion on. Guarded, because localStorage throws outright where site data
+   * is blocked and this runs before the first render.
+   */
+  getSavedWide = () => {
+    try {
+      return localStorage.getItem('slskd-wide') === 'true';
+    } catch {
+      return false;
+    }
+  };
+
+  toggleWide = () => {
+    this.setState((state) => {
+      const wide = !state.wide;
+
+      try {
+        localStorage.setItem('slskd-wide', String(wide));
+      } catch {
+        // a preference that cannot be saved is still a preference for this tab
+      }
+
+      return { wide };
+    });
+  };
+
   toggleTheme = () => {
     this.setState((state) => {
       const newTheme = state.theme === 'dark' ? 'light' : 'dark';
@@ -327,6 +357,7 @@ class App extends Component {
           ? 'dark'
           : 'light'),
       transferMetrics = {},
+      wide = this.getSavedWide(),
     } = this.state;
     const {
       connectionWatchdog = {},
@@ -388,6 +419,11 @@ class App extends Component {
     } else {
       document.documentElement.classList.remove('dark');
     }
+
+    // on the root rather than on each container, because the width is capped
+    // in three places -- the view, the search container and the show-more
+    // button -- and they have to widen together or the page goes ragged
+    document.documentElement.classList.toggle('wide', Boolean(wide));
 
     return (
       <>
@@ -479,6 +515,17 @@ class App extends Component {
               <Menu.Item onClick={() => this.toggleTheme()}>
                 <Icon name="theme" />
                 Theme
+              </Menu.Item>
+              <Menu.Item
+                onClick={() => this.toggleWide()}
+                title={
+                  wide
+                    ? 'Hold the page to 1200px'
+                    : 'Let the page use the width of the window'
+                }
+              >
+                <Icon name={wide ? 'compress' : 'expand'} />
+                {wide ? 'Narrow' : 'Wide'}
               </Menu.Item>
               <ModeSpecificConnectButton
                 connectionWatchdog={connectionWatchdog}

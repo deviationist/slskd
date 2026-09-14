@@ -243,6 +243,16 @@ body {
     height: auto;
 }
 
+/* The folder the file sits in. Given room to breathe in wide mode, where it is
+   most of the reason to be in wide mode; still useful narrow, where it takes
+   what is left after the fixed columns. */
+.flatlist-folder {
+    max-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .flatlist-user {
     width: 180px;
     overflow: hidden;
@@ -262,8 +272,7 @@ body {
 }
 
 .flatlist-selector,
-.flatlist-download,
-.flatlist-hide {
+.flatlist-download {
     width: 40px;
     text-align: center !important;
 }
@@ -283,6 +292,7 @@ body {
 }
 
 /* How many files are listed, how many are picked, and a way to unpick them. */
+/* How many files are listed, how many are picked, and a way to unpick them. */
 .flatlist-summary {
     padding-bottom: 8px;
     display: flex;
@@ -291,21 +301,24 @@ body {
     flex-wrap: wrap;
 }
 
-/* Sticks to the bottom of the viewport while the list is in view, rather than
-   sitting at the end of it. The list is every matching file now, so the end of
-   it is a long way from the row you just ticked -- and a download button you
-   have to go and find is one you scroll past your own selection to reach.
-   
-   The background is the segment's own variable rather than `inherit`, so it
-   stays opaque in both themes: rows scrolling underneath a transparent bar
-   read as a rendering fault. */
-.flatlist-actions {
-    position: sticky;
-    bottom: 0;
-    z-index: 2;
-    padding-top: 12px;
-    padding-bottom: 12px;
-    background: var(--smui-segment-background, #fff);
+/* Where a page hangs an action that must outlive its own scrolling. Pushed to
+   the right of the transfer stats, left of the logo, and gone entirely when
+   nothing has filled it. */
+.footer-slot {
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+    padding-right: 10px;
+}
+
+.footer-slot:empty {
+    display: none;
+}
+
+/* The footer is 41px; a default button does not fit in it. */
+.footer-slot .ui.button {
+    padding: 6px 10px;
+    margin: 0;
 }
 
 .showmore-button {
@@ -367,6 +380,20 @@ body {
   max-width: 1200px !important;
   margin-left: auto !important;
   margin-right: auto !important;
+}
+
+/* Wide mode, from the menu. The cap lives in three places -- here, the search
+   container and the show-more button -- and lifting one without the others
+   leaves the page ragged, with a table wider than the button under it.
+
+   2400 rather than none at all: on a very wide monitor an unbounded table puts
+   the size and length columns so far from the filename that reading across a
+   row needs a ruler. Wide enough for a remote path and its folder, not so wide
+   that the row stops being one thing. */
+:root.wide .view,
+:root.wide .search-container,
+:root.wide .showmore-button {
+  max-width: 2400px !important;
 }
   
 .view:last-child {

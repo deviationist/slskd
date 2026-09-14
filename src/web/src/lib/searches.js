@@ -1,5 +1,5 @@
 import api from './api';
-import { getFileName } from './util';
+import { getDirectoryName, getFileName } from './util';
 
 /**
  * Whether a phrase can be searched for.
@@ -439,4 +439,55 @@ export const downloadStateOf = ({ row, index }) => {
   return signature !== undefined && index.bySignature.has(signature)
     ? 'have'
     : undefined;
+};
+
+/**
+ * The folder a search result sits in, as much of it as is worth reading.
+ *
+ * The full remote path is often three or four levels of someone else's
+ * library -- `@@abcde\\Music\\FLAC\\Artist - Album (2003)` -- and the part
+ * that says anything is the end of it. Truncating from the left would hide
+ * exactly that, so this takes the last segment and leaves the whole path to
+ * the cell's title.
+ * @param {object} params
+ * @param {string} params.filename - The full remote path.
+ * @returns {string} The containing folder's own name, or '' if there is none.
+ */
+export const folderOf = ({ filename }) => {
+  if (!filename) {
+    return '';
+  }
+
+  const directory = getDirectoryName(filename);
+
+  // getDirectoryName hands back the whole path when there is no separator in
+  // it -- a file at the root of a share -- and that is a filename, not a folder
+  if (directory === filename) {
+    return '';
+  }
+
+  return directory.split(/[/\\]/u).filter(Boolean).pop() ?? '';
+};
+
+/**
+ * The line above the list: how many files there are, and how many are picked.
+ *
+ * "605 files, all selected" rather than "605 files, 605 selected". The second
+ * makes the reader compare two numbers to learn something the first just says,
+ * and they are the same number often enough for that to be a chore.
+ * @param {object} params
+ * @param {number} params.total - How many files are listed.
+ * @param {object} params.selection - The result of `selectionState`.
+ * @returns {string} The line.
+ */
+export const describeSelection = ({ total = 0, selection }) => {
+  const files = `${total} file${total === 1 ? '' : 's'}`;
+
+  if (!selection?.count) {
+    return files;
+  }
+
+  return selection.all
+    ? `${files}, all selected`
+    : `${files}, ${selection.count} selected`;
 };

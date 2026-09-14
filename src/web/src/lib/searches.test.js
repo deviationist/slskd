@@ -587,3 +587,78 @@ describe('indexDownloads / downloadStateOf', () => {
     expect(search.downloadStateOf({ row: {} })).toBeUndefined();
   });
 });
+
+describe('folderOf', () => {
+  it('takes the folder the file is actually in', () => {
+    expect(
+      search.folderOf({
+        filename: '@@abc\\Music\\FLAC\\Artist - Album (2003)\\01.flac',
+      }),
+    ).toBe('Artist - Album (2003)');
+  });
+
+  it('takes the last segment, not the first', () => {
+    // the end of someone else's library path is the part that says anything;
+    // the start is their drive letter and their username
+    expect(
+      search.folderOf({
+        filename: 'C:\\shared\\music\\Aphex Twin - SAW\\a.mp3',
+      }),
+    ).toBe('Aphex Twin - SAW');
+  });
+
+  it('handles forward slashes too', () => {
+    expect(search.folderOf({ filename: '/home/x/Some Album/track.flac' })).toBe(
+      'Some Album',
+    );
+  });
+
+  it('is empty for a file with no folder', () => {
+    // getDirectoryName returns the whole path when there is no separator, and
+    // that is the filename -- showing it in a Folder column would be a lie
+    expect(search.folderOf({ filename: 'loose.mp3' })).toBe('');
+    expect(search.folderOf({ filename: '' })).toBe('');
+    expect(search.folderOf({})).toBe('');
+  });
+
+  it('ignores a trailing separator rather than returning nothing', () => {
+    expect(search.folderOf({ filename: 'a\\Album\\\\track.mp3' })).toBe(
+      'Album',
+    );
+  });
+});
+
+describe('describeSelection', () => {
+  const state = (count, all) => ({ all, count, some: count > 0 && !all });
+
+  it('says how many files there are when none are picked', () => {
+    expect(
+      search.describeSelection({ selection: state(0, false), total: 605 }),
+    ).toBe('605 files');
+  });
+
+  it('counts a partial selection', () => {
+    expect(
+      search.describeSelection({ selection: state(12, false), total: 605 }),
+    ).toBe('605 files, 12 selected');
+  });
+
+  it('says "all selected" rather than repeating the number', () => {
+    // "605 files, 605 selected" makes the reader compare two numbers to learn
+    // what the words can just say
+    expect(
+      search.describeSelection({ selection: state(605, true), total: 605 }),
+    ).toBe('605 files, all selected');
+  });
+
+  it('gets the singular right', () => {
+    expect(
+      search.describeSelection({ selection: state(0, false), total: 1 }),
+    ).toBe('1 file');
+  });
+
+  it('copes with no selection state at all', () => {
+    expect(search.describeSelection({ total: 3 })).toBe('3 files');
+    expect(search.describeSelection({})).toBe('0 files');
+  });
+});
