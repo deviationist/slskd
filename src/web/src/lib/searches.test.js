@@ -563,3 +563,78 @@ describe('pathOf', () => {
     expect(search.pathOf({})).toBe('');
   });
 });
+
+describe('rowActionOf', () => {
+  const downloads = (state, localFileExists) => [
+    {
+      username: 'alice',
+      directories: [
+        {
+          files: [
+            {
+              username: 'alice',
+              filename: 'a\\got-it.flac',
+              size: 100,
+              state,
+              localFileExists,
+              id: 'tid-1',
+            },
+          ],
+        },
+      ],
+    },
+  ];
+
+  const row = { username: 'alice', filename: 'a\\got-it.flac', size: 100 };
+  const action = (state, onDisk, retrievalEnabled = true) =>
+    search.rowActionOf({
+      index: search.indexDownloads(downloads(state, onDisk)),
+      retrievalEnabled,
+      row,
+    });
+
+  it('offers a plain download for a file never taken', () => {
+    expect(
+      search.rowActionOf({ index: search.indexDownloads([]), row }).kind,
+    ).toBe('enqueue');
+  });
+
+  it('offers to fetch a downloaded file that is still on disk', () => {
+    // asking the peer again for something already sitting on the server is
+    // the wrong favour to ask of either of them
+    const a = action('Completed, Succeeded', true);
+
+    expect(a.kind).toBe('retrieve');
+    expect(a.id).toBe('tid-1');
+  });
+
+  it('offers to download it again once the file has gone', () => {
+    const a = action('Completed, Succeeded', false);
+
+    expect(a.kind).toBe('redownload');
+    expect(a.tip).toMatch(/gone/u);
+  });
+
+  it('says why it is offering a second download of something downloaded', () => {
+    // the row is marked as downloaded, so a download button next to that mark
+    // looks like a contradiction unless it explains itself
+    expect(action('Completed, Succeeded', true, false).tip).toMatch(
+      /already downloaded/iu,
+    );
+  });
+
+  it('falls back to downloading again where retrieval is switched off', () => {
+    expect(action('Completed, Succeeded', true, false).kind).toBe('redownload');
+  });
+
+  it('is a plain download while one is still in flight or has failed', () => {
+    // an unfinished transfer has no file to fetch, and a failed one is a
+    // reason to ask the peer rather than the server
+    expect(action('InProgress', false).kind).toBe('enqueue');
+    expect(action('Completed, Errored', false).kind).toBe('enqueue');
+  });
+
+  it('copes with no index at all', () => {
+    expect(search.rowActionOf({ row }).kind).toBe('enqueue');
+  });
+});
