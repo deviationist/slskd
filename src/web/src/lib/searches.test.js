@@ -838,3 +838,112 @@ describe('sortFromQuery / sortToQuery', () => {
     ).toBe('');
   });
 });
+
+describe('the peer columns sort', () => {
+  const rows = [
+    {
+      filename: 'a\\x.mp3',
+      username: 'slow',
+      uploadSpeed: 100,
+      queueLength: 9,
+      hasFreeUploadSlot: false,
+    },
+    {
+      filename: 'a\\y.mp3',
+      username: 'fast',
+      uploadSpeed: 9_000,
+      queueLength: 0,
+      hasFreeUploadSlot: true,
+    },
+    {
+      filename: 'a\\z.mp3',
+      username: 'mid',
+      uploadSpeed: 900,
+      queueLength: 3,
+      hasFreeUploadSlot: false,
+    },
+  ];
+
+  const order = (column, direction = 'asc') =>
+    search.sortRows({ column, direction, rows }).map((r) => r.username);
+
+  it('orders by upload speed', () => {
+    expect(order('speed')).toEqual(['slow', 'mid', 'fast']);
+    expect(order('speed', 'desc')).toEqual(['fast', 'mid', 'slow']);
+  });
+
+  it('orders by queue length', () => {
+    expect(order('queue')).toEqual(['fast', 'mid', 'slow']);
+  });
+
+  it('orders by free slot, rather than merely grouping', () => {
+    // descending is the useful click: the peers who can send now, first
+    expect(order('slot', 'desc')).toEqual(['fast', 'slow', 'mid']);
+    expect(order('slot')[0]).not.toBe('fast');
+  });
+});
+
+describe('parseColumns / withColumn', () => {
+  it('shows everything but the peer columns by default', () => {
+    expect(search.DEFAULT_COLUMNS).toEqual([
+      'name',
+      'path',
+      'user',
+      'size',
+      'attributes',
+      'length',
+    ]);
+    expect(search.parseColumns(null)).toEqual(search.DEFAULT_COLUMNS);
+    expect(search.parseColumns(undefined)).toEqual(search.DEFAULT_COLUMNS);
+  });
+
+  it('reads a stored list back', () => {
+    expect(search.parseColumns('name,size,speed')).toEqual([
+      'name',
+      'size',
+      'speed',
+    ]);
+  });
+
+  it('keeps this file’s order, not the stored one', () => {
+    // a column list is a set; letting a saved value decide the order would
+    // leave a reordering nobody asked for alive in a browser forever
+    expect(search.parseColumns('queue,name,size')).toEqual([
+      'name',
+      'size',
+      'queue',
+    ]);
+  });
+
+  it('drops a column it no longer has', () => {
+    expect(search.parseColumns('name,bitrot,size')).toEqual(['name', 'size']);
+  });
+
+  it('treats every column switched off as a choice', () => {
+    // but a value naming nothing known is a value from another version
+    expect(search.parseColumns('')).toEqual([]);
+    expect(search.parseColumns('bitrot,gone')).toEqual(search.DEFAULT_COLUMNS);
+  });
+
+  it('adds and removes a column, keeping the order', () => {
+    expect(
+      search.withColumn({ columns: ['name', 'size'], key: 'path', on: true }),
+    ).toEqual(['name', 'path', 'size']);
+    expect(
+      search.withColumn({
+        columns: ['name', 'path', 'size'],
+        key: 'path',
+        on: false,
+      }),
+    ).toEqual(['name', 'size']);
+  });
+
+  it('is unbothered by switching on what is already on', () => {
+    expect(
+      search.withColumn({ columns: ['name'], key: 'name', on: true }),
+    ).toEqual(['name']);
+    expect(search.withColumn({ columns: [], key: 'nope', on: true })).toEqual(
+      [],
+    );
+  });
+});

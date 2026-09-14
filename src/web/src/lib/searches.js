@@ -506,10 +506,17 @@ export const describeSelection = ({ total = 0, selection }) => {
  */
 export const SORT_COLUMNS = {
   attributes: { kind: 'text', of: (row) => formatAttributes(row) },
-  path: { kind: 'text', of: (row) => pathOf(row) },
   length: { kind: 'number', of: (row) => row.length },
   name: { kind: 'text', of: (row) => getFileName(row.filename ?? '') },
+  path: { kind: 'text', of: (row) => pathOf(row) },
+  queue: { kind: 'number', of: (row) => row.queueLength },
   size: { kind: 'number', of: (row) => row.size },
+
+  // as a number, so it orders rather than merely groups: ascending puts the
+  // peers who cannot send now first, which is why the useful click is the
+  // second one
+  slot: { kind: 'number', of: (row) => (row.hasFreeUploadSlot ? 1 : 0) },
+  speed: { kind: 'number', of: (row) => row.uploadSpeed },
   user: { kind: 'text', of: (row) => row.username },
 };
 
@@ -638,4 +645,82 @@ export const sortToQuery = ({ search, column, direction }) => {
   const next = params.toString();
 
   return next ? `?${next}` : '';
+};
+
+/*
+ * Which columns the table shows.
+ *
+ * Three of them describe the *peer* rather than the file -- how fast they
+ * upload, whether they can send now, how long their queue is. They decide
+ * which copy of a file to take, which is a question worth asking and not one
+ * worth nine columns of width while you are not asking it. So they exist, and
+ * they are off until switched on.
+ *
+ * The order is fixed here rather than taken from what was stored: a column
+ * list is a set, and letting a saved value decide the order would mean a
+ * reordering nobody asked for surviving in a browser forever.
+ */
+
+/**
+ * Every column, in the order they are drawn.
+ */
+export const COLUMNS = [
+  { key: 'name', label: 'File', className: 'flatlist-filename' },
+  { key: 'path', label: 'Path', className: 'flatlist-path' },
+  { key: 'user', label: 'User', className: 'flatlist-user' },
+  { key: 'size', label: 'Size', className: 'flatlist-size' },
+  { key: 'attributes', label: 'Attributes', className: 'flatlist-attributes' },
+  { key: 'length', label: 'Length', className: 'flatlist-length' },
+  { key: 'speed', label: 'Speed', className: 'flatlist-speed', peer: true },
+  { key: 'slot', label: 'Free Slot', className: 'flatlist-slot', peer: true },
+  { key: 'queue', label: 'Queue', className: 'flatlist-queue', peer: true },
+];
+
+/**
+ * The columns shown to someone who has never touched the setting.
+ */
+export const DEFAULT_COLUMNS = COLUMNS.filter((c) => !c.peer).map((c) => c.key);
+
+/**
+ * Reads a stored column list, and copes with anything else.
+ *
+ * Nothing stored means the defaults rather than nothing: an empty table is a
+ * worse answer to a cleared browser than the table everyone else sees. An
+ * unknown key is dropped -- the value outlives the version that wrote it, and
+ * a column removed in a later release should not leave a hole.
+ * @param {string} stored - The saved value, or null.
+ * @returns {string[]} Column keys, in this file's order.
+ */
+export const parseColumns = (stored) => {
+  if (typeof stored !== 'string') {
+    return DEFAULT_COLUMNS;
+  }
+
+  const asked = new Set(stored.split(',').filter(Boolean));
+  const known = COLUMNS.filter((c) => asked.has(c.key)).map((c) => c.key);
+
+  // every known column switched off is a choice, but a stored value naming
+  // *nothing* known is a value from another version or a typo, and the
+  // defaults are the better answer to it
+  return known.length > 0 || asked.size === 0 ? known : DEFAULT_COLUMNS;
+};
+
+/**
+ * Turns one column on or off, keeping the canonical order.
+ * @param {object} params
+ * @param {string[]} params.columns - The columns shown now.
+ * @param {string} params.key - The column to change.
+ * @param {boolean} params.on - Whether it should be shown.
+ * @returns {string[]} The new list.
+ */
+export const withColumn = ({ columns = [], key, on }) => {
+  const wanted = new Set(columns);
+
+  if (on) {
+    wanted.add(key);
+  } else {
+    wanted.delete(key);
+  }
+
+  return COLUMNS.filter((c) => wanted.has(c.key)).map((c) => c.key);
 };

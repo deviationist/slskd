@@ -1,13 +1,16 @@
 import {
+  COLUMNS,
   describeSelection,
   downloadStateOf,
   groupByUser,
   nextSort,
+  parseColumns,
   pathOf,
   selectionState,
   sortFromQuery,
   sortRows,
   sortToQuery,
+  withColumn,
 } from '../../lib/searches';
 import * as transfers from '../../lib/transfers';
 import {
@@ -104,17 +107,31 @@ const MARKS = {
   },
 };
 
-/**
- * The columns, in the order they are drawn, and what each one is called.
+/*
+ * Which columns this browser shows. Per browser like the view toggle itself,
+ * and for the same reason: it says how this operator reads results, not
+ * anything about the search.
+ *
+ * Guarded on both sides -- localStorage throws outright where site data is
+ * blocked, and the read runs on the first render.
  */
-const COLUMNS = [
-  { key: 'name', label: 'File', className: 'flatlist-filename' },
-  { key: 'path', label: 'Path', className: 'flatlist-path' },
-  { key: 'user', label: 'User', className: 'flatlist-user' },
-  { key: 'size', label: 'Size', className: 'flatlist-size' },
-  { key: 'attributes', label: 'Attributes', className: 'flatlist-attributes' },
-  { key: 'length', label: 'Length', className: 'flatlist-length' },
-];
+const COLUMNS_KEY = 'slskd-search-columns';
+
+const readStoredColumns = () => {
+  try {
+    return parseColumns(window.localStorage.getItem(COLUMNS_KEY));
+  } catch {
+    return parseColumns(null);
+  }
+};
+
+const storeColumns = (columns) => {
+  try {
+    window.localStorage.setItem(COLUMNS_KEY, columns.join(','));
+  } catch {
+    // a preference that cannot be saved is still a preference for this tab
+  }
+};
 
 const FlatFileList = ({ disabled, downloads, rows: unsorted }) => {
   const [selected, setSelected] = useState(() => new Set());
@@ -142,6 +159,17 @@ const FlatFileList = ({ disabled, downloads, rows: unsorted }) => {
       pathname: location.pathname,
       search: sortToQuery({ ...next, search: location.search }),
     });
+  };
+
+  const [columns, setColumns] = useState(readStoredColumns);
+  const shown = COLUMNS.filter((col) => columns.includes(col.key));
+  const show = (key) => columns.includes(key);
+
+  const setColumn = (key, on) => {
+    const next = withColumn({ columns, key, on });
+
+    setColumns(next);
+    storeColumns(next);
   };
 
   const [footerSlot, setFooterSlot] = useState(null);
@@ -312,6 +340,40 @@ const FlatFileList = ({ disabled, downloads, rows: unsorted }) => {
             Clear selection
           </Button>
         )}
+        {/*
+         * A Popup rather than a Dropdown. Semantic's Dropdown closes from a
+         * *native* document listener, which a React `stopPropagation` cannot
+         * reach -- measured, the menu shut on the first tick and swallowed
+         * the tick itself, so nothing changed either. Popup's portal ignores
+         * clicks inside itself, which is what lets several columns be
+         * switched in one visit.
+         */}
+        <Popup
+          content={
+            <div className="flatlist-columns-menu">
+              {COLUMNS.map((col) => (
+                <Checkbox
+                  checked={show(col.key)}
+                  key={col.key}
+                  label={col.label}
+                  onChange={() => setColumn(col.key, !show(col.key))}
+                />
+              ))}
+            </div>
+          }
+          on="click"
+          position="bottom right"
+          trigger={
+            <Button
+              basic
+              className="flatlist-columns"
+              compact
+              content="Columns"
+              icon="columns"
+              size="tiny"
+            />
+          }
+        />
       </div>
       {/*
        * Into the footer, which is the one strip always on screen and has room
@@ -375,7 +437,7 @@ const FlatFileList = ({ disabled, downloads, rows: unsorted }) => {
                   }
                 />
               </Table.HeaderCell>
-              {COLUMNS.map((col) => (
+              {shown.map((col) => (
                 <Table.HeaderCell
                   className={col.className}
                   key={col.key}
@@ -400,7 +462,7 @@ const FlatFileList = ({ disabled, downloads, rows: unsorted }) => {
             {paddingTop > 0 && (
               <Table.Row>
                 <Table.Cell
-                  colSpan={8}
+                  colSpan={shown.length + 2}
                   style={{ height: paddingTop, padding: 0 }}
                 />
               </Table.Row>
@@ -424,74 +486,106 @@ const FlatFileList = ({ disabled, downloads, rows: unsorted }) => {
                       onChange={(_event, data) => toggle(row.key, data.checked)}
                     />
                   </Table.Cell>
-                  <Table.Cell
-                    className="flatlist-filename"
-                    // the full remote path, which the column truncates and
-                    // which is the only way to tell two files apart when their
-                    // names differ only past where the column ends
-                    title={row.filename}
-                  >
-                    {/*
-                     * An inner element, and media-bridge injects its play
-                     * button and quality badge into *this* rather than into
-                     * the cell. The layout has to be flex so the filename is
-                     * the only thing that shrinks -- and a `<td>` that is not
-                     * `table-cell` leaves the table's column layout, taking
-                     * the column's width with it. So the cell stays a cell
-                     * and this does the arranging.
-                     */}
-                    <div className="flatlist-cell">
-                      {row.locked && <Icon name="lock" />}
-                      {mark && (
-                        <Popup
-                          content={mark.tip}
-                          position="top left"
-                          trigger={
-                            <Icon
-                              color={mark.colour}
-                              name={mark.icon}
-                            />
-                          }
-                        />
-                      )}
-                      <span className="flatlist-name">
-                        {getFileName(row.filename)}
-                      </span>
-                    </div>
-                  </Table.Cell>
-                  <Table.Cell
-                    className="flatlist-path"
-                    // the filename too, since the column stops at the folder
-                    // and truncates even that on a narrow window
-                    title={row.filename}
-                  >
-                    {pathOf(row)}
-                  </Table.Cell>
-                  <Table.Cell className="flatlist-user">
-                    <Popup
-                      content={`Upload speed ${formatBytes(row.uploadSpeed)}/s · Free upload slot ${row.hasFreeUploadSlot ? 'YES' : 'NO'} · Queue length ${row.queueLength}`}
-                      position="top left"
-                      trigger={
-                        <span>
-                          <Icon
-                            color={row.hasFreeUploadSlot ? 'green' : 'yellow'}
-                            name="circle"
-                            size="small"
+                  {show('name') && (
+                    <Table.Cell
+                      className="flatlist-filename"
+                      // the full remote path, which the column truncates and
+                      // which is the only way to tell two files apart when their
+                      // names differ only past where the column ends
+                      title={row.filename}
+                    >
+                      {/*
+                       * An inner element, and media-bridge injects its play
+                       * button and quality badge into *this* rather than into
+                       * the cell. The layout has to be flex so the filename is
+                       * the only thing that shrinks -- and a `<td>` that is not
+                       * `table-cell` leaves the table's column layout, taking
+                       * the column's width with it. So the cell stays a cell
+                       * and this does the arranging.
+                       */}
+                      <div className="flatlist-cell">
+                        {row.locked && <Icon name="lock" />}
+                        {mark && (
+                          <Popup
+                            content={mark.tip}
+                            position="top left"
+                            trigger={
+                              <Icon
+                                color={mark.colour}
+                                name={mark.icon}
+                              />
+                            }
                           />
-                          {row.username}
+                        )}
+                        <span className="flatlist-name">
+                          {getFileName(row.filename)}
                         </span>
-                      }
-                    />
-                  </Table.Cell>
-                  <Table.Cell className="flatlist-size">
-                    {formatBytes(row.size)}
-                  </Table.Cell>
-                  <Table.Cell className="flatlist-attributes">
-                    {formatAttributes(row)}
-                  </Table.Cell>
-                  <Table.Cell className="flatlist-length">
-                    {formatSeconds(row.length)}
-                  </Table.Cell>
+                      </div>
+                    </Table.Cell>
+                  )}
+                  {show('path') && (
+                    <Table.Cell
+                      className="flatlist-path"
+                      // the filename too, since the column stops at the folder
+                      // and truncates even that on a narrow window
+                      title={row.filename}
+                    >
+                      {pathOf(row)}
+                    </Table.Cell>
+                  )}
+                  {show('user') && (
+                    <Table.Cell className="flatlist-user">
+                      <Popup
+                        content={`Upload speed ${formatBytes(row.uploadSpeed)}/s · Free upload slot ${row.hasFreeUploadSlot ? 'YES' : 'NO'} · Queue length ${row.queueLength}`}
+                        position="top left"
+                        trigger={
+                          <span>
+                            <Icon
+                              color={row.hasFreeUploadSlot ? 'green' : 'yellow'}
+                              name="circle"
+                              size="small"
+                            />
+                            {row.username}
+                          </span>
+                        }
+                      />
+                    </Table.Cell>
+                  )}
+                  {show('size') && (
+                    <Table.Cell className="flatlist-size">
+                      {formatBytes(row.size)}
+                    </Table.Cell>
+                  )}
+                  {show('attributes') && (
+                    <Table.Cell className="flatlist-attributes">
+                      {formatAttributes(row)}
+                    </Table.Cell>
+                  )}
+                  {show('length') && (
+                    <Table.Cell className="flatlist-length">
+                      {formatSeconds(row.length)}
+                    </Table.Cell>
+                  )}
+                  {show('speed') && (
+                    <Table.Cell className="flatlist-speed">
+                      {row.uploadSpeed === undefined
+                        ? ''
+                        : `${formatBytes(row.uploadSpeed)}/s`}
+                    </Table.Cell>
+                  )}
+                  {show('slot') && (
+                    <Table.Cell className="flatlist-slot">
+                      <Icon
+                        color={row.hasFreeUploadSlot ? 'green' : 'yellow'}
+                        name={row.hasFreeUploadSlot ? 'check' : 'clock outline'}
+                      />
+                    </Table.Cell>
+                  )}
+                  {show('queue') && (
+                    <Table.Cell className="flatlist-queue">
+                      {row.queueLength}
+                    </Table.Cell>
+                  )}
                   <Table.Cell className="flatlist-download">
                     <Popup
                       content={`Download this file from ${row.username}`}
@@ -517,7 +611,7 @@ const FlatFileList = ({ disabled, downloads, rows: unsorted }) => {
             {paddingBottom > 0 && (
               <Table.Row>
                 <Table.Cell
-                  colSpan={8}
+                  colSpan={shown.length + 2}
                   style={{ height: paddingBottom, padding: 0 }}
                 />
               </Table.Row>

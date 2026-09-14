@@ -373,6 +373,33 @@ body {
     width: 65px;
 }
 
+.flatlist-speed {
+    width: 100px;
+}
+
+.flatlist-queue {
+    width: 70px;
+}
+
+.flatlist-slot {
+    width: 80px;
+    text-align: center !important;
+}
+
+/* Pushed to the end of the summary bar, away from the count and the clear. */
+.flatlist-columns {
+    margin-left: auto !important;
+}
+
+/* One switch per line, so the list reads as a set of independent choices
+   rather than a menu where picking one means not picking the others. */
+.flatlist-columns-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 2px;
+}
+
 .flatlist-selector,
 .flatlist-download {
     width: 40px;
