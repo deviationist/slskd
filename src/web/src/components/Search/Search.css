@@ -34,12 +34,19 @@
    "Fold Results". A fifth needs no CSS at all now. */
 
 /* Toggles on the left, the sort on the right. One row, so the sort ends up
-   against the edge rather than wherever the toggles happen to end. */
+   against the edge rather than wherever the toggles happen to end.
+
+   The floor is what stops the filter box below jumping. The sort is 36px and
+   the toggles 21, and the sort is absent in Table View -- so without this the
+   row loses 15px the moment the view changes and everything under it steps up.
+   min-height rather than height: below about 1000px the two no longer fit side
+   by side and the row wraps, which a fixed height would crop. */
 .search-options-row {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 1rem;
+  min-height: 36px;
 }
 
 .search-options-row .search-options-sort {
