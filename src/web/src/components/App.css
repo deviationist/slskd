@@ -300,9 +300,19 @@ body {
    know the headers do anything. These are the missing halves: a faint marker
    on every unsorted column, and a stronger one under the pointer. */
 .flatlist thead th {
-    cursor: pointer;
     user-select: none;
     white-space: nowrap;
+}
+
+.flatlist thead th.flatlist-sortable {
+    cursor: pointer;
+}
+
+/* Semantic puts `cursor: pointer` on every header of a sortable table. The
+   checkbox and the action column are headers and neither sorts, so the pointer
+   was promising a click that does nothing. */
+.ui.sortable.table.flatlist thead th:not(.flatlist-sortable) {
+    cursor: default;
 }
 
 /* Prefixed with Semantic's own classes to outweigh
@@ -312,7 +322,7 @@ body {
 
    `font-family: inherit` because that same rule switches to the Icons font for
    Semantic's own glyphs, and this marker is an ordinary character. */
-.ui.sortable.table.flatlist thead th:not(.sorted)::after {
+.ui.sortable.table.flatlist thead th.flatlist-sortable:not(.sorted)::after {
     content: '↕';
     display: inline-block;
     font-family: inherit;
@@ -325,7 +335,7 @@ body {
     opacity: 0;
 }
 
-.ui.sortable.table.flatlist thead th:not(.sorted):hover::after {
+.ui.sortable.table.flatlist thead th.flatlist-sortable:not(.sorted):hover::after {
     opacity: 0.55;
 }
 
@@ -371,6 +381,33 @@ body {
 
 .flatlist-length {
     width: 65px;
+}
+
+.flatlist-speed {
+    width: 100px;
+}
+
+.flatlist-queue {
+    width: 70px;
+}
+
+.flatlist-slot {
+    width: 80px;
+    text-align: center !important;
+}
+
+/* Pushed to the end of the summary bar, away from the count and the clear. */
+.flatlist-columns {
+    margin-left: auto !important;
+}
+
+/* One switch per line, so the list reads as a set of independent choices
+   rather than a menu where picking one means not picking the others. */
+.flatlist-columns-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 2px;
 }
 
 .flatlist-selector,
