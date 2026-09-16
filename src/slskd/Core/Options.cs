@@ -3072,6 +3072,11 @@ namespace slskd
                 public static readonly string[] Adapters = ["smtp", "brevo", "sendmail"];
 
                 /// <summary>
+                ///     The layouts a message listing files can be composed in.
+                /// </summary>
+                public static readonly string[] Formats = [Search.Watches.Notification.TableLayout, Search.Watches.Notification.ListLayout];
+
+                /// <summary>
                 ///     Gets a value indicating whether outgoing mail is enabled.
                 /// </summary>
                 [Argument(default, "mail")]
@@ -3116,6 +3121,20 @@ namespace slskd
                 public string BaseUrl { get; init; }
 
                 /// <summary>
+                ///     Gets the layout of a message that lists files; a table, or a block per file.
+                /// </summary>
+                /// <remarks>
+                ///     A table by default, because the question asked of a watch's mail is whether anything in it is
+                ///     worth having, and that is answered by scanning a column. The layout governs the <em>HTML</em>
+                ///     body; the plain one stays a block per file, since it is the fallback that has to carry a link
+                ///     per file on its own line -- and it is all the sendmail adapter sends, which cannot do multipart.
+                /// </remarks>
+                [Argument(default, "mail-format")]
+                [EnvironmentVariable("MAIL_FORMAT")]
+                [Description("the layout of mail listing files; table or list")]
+                public string Format { get; init; } = Search.Watches.Notification.TableLayout;
+
+                /// <summary>
                 ///     Gets SMTP options.
                 /// </summary>
                 [Validate]
@@ -3145,6 +3164,11 @@ namespace slskd
                     if (!Adapters.Contains(Adapter, StringComparer.OrdinalIgnoreCase))
                     {
                         results.Add(new ValidationResult($"The Mail field Adapter must be one of {string.Join(", ", Adapters)}"));
+                    }
+
+                    if (!Formats.Contains(Format, StringComparer.OrdinalIgnoreCase))
+                    {
+                        results.Add(new ValidationResult($"The Mail field Format must be one of {string.Join(", ", Formats)}"));
                     }
 
                     if (string.IsNullOrWhiteSpace(From))

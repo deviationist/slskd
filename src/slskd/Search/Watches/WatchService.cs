@@ -36,7 +36,6 @@ namespace slskd.Search.Watches;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
@@ -631,60 +630,25 @@ public class WatchService
         }
 
         var options = OptionsMonitor.CurrentValue.Integrations.Mail;
-        var subject = $"slskd: {files.Count} new result{(files.Count == 1 ? string.Empty : "s")} for '{searchText}'";
 
-        var body = new StringBuilder();
-        body.AppendLine($"A watch on '{searchText}' found {files.Count} file(s) it has not reported before.");
-        body.AppendLine();
+        // what it says lives in Notification, where it can be tested. this arranges the run and sends what comes back
+        var composed = Notification.Compose(
+            searchText: searchText,
+            searchId: watch.SearchId,
+            files: files,
+            enqueued: enqueued,
+            baseUrl: options.BaseUrl,
+            layout: options.Format,
+            maximumListed: MaximumFilesListed);
 
-        var listed = files.OrderBy(f => f.Username).ThenBy(f => f.Filename).Take(MaximumFilesListed).ToList();
-
-        var baseUrl = options.BaseUrl?.TrimEnd('/');
-
-        foreach (var file in listed)
-        {
-            body.AppendLine($"  {file.Username}");
-            body.AppendLine($"    {file.Filename}");
-            body.AppendLine($"    {file.Size / 1024 / 1024} MB{(file.BitRate.HasValue ? $", {file.BitRate} kbps" : string.Empty)}{(file.Length.HasValue ? $", {file.Length / 60}:{file.Length % 60:00}" : string.Empty)}");
-
-            // a link to stop hearing about this one, which is the thing an operator wants at the moment they are
-            // reading about a file they do not want. it opens the search and asks before it does anything: the link
-            // carries no authority of its own, so following it is safe for anything that prefetches links in mail
-            if (!string.IsNullOrWhiteSpace(baseUrl))
-            {
-                var name = Uri.EscapeDataString(IgnoreSet.NameOf(file.Filename) ?? string.Empty);
-                body.AppendLine($"    Never report this again: {baseUrl}/searches/{watch.SearchId}?ignore={name}");
-            }
-
-            body.AppendLine();
-        }
-
-        if (enqueued > 0)
-        {
-            body.AppendLine($"{enqueued} of these have been queued for download.");
-            body.AppendLine();
-        }
-
-        if (files.Count > listed.Count)
-        {
-            body.AppendLine($"...and {files.Count - listed.Count} more.");
-            body.AppendLine();
-            body.AppendLine("A search this broad will report hundreds of files on every run, because the network");
-            body.AppendLine("answers with whichever peers happen to reply and that set differs each time. A watch");
-            body.AppendLine("is at its best on a search narrow enough that its results are stable.");
-            body.AppendLine();
-        }
-
-        if (!string.IsNullOrWhiteSpace(options.BaseUrl))
-        {
-            body.AppendLine($"{options.BaseUrl.TrimEnd('/')}/searches/{watch.SearchId}");
-        }
+        var subject = composed.Subject;
 
         var mail = new Mail
         {
             To = watch.NotifyEmail,
             Subject = subject,
-            Text = body.ToString(),
+            Text = composed.Text,
+            Html = composed.Html,
         };
 
         string adapter = null;
