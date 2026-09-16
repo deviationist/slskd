@@ -186,6 +186,20 @@ const Searches = ({ server } = {}) => {
     }
   };
 
+  // the detail page owns the watch it is showing, and the list badges searches
+  // from this map -- so the two have to be kept level, or a watch added or
+  // removed in there is invisible here until the page is reloaded
+  const onWatchChanged = ({ searchId: id, watch }) => {
+    setWatches((old) => {
+      if (!watch) {
+        delete old[id];
+        return { ...old };
+      }
+
+      return { ...old, [id]: watch };
+    });
+  };
+
   // delete a search
   const remove = async (search) => {
     try {
@@ -241,6 +255,7 @@ const Searches = ({ server } = {}) => {
           onCreate={create}
           onRemove={remove}
           onStop={stop}
+          onWatchChanged={onWatchChanged}
           removing={removing}
           search={searches[searchId]}
           stopping={stopping}

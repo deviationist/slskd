@@ -289,6 +289,7 @@ const SearchDetail = ({
   onCreate,
   onRemove,
   onStop,
+  onWatchChanged,
   removing,
   search,
   stopping,
@@ -421,15 +422,21 @@ const SearchDetail = ({
 
   const filteredCount = results?.length - sortedAndFilteredResults.length;
   const remainingCount = sortedAndFilteredResults.length - displayCount;
+  // the list behind this page badges a search from a map it loaded once, so a
+  // watch created, changed or deleted here has to be reported back -- otherwise
+  // returning to the list shows what was true when the page was opened, and the
+  // badge only appears after a manual refresh
   const loadWatch = async () => {
     try {
       const found = await watchLibrary.get({ id });
 
       setWatch(found);
+      onWatchChanged?.({ searchId: id, watch: found });
       return found;
     } catch {
       // a 404 is the ordinary case: most searches are not watched
       setWatch(undefined);
+      onWatchChanged?.({ searchId: id, watch: undefined });
       return undefined;
     }
   };
