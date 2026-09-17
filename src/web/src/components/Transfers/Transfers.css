@@ -2,13 +2,26 @@
    stretch and their contents sit at the top of them -- measured, the sort
    dropdown and the action buttons were 6px above the centre while the filter
    input, which centres itself, was on it. Centring the row lines all of them
-   up from one place. */
+   up from one place.
+
+   It wraps, and its height follows what it holds. It used to be a hard 78px
+   with no wrapping, which was true when it held an icon and three buttons and
+   stopped being true when the filter and the Table View toggle joined them:
+   measured against the live page, the row overflowed the segment by 62px at
+   800px wide and by 191px at 420px, spilling its buttons outside the card.
+   A single row still measures 78px, so nothing moves at the widths where it
+   already fitted. `align-items` applies per line in a wrapped flex container,
+   so each row centres on itself rather than on the whole box. */
 .transfers-header-segment {
   margin-top: 15px !important;
-  height: 78px !important;
+  min-height: 78px;
+  height: auto !important;
   padding-top: 14px !important;
+  padding-bottom: 14px !important;
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  row-gap: 10px;
 }
 
 .transfers-segment-icon {
@@ -120,13 +133,13 @@
   word-wrap: break-word !important;
 }
 
-/* A row that does not wrap. Adding the Table View toggle to this group pushed
-   the last button onto a second line, which made the wrapper 72px tall and
-   left everything in it sitting 18px above the header's centre -- the fixed
-   78px header has no room for two rows.
+/* The toggle and the three action buttons, as one unit that never breaks
+   across lines: they are a group, and a group split down the middle reads as
+   two unrelated things. The whole unit moves to the next line instead, which
+   is what the header's own `flex-wrap` is for.
 
-   The filter beside it is `flex: 1 1 auto; min-width: 0`, so it is what gives
-   way when the window narrows rather than these. */
+   `margin-left: auto` holds it hard right while it shares a line, and keeps it
+   right once it has a line of its own. */
 .transfers-header-buttons {
   display: flex;
   align-items: center;
@@ -181,10 +194,17 @@
     margin-right: 12px;
 }
 
-/* Between the sort and the action buttons, taking the middle of the header
-   rather than a line of its own -- the segment is a fixed 78px and a second
-   row would not fit in it. Capped so it does not crowd the buttons on a wide
-   window.
+/* Between the sort and the action buttons. Capped so it does not crowd the
+   buttons on a wide window, and floored so it stops being the only thing that
+   gives.
+
+   The floor is the point: it was `flex: 1 1 auto; min-width: 0`, which made it
+   the sole shock absorber for a row that had grown two controls wider than it
+   used to be. Measured against the live page, it was 24px wide at 900px and
+   0px at 800px -- a Filter label with no field after it -- while the buttons
+   beside it, at `flex: 0 0 auto`, gave up nothing and overflowed the segment
+   anyway. Below the floor the row wraps instead, which loses a line of height
+   rather than a control.
 
    The air is on the right rather than the left, where the Table View toggle
    is: the sort dropdown to the left of this is hidden in table view, so a
@@ -194,10 +214,24 @@
 .transfers-header-filter {
   display: inline-flex;
   align-items: center;
-  flex: 1 1 auto;
-  min-width: 0;
+  flex: 1 1 160px;
+  min-width: 160px;
   max-width: 320px;
   margin-right: 1em;
+}
+
+/* Narrow enough that the field cannot share a line with anything: it takes one
+   of its own, and the icon, the sort and the buttons arrange themselves around
+   it. Measured, this is where the card view ran out of room -- at 420px the
+   direction icon and the sort dropdown alone are 235px of the 390px there is,
+   leaving less than the field's floor, so without this the line overflowed by
+   54px rather than wrapping. */
+@media (max-width: 560px) {
+  .transfers-header-filter {
+    flex-basis: 100%;
+    max-width: none;
+    margin-right: 0;
+  }
 }
 
 .transfers-header-filter .ui.input {

@@ -3,10 +3,25 @@ import {
   isStateRetryable,
   SORT_OPTIONS,
 } from '../../lib/transfers';
-import { Div, Nbsp } from '../Shared';
+import { Div } from '../Shared';
 import ShrinkableDropdownButton from '../Shared/ShrinkableDropdownButton';
 import React, { useMemo, useState } from 'react';
 import { Checkbox, Dropdown, Icon, Input, Segment } from 'semantic-ui-react';
+
+/*
+ * Where the action buttons give up their labels for their icons.
+ *
+ * Upstream's 715px was measured when this header held an icon and three
+ * buttons. It now also holds a filter and the Table View toggle, and the
+ * buttons at full width are 752px of the 770px a 800px window leaves --
+ * so by the time this fired the row had already overflowed the segment.
+ *
+ * At this width the header wraps instead: the buttons take a line of their
+ * own, where they have the room to keep their labels. Below it they would not
+ * fit even on a line of their own, so the labels go and the tooltips carry
+ * them.
+ */
+const SHRINK_BUTTONS = '(max-width: 800px)';
 
 const getRetryableFiles = ({ files, retryOption }) => {
   switch (retryOption) {
@@ -181,7 +196,7 @@ const TransfersHeader = ({
           hidden={direction === 'upload'}
           icon="redo"
           loading={retrying}
-          mediaQuery="(max-width: 715px)"
+          mediaQuery={SHRINK_BUTTONS}
           onChange={(_, data) => setRetryOption(data.value)}
           onClick={() => onRetryAll(getRetryableFiles({ files, retryOption }))}
           options={[
@@ -192,13 +207,12 @@ const TransfersHeader = ({
         >
           {`Retry ${retryOption === 'All' ? retryOption : `All ${retryOption}`}`}
         </ShrinkableDropdownButton>
-        <Nbsp />
         <ShrinkableDropdownButton
           color="red"
           disabled={working || empty}
           icon="x"
           loading={cancelling}
-          mediaQuery="(max-width: 715px)"
+          mediaQuery={SHRINK_BUTTONS}
           onChange={(_, data) => setCancelOption(data.value)}
           onClick={() =>
             onCancelAll(getCancellableFiles({ cancelOption, files }))
@@ -211,12 +225,11 @@ const TransfersHeader = ({
         >
           {`Cancel ${cancelOption === 'All' ? cancelOption : `All ${cancelOption}`}`}
         </ShrinkableDropdownButton>
-        <Nbsp />
         <ShrinkableDropdownButton
           disabled={working || empty}
           icon="trash alternate"
           loading={removing}
-          mediaQuery="(max-width: 715px)"
+          mediaQuery={SHRINK_BUTTONS}
           onChange={(_, data) => setRemoveOption(data.value)}
           onClick={() =>
             onRemoveAll(getRemovableFiles({ files, removeOption }))
