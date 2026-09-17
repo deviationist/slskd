@@ -1,6 +1,104 @@
 import * as tables from './tables';
 import * as transfers from './transfers';
 
+describe('describeEnqueueFailures', () => {
+  it('uses the server\u2019s reason when every file was refused for it', () => {
+    // which is nearly always "already in progress", and is the useful half
+    expect(
+      transfers.describeEnqueueFailures({
+        failures: [
+          { filename: 'a.flac', message: 'Skipped: Already in progress' },
+          { filename: 'b.flac', message: 'Skipped: Already in progress' },
+        ],
+        username: 'bob',
+      }),
+    ).toBe('Could not enqueue 2 files from bob: Already in progress');
+  });
+
+  it('gets the singular right', () => {
+    expect(
+      transfers.describeEnqueueFailures({
+        failures: [
+          { filename: 'a.flac', message: 'Skipped: Already in progress' },
+        ],
+        username: 'bob',
+      }),
+    ).toBe('Could not enqueue 1 file from bob: Already in progress');
+  });
+
+  it('counts rather than guesses where the reasons differ', () => {
+    // two reasons cannot both be the sentence, and picking one would report
+    // the wrong thing about half the files
+    expect(
+      transfers.describeEnqueueFailures({
+        failures: [
+          { filename: 'a.flac', message: 'Skipped: Already in progress' },
+          { filename: 'b.flac', message: 'Something else entirely' },
+        ],
+        username: 'bob',
+      }),
+    ).toBe('Could not enqueue 2 files from bob');
+  });
+
+  it('says something when the server said nothing', () => {
+    expect(
+      transfers.describeEnqueueFailures({
+        failures: [{ filename: 'a.flac' }],
+        username: 'bob',
+      }),
+    ).toBe('Could not enqueue 1 file from bob');
+  });
+});
+
+describe('the search a download came from', () => {
+  const row = {
+    filename: 'x\\a.flac',
+    searchId: '8f21c430-7c03-4199-8cce-35053f8892b3',
+    searchText: 'aphex twin',
+  };
+
+  it('sorts on the text, which is what the column shows', () => {
+    const rows = [
+      { ...row, searchText: 'zomby' },
+      { ...row, searchText: 'aphex twin' },
+    ];
+
+    expect(
+      tables
+        .sortRows({
+          column: 'search',
+          columns: transfers.TRANSFER_SORT_COLUMNS,
+          direction: 'asc',
+          rows,
+        })
+        .map((r) => r.searchText),
+    ).toEqual(['aphex twin', 'zomby']);
+  });
+
+  it('puts the downloads that came from no search last', () => {
+    // sorting by origin to find out where something came from, and being
+    // handed the ones with no origin first, is not an answer
+    const rows = [{ filename: 'x\\b.flac' }, row];
+
+    expect(
+      tables
+        .sortRows({
+          column: 'search',
+          columns: transfers.TRANSFER_SORT_COLUMNS,
+          direction: 'asc',
+          rows,
+        })
+        .map((r) => r.searchText),
+    ).toEqual(['aphex twin', undefined]);
+  });
+
+  it('is a column that is off until it is asked for', () => {
+    expect(
+      transfers.TRANSFER_COLUMNS.find((c) => c.key === 'search').optional,
+    ).toBe(true);
+  });
+});
+
 describe('summariseDeletions', () => {
   const deleted = {
     data: {

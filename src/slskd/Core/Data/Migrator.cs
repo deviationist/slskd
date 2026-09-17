@@ -67,6 +67,7 @@ public class Migrator
             { nameof(Z2026_09_12_WatchIgnoresMigration), new Z2026_09_12_WatchIgnoresMigration(connectionStrings: Databases) },
             { nameof(Z2026_09_13_WatchSeedPendingMigration), new Z2026_09_13_WatchSeedPendingMigration(connectionStrings: Databases) },
             { nameof(Z2026_09_12_WatchAutoDownloadMigration), new Z2026_09_12_WatchAutoDownloadMigration(connectionStrings: Databases) },
+            { nameof(Z2026_09_17_BatchSearchTextMigration), new Z2026_09_17_BatchSearchTextMigration(connectionStrings: Databases) },
         };
     }
 

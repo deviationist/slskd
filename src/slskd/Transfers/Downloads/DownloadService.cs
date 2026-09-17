@@ -475,10 +475,15 @@ namespace slskd.Transfers.Downloads
                             we have to persist these changes to the database at this time so the record shows up on the UI,
                             otherwise the transfers only show up as they are enqueued.
                         */
+
+                        // a re-enqueue with no batch of its own inherits the one it supersedes, so a retry
+                        // does not forget where the download came from; see BatchInheritance
+                        var inheritedBatchId = BatchInheritance.Resolve(batchId, existingRecordsNotYetRemoved, file.Filename);
+
                         var transfer = new Transfer()
                         {
                             Id = transferId,
-                            BatchId = batchId,
+                            BatchId = inheritedBatchId,
                             Username = username,
                             Direction = TransferDirection.Download,
                             Filename = file.Filename, // important! use the remote filename
@@ -901,11 +906,34 @@ namespace slskd.Transfers.Downloads
             {
                 using var context = ContextFactory.CreateDbContext();
 
+                /*
+                    the batch's search comes back with each row rather than being looked up per row afterwards:
+                    a left join on the Batches primary key, in the query that was already being made, against
+                    a table with one row per enqueue. Resolving it in the caller would be a query per distinct
+                    batch, or one `IN` list long enough to exceed SQLite's variable limit on a busy queue.
+
+                    the join is here rather than at the API so that every reader of a download sees the same
+                    fields; a row that knows where it came from in one place and not another is the kind of
+                    difference nobody remembers to look for.
+                */
                 return context.Transfers
                     .AsNoTracking()
                     .Where(t => t.Direction == TransferDirection.Download)
                     .Where(t => !t.Removed || includeRemoved)
                     .Where(expression)
+                    .GroupJoin(
+                        context.Batches.AsNoTracking(),
+                        transfer => transfer.BatchId,
+                        batch => (Guid?)batch.Id,
+                        (transfer, batches) => new { transfer, batch = batches.FirstOrDefault() })
+                    .ToList()
+                    .Select(row =>
+                    {
+                        row.transfer.SearchId = row.batch?.SearchId;
+                        row.transfer.SearchText = row.batch?.SearchText;
+
+                        return row.transfer;
+                    })
                     .ToList();
             }
             catch (Exception ex)

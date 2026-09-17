@@ -398,6 +398,16 @@ body {
     width: 70px;
 }
 
+/* The search a download came from. Fixed and elided rather than sized to its
+   contents: a phrase can be a few words or a whole title, and a column that
+   grows with the longest one takes the room from the filename beside it. */
+.flatlist-search {
+    width: 190px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .flatlist-size {
     width: 100px;
 }

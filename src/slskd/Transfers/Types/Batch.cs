@@ -57,6 +57,16 @@ public record Batch
     public Guid? SearchId { get; init; } = null;
 
     /// <summary>
+    ///     Gets the text of the associated Search, as it was when the Batch was enqueued.
+    /// </summary>
+    /// <remarks>
+    ///     Recorded rather than resolved through <see cref="SearchId"/>, so that a Batch can still say
+    ///     where it came from once its Search has been deleted or pruned -- which is the moment the
+    ///     question is worth asking. The id remains the link; this is the label.
+    /// </remarks>
+    public string SearchText { get; init; } = null;
+
+    /// <summary>
     ///     Gets the unique identifier for the Batch.
     /// </summary>
     [Key]
