@@ -683,7 +683,11 @@ class App extends Component {
                       }
                     />
                     <Route
-                      path={`${urlBase}/users`}
+                      // the username is in the route, so a user can be linked
+                      // to -- from the User column of either table, or from
+                      // anywhere else. optional, because the page is also
+                      // reached from the menu with nobody in mind yet
+                      path={`${urlBase}/users/:username?`}
                       render={(props) =>
                         this.withTokenCheck(<Users {...props} />)
                       }
