@@ -18,6 +18,38 @@ export const userPath = (username) =>
   `${urlBase}/users/${encodeURIComponent(username ?? '')}`;
 
 /**
+ * Where the Browse page shows a user's files.
+ *
+ * Encoded for the same reason as `userPath`, and beside it so that the two
+ * addresses a username can be turned into are written in one place.
+ * @param {string} username - The user.
+ * @returns {string} The path to link to.
+ */
+export const browsePath = (username) =>
+  `${urlBase}/browse/${encodeURIComponent(username ?? '')}`;
+
+/**
+ * The username a route parameter names.
+ *
+ * A malformed escape throws rather than returning the text it could not
+ * decode, and the parameter comes from whatever is in the address bar -- so a
+ * bad one leaves the page empty rather than breaking the render.
+ * @param {string} parameter - The raw route parameter.
+ * @returns {string|undefined} The username.
+ */
+export const usernameFromRoute = (parameter) => {
+  if (!parameter) {
+    return undefined;
+  }
+
+  try {
+    return decodeURIComponent(parameter);
+  } catch {
+    return undefined;
+  }
+};
+
+/**
  * The presences the Soulseek server reports for a user who is connected.
  *
  * Everything else is `Offline`, which the server also answers for a name that

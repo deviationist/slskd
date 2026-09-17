@@ -1,4 +1,9 @@
-import { describeLookup, userPath } from './users';
+import {
+  browsePath,
+  describeLookup,
+  usernameFromRoute,
+  userPath,
+} from './users';
 
 describe('userPath', () => {
   it('addresses the Users page for a user', () => {
@@ -21,9 +26,11 @@ describe('userPath', () => {
   });
 });
 
+// / The two shapes `describeLookup` takes for each of its three requests.
+const ok = (data) => ({ data, ok: true });
+const failed = (reason) => ({ ok: false, reason });
+
 describe('describeLookup', () => {
-  const ok = (data) => ({ data, ok: true });
-  const failed = (reason) => ({ ok: false, reason });
   const offline = { isPrivileged: false, presence: 'Offline' };
 
   it('reports a connected user with everything that came back', () => {
@@ -131,5 +138,43 @@ describe('describeLookup', () => {
     });
 
     expect(outcome.error).toBe('Could not look up alice');
+  });
+});
+
+describe('browsePath', () => {
+  it('addresses the Browse page for a user', () => {
+    expect(browsePath('alice')).toBe('/browse/alice');
+  });
+
+  it('encodes a name that would otherwise leave the segment', () => {
+    expect(browsePath('two words')).toBe('/browse/two%20words');
+    expect(browsePath('a/b')).toBe('/browse/a%2Fb');
+  });
+});
+
+describe('usernameFromRoute', () => {
+  it('reads a name back out of a route parameter', () => {
+    expect(usernameFromRoute('two%20words')).toBe('two words');
+    expect(usernameFromRoute('a%2Fb')).toBe('a/b');
+  });
+
+  it('round-trips whatever the path helpers wrote', () => {
+    for (const name of ['alice', 'two words', 'a/b', '100%', "o'brien"]) {
+      expect(usernameFromRoute(userPath(name).split('/users/')[1])).toBe(name);
+      expect(usernameFromRoute(browsePath(name).split('/browse/')[1])).toBe(
+        name,
+      );
+    }
+  });
+
+  it('has no username where there is no parameter', () => {
+    expect(usernameFromRoute(undefined)).toBeUndefined();
+    expect(usernameFromRoute('')).toBeUndefined();
+  });
+
+  it('refuses a malformed escape rather than throwing', () => {
+    // the parameter is whatever is in the address bar, and a stray percent
+    // sign would otherwise take the page down with it
+    expect(usernameFromRoute('%E0%A4%A')).toBeUndefined();
   });
 });

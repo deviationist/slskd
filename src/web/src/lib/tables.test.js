@@ -603,9 +603,11 @@ describe('the peer columns sort', () => {
   });
 });
 
+// / A selection as a sorted list, which is what the assertions compare.
+const keys = (set) => [...set].sort();
+
 describe('selectRange', () => {
   const rows = ['a', 'b', 'c', 'd', 'e'].map((key) => ({ key }));
-  const keys = (set) => [...set].sort();
 
   it('takes everything between the anchor and the click', () => {
     expect(
