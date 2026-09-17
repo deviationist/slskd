@@ -111,7 +111,13 @@ const User = ({
     )}
 
     <Item.Content>
-      <Item.Header as="a">
+      {/*
+        A header, not an anchor. It was rendered `as="a"` with no href and no
+        handler, so it took a link's pointer cursor and hover colour while
+        going nowhere -- and on this page there is nowhere for it to go, since
+        the user it names is the user being shown.
+      */}
+      <Item.Header>
         <Presence presence={presence} />
         {username}
       </Item.Header>
