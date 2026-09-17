@@ -1,32 +1,11 @@
 import './Users.css';
-import { activeUserInfoKey, urlBase } from '../../config';
+import { urlBase } from '../../config';
 import * as users from '../../lib/users';
 import PlaceholderSegment from '../Shared/PlaceholderSegment';
 import User from './User';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { useHistory, useLocation, useParams } from 'react-router-dom';
+import { useHistory, useParams } from 'react-router-dom';
 import { Icon, Input, Item, Loader, Message, Segment } from 'semantic-ui-react';
-
-/**
- * The username a route parameter names.
- *
- * A malformed escape throws rather than returning the text it could not
- * decode, and the parameter comes from whatever is in the address bar -- so a
- * bad one leaves the page empty rather than breaking the render.
- * @param {string} parameter - The raw route parameter.
- * @returns {string|undefined} The username.
- */
-const usernameFrom = (parameter) => {
-  if (!parameter) {
-    return undefined;
-  }
-
-  try {
-    return decodeURIComponent(parameter);
-  } catch {
-    return undefined;
-  }
-};
 
 /**
  * One of `Promise.allSettled`'s results, as `describeLookup` wants it.
@@ -48,7 +27,6 @@ const settled = (result) =>
       };
 
 const Users = () => {
-  const location = useLocation();
   const history = useHistory();
   const { username: usernameParameter } = useParams();
   const inputRef = useRef();
@@ -62,7 +40,7 @@ const Users = () => {
    * anywhere else that has a username in its hand. localStorage keeps the last
    * one for a bare /users, which is what the menu leads to.
    */
-  const selectedUsername = usernameFrom(usernameParameter);
+  const selectedUsername = users.usernameFromRoute(usernameParameter);
   // eslint-disable-next-line react/hook-use-state
   const [{ error, fetching }, setStatus] = useState({
     error: undefined,
@@ -84,7 +62,6 @@ const Users = () => {
   };
 
   const clear = () => {
-    localStorage.removeItem(activeUserInfoKey);
     setUser(undefined);
     setNote(undefined);
     setInputText('');
@@ -100,23 +77,6 @@ const Users = () => {
 
   useEffect(() => {
     document.addEventListener('keyup', keyUp, false);
-
-    // an address naming a user is the whole instruction; there is nothing to
-    // remember or restore
-    if (selectedUsername) {
-      return;
-    }
-
-    const storedUsername =
-      location.state?.user || localStorage.getItem(activeUserInfoKey);
-
-    // into the address rather than into state, so that the user being shown is
-    // always the user the address names -- and `replace`, because arriving at
-    // /users and going back to where it sent you should not require two
-    // presses of the back button
-    if (storedUsername) {
-      history.replace(users.userPath(storedUsername));
-    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   /*
@@ -169,7 +129,6 @@ const Users = () => {
         return;
       }
 
-      localStorage.setItem(activeUserInfoKey, selectedUsername);
       setUser(outcome.user);
       setNote(outcome.note);
       setStatus({ error: undefined, fetching: false });

@@ -677,7 +677,11 @@ class App extends Component {
                       }
                     />
                     <Route
-                      path={`${urlBase}/browse`}
+                      // the username is in the route, so a user's files can be
+                      // linked to -- from a search result, or from anywhere
+                      // else holding a name. optional, because the page is
+                      // also reached from the menu with nobody in mind yet
+                      path={`${urlBase}/browse/:username?`}
                       render={(props) =>
                         this.withTokenCheck(<Browse {...props} />)
                       }

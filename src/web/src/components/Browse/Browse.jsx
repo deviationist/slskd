@@ -1,4 +1,5 @@
 import './Browse.css';
+import { urlBase } from '../../config';
 import * as users from '../../lib/users';
 import PlaceholderSegment from '../Shared/PlaceholderSegment';
 import DirectoryTree from './DirectoryTree';
@@ -82,11 +83,39 @@ class Browse extends Component {
       );
     })();
 
-    if (this.props.location.state?.user) {
-      this.setState({ username: this.props.location.state.user }, this.browse);
+    const routed = users.usernameFromRoute(this.props.match.params.username);
+
+    if (routed) {
+      this.show(routed);
+    } else if (this.props.location.state?.user) {
+      this.show(this.props.location.state.user);
     }
 
     document.addEventListener('keyup', this.keyUp, false);
+  }
+
+  /*
+   * The address is what decides who is being browsed, so that a user can be
+   * linked to -- from a search result, or from anywhere else holding a name.
+   * Everything that starts a browse goes through the route: `submit` only
+   * changes the address, and this is what reacts to it, which is what keeps
+   * the two from triggering each other.
+   */
+  componentDidUpdate(previous) {
+    const before = users.usernameFromRoute(previous.match.params.username);
+    const now = users.usernameFromRoute(this.props.match.params.username);
+
+    if (now === before) {
+      return;
+    }
+
+    if (now) {
+      this.show(now);
+      return;
+    }
+
+    // back to a bare /browse, by the back button or by the clear control
+    this.reset();
   }
 
   componentWillUnmount() {
@@ -95,8 +124,43 @@ class Browse extends Component {
     document.removeEventListener('keyup', this.keyUp, false);
   }
 
+  /**
+   * Puts a user in the address bar, which is what starts the browse.
+   *
+   * Asking again for the user already named there is a refresh rather than a
+   * navigation, and `history.push` to the address you are on changes nothing
+   * -- so that case goes straight to the browse.
+   */
+  submit = () => {
+    const username = this.inputtext.inputRef.current.value?.trim();
+
+    if (!username) {
+      return;
+    }
+
+    if (
+      users.usernameFromRoute(this.props.match.params.username) === username
+    ) {
+      this.show(username);
+      return;
+    }
+
+    this.props.history.push(users.browsePath(username));
+  };
+
+  /**
+   * Shows a user's files, and puts their name in the box.
+   */
+  show = (username) => {
+    if (this.inputtext?.inputRef?.current) {
+      this.inputtext.inputRef.current.value = username;
+    }
+
+    this.setState({ username }, this.browse);
+  };
+
   browse = async () => {
-    const username = this.inputtext.inputRef.current.value;
+    const { username } = this.state;
     this.setState({ browseError: undefined, browseState: 'pending', username });
 
     try {
@@ -147,12 +211,23 @@ class Browse extends Component {
     }
   };
 
-  clear = () => {
+  reset = () => {
     this.setState(initialState, () => {
       this.saveTree();
       this.saveState();
       this.inputtext.focus();
     });
+  };
+
+  clear = () => {
+    // through the address, so that clearing and arriving at a bare /browse
+    // are the same thing rather than two states that can disagree
+    if (users.usernameFromRoute(this.props.match.params.username)) {
+      this.props.history.push(`${urlBase}/browse`);
+      return;
+    }
+
+    this.reset();
   };
 
   keyUp = (event) => (event.key === 'Escape' ? this.clear() : '');
@@ -203,7 +278,12 @@ class Browse extends Component {
   };
 
   loadState = async () => {
-    if (this.props.location.state?.user) {
+    // an address naming a user is the whole instruction, and so is a handoff
+    // through location state: neither wants the last browse restored over it
+    if (
+      this.props.location.state?.user ||
+      users.usernameFromRoute(this.props.match.params.username)
+    ) {
       return;
     }
 
@@ -376,7 +456,7 @@ class Browse extends Component {
           action={
             !pending &&
             (browseState === 'idle'
-              ? { icon: 'search', onClick: this.browse }
+              ? { icon: 'search', onClick: this.submit }
               : { color: 'red', icon: 'x', onClick: this.clear })
           }
           className="search-input"
@@ -389,7 +469,7 @@ class Browse extends Component {
             />
           }
           loading={pending}
-          onKeyUp={(event) => (event.key === 'Enter' ? this.browse() : '')}
+          onKeyUp={(event) => (event.key === 'Enter' ? this.submit() : '')}
           placeholder="Username"
           ref={(input) => (this.inputtext = input)}
           size="big"

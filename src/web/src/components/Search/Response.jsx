@@ -1,8 +1,9 @@
 import * as transfers from '../../lib/transfers';
-import { getDirectoryContents } from '../../lib/users';
+import { browsePath, getDirectoryContents } from '../../lib/users';
 import { formatBytes, getDirectoryName } from '../../lib/util';
 import FileList from '../Shared/FileList';
 import React, { Component } from 'react';
+import { Link } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { Button, Card, Icon, Label, Popup } from 'semantic-ui-react';
 
@@ -205,6 +206,24 @@ class Response extends Component {
               name="circle"
             />
             {response.username}
+            {/*
+              The peer's shares, one click from a result of theirs. The whole
+              reason to look at a card rather than a flat list is that it is
+              *this peer's* answer, and until now getting from that to the
+              rest of what they have meant copying the name to another page.
+            */}
+            <Popup
+              content={`Browse ${response.username}'s files`}
+              position="top center"
+              trigger={
+                <Link
+                  className="result-browse"
+                  to={browsePath(response.username)}
+                >
+                  <Icon name="folder open" />
+                </Link>
+              }
+            />
             <Popup
               content="Hide this user's results. They come back when the search is reloaded or run again -- nothing is remembered."
               position="left center"
