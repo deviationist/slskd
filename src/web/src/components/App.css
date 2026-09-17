@@ -712,10 +712,11 @@ body {
    that the row stops being one thing. */
 :root.wide .view,
 :root.wide .search-container,
-:root.wide .showmore-button {
+:root.wide .showmore-button,
+:root.wide .users-container {
   max-width: 2400px !important;
 }
-  
+
 .view:last-child {
   margin-bottom: 16px;
 }
@@ -782,16 +783,17 @@ body {
     font-size: 14px;
     margin-top: 1px;
 }
-/* The browse link on a search result's header. Beside the name rather than
-   among the header's other controls, because it is about the peer the name
-   belongs to; muted until pointed at, because the card is a list of files and
-   this is not one of them. */
-.result-browse {
+/* The link to a user's shares, wherever their name is shown -- a search
+   result's header and the user card. Beside the name rather than among a
+   card's other controls, because it is about the peer the name belongs to;
+   muted until pointed at, because on a search result the card is a list of
+   files and this is not one of them. */
+.browse-link {
     margin-left: 6px;
     opacity: 0.45;
 }
 
-.result-browse:hover {
+.browse-link:hover {
     opacity: 1;
 }
 
