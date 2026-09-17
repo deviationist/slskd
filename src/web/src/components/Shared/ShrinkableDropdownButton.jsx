@@ -19,7 +19,12 @@ const ShrinkableDropdownButton = ({
   }
 
   return (
-    <Button.Group color={color}>
+    // the class carries the padding on the labelled button's caret side; see
+    // `.shrinkable-dropdown` in App.css
+    <Button.Group
+      className="shrinkable-dropdown"
+      color={color}
+    >
       <ShrinkableButton
         disabled={disabled}
         icon={icon}

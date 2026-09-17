@@ -559,6 +559,21 @@ body {
     flex-wrap: wrap;
 }
 
+/* The button in a group with a caret beside it.
+
+   Semantic gives a labelled button 1.5em on both sides, which measures 21px
+   between the label and the caret against 11px on the caret's own far side --
+   the pair reads lopsided, weighted towards a gap that is inside the group
+   rather than around it. The far side is Semantic's to set; this is the side
+   that is ours.
+
+   Only the labelled state. When the button shrinks to its icon it is
+   `.ui.icon.button` at 11px each side, which is square already and should
+   stay that way. */
+.shrinkable-dropdown > .ui.button:not(.icon) {
+    padding-right: 0.5em;
+}
+
 /* The line that says a sort can have more than one column. Quiet, because it
    is help rather than data, and it sits among the counts that are.
 
