@@ -30,7 +30,7 @@ import {
   offsetWithin,
   scrollParentOf,
 } from '../../lib/util';
-import { EmptyTableRow, SortRank } from '../Shared';
+import { EmptyTableRow, SortHint, SortRank } from '../Shared';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -447,6 +447,7 @@ const FlatFileList = ({
     >
       <div className="flatlist-summary">
         <span>{describeSelection({ selection, total: rows.length })}</span>
+        <SortHint />
         {selection.count > 0 && (
           <Button
             basic

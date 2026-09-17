@@ -9,5 +9,6 @@ export { default as Nbsp } from './Nbsp';
 export { default as PlaceholderSegment } from './PlaceholderSegment';
 export { default as ShrinkableButton } from './ShrinkableButton';
 export { default as ShrinkableDropdownButton } from './ShrinkableDropdownButton';
+export { default as SortHint } from './SortHint';
 export { default as SortRank } from './SortRank';
 export { default as Switch } from './Switch';

@@ -206,6 +206,13 @@ export const SORT_HINT =
   'Click to sort by this column; shift-click to sort by it as well';
 
 /**
+ * The same thing said as a statement rather than as an instruction about one
+ * header, for the line above the table.
+ */
+export const SORT_HINT_TEXT =
+  'Hold shift while clicking a column header to sort by several at once';
+
+/**
  * How a column header should draw itself, given the sort.
  *
  * The rank is shown only once there is more than one key, because "1" beside

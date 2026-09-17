@@ -21,7 +21,7 @@ import {
   offsetWithin,
   scrollParentOf,
 } from '../../lib/util';
-import { EmptyTableRow, SortRank } from '../Shared';
+import { EmptyTableRow, SortHint, SortRank } from '../Shared';
 import TransferDetails from './TransferDetails';
 import {
   ConfirmRemovalModal,
@@ -621,6 +621,7 @@ const FlatTransferList = ({
             total: rows.length,
           })}
         </span>
+        <SortHint />
         {selection.count > 0 && (
           <Button
             basic
