@@ -12,6 +12,7 @@ import {
   nextSort,
   parseColumns,
   selectionState,
+  selectRange,
   SORT_HINT,
   sortFromQuery,
   sortRows,
@@ -199,6 +200,9 @@ const FlatFileList = ({
   total,
 }) => {
   const [selected, setSelected] = useState(() => new Set());
+
+  // the last row ticked without shift; where a shift-click measures from
+  const [anchor, setAnchor] = useState(undefined);
   const [downloading, setDownloading] = useState(false);
   const [rowDownloading, setRowDownloading] = useState(undefined);
   /*
@@ -320,7 +324,24 @@ const FlatFileList = ({
   const selection = selectionState({ rows, selected });
   const selectedSize = selectedRows.reduce((sum, row) => sum + row.size, 0);
 
-  const toggle = (key, checked) =>
+  /*
+   * A click ticks one box; a shift-click takes everything between it and the
+   * last box clicked without shift, as a file manager does.
+   *
+   * The anchor stays where it was through a run of shift-clicks, so a range
+   * can be widened or narrowed after the fact rather than restarting from the
+   * last click. `selectRange` is where the rest of it lives, with tests.
+   */
+  const toggle = (key, checked, event) => {
+    if (event?.shiftKey && anchor !== undefined && anchor !== key) {
+      setSelected((old) =>
+        selectRange({ anchor, checked, key, rows, selected: old }),
+      );
+
+      return;
+    }
+
+    setAnchor(key);
     setSelected((old) => {
       const next = new Set(old);
 
@@ -332,6 +353,7 @@ const FlatFileList = ({
 
       return next;
     });
+  };
 
   // every row is listed, so this is the whole filtered set and says so. it was
   // "the rows on this page" while the list was paged, which needed an extra
@@ -622,7 +644,9 @@ const FlatFileList = ({
                       checked={selected.has(row.key)}
                       disabled={disabled}
                       fitted
-                      onChange={(_event, data) => toggle(row.key, data.checked)}
+                      onChange={(event, data) =>
+                        toggle(row.key, data.checked, event)
+                      }
                     />
                   </Table.Cell>
                   {show('name') && (

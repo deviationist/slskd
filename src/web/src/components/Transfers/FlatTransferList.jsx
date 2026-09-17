@@ -5,6 +5,7 @@ import {
   nextSort,
   parseColumns,
   selectionState,
+  selectRange,
   SORT_HINT,
   sortFromQuery,
   sortRows,
@@ -263,6 +264,9 @@ const FlatTransferList = ({
   users,
 }) => {
   const [selected, setSelected] = useState(() => new Set());
+
+  // the last row ticked without shift; where a shift-click measures from
+  const [anchor, setAnchor] = useState(undefined);
   const [columns, setColumns] = useState(() => readStoredColumns(direction));
   const [confirming, setConfirming] = useState(null);
   const [removing, setRemoving] = useState(null);
@@ -365,7 +369,24 @@ const FlatTransferList = ({
   );
   const selection = selectionState({ rows, selected });
 
-  const toggle = (key, checked) =>
+  /*
+   * A click ticks one box; a shift-click takes everything between it and the
+   * last box clicked without shift, as a file manager does.
+   *
+   * The anchor stays where it was through a run of shift-clicks, so a range
+   * can be widened or narrowed after the fact rather than restarting from the
+   * last click. `selectRange` is where the rest of it lives, with tests.
+   */
+  const toggle = (key, checked, event) => {
+    if (event?.shiftKey && anchor !== undefined && anchor !== key) {
+      setSelected((old) =>
+        selectRange({ anchor, checked, key, rows, selected: old }),
+      );
+
+      return;
+    }
+
+    setAnchor(key);
     setSelected((old) => {
       const next = new Set(old);
 
@@ -377,6 +398,7 @@ const FlatTransferList = ({
 
       return next;
     });
+  };
 
   const retrieve = async (row) => {
     try {
@@ -769,7 +791,9 @@ const FlatTransferList = ({
                     <Checkbox
                       checked={selected.has(row.key)}
                       fitted
-                      onChange={(_event, data) => toggle(row.key, data.checked)}
+                      onChange={(event, data) =>
+                        toggle(row.key, data.checked, event)
+                      }
                     />
                   </Table.Cell>
                   {shown.map((col) => cell(row, col.key))}

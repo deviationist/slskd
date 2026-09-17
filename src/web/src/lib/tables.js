@@ -322,6 +322,58 @@ export const sortToQuery = ({ search, sort, column, direction }) => {
 };
 
 /**
+ * The selection after a shift-click, which takes everything between.
+ *
+ * Measured against the rows as they are *drawn*: "between" means between on
+ * screen, so it follows the sort and the filter in force rather than any
+ * underlying order. A run of shift-clicks all measure from the same anchor,
+ * which is what lets a range be widened or narrowed after the fact instead of
+ * restarting from wherever the last click landed.
+ *
+ * The clicked box's new state is applied to the whole range, so a shift-click
+ * that unticks unticks the range -- the alternative, always selecting, gives
+ * no way to take a run back out.
+ *
+ * An anchor that is no longer drawn is not an anchor: a sort or a filter can
+ * remove it between the two clicks, and a range with one end missing would be
+ * measured from somewhere nobody pointed at. That falls back to the plain
+ * toggle, which is what a click with no range is.
+ * @param {object} params
+ * @param {object[]} params.rows - The rows, in the order they are drawn.
+ * @param {Set<string>} params.selected - The selection now.
+ * @param {string} params.anchor - The key of the last row clicked without shift.
+ * @param {string} params.key - The key of the row just clicked.
+ * @param {boolean} params.checked - What the clicked box has become.
+ * @returns {Set<string>} The new selection.
+ */
+export const selectRange = ({
+  rows = [],
+  selected = new Set(),
+  anchor,
+  key,
+  checked,
+}) => {
+  const next = new Set(selected);
+  const apply = (rowKey) => (checked ? next.add(rowKey) : next.delete(rowKey));
+  const from = rows.findIndex((row) => row.key === anchor);
+  const to = rows.findIndex((row) => row.key === key);
+
+  if (from < 0 || to < 0) {
+    apply(key);
+
+    return next;
+  }
+
+  const [start, end] = from <= to ? [from, to] : [to, from];
+
+  for (let index = start; index <= end; index += 1) {
+    apply(rows[index].key);
+  }
+
+  return next;
+};
+
+/**
  * What a select-all checkbox over a list of rows should show.
  *
  * Three states rather than two: a box that is merely unticked while half the
