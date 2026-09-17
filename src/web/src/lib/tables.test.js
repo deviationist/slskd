@@ -603,6 +603,116 @@ describe('the peer columns sort', () => {
   });
 });
 
+describe('selectRange', () => {
+  const rows = ['a', 'b', 'c', 'd', 'e'].map((key) => ({ key }));
+  const keys = (set) => [...set].sort();
+
+  it('takes everything between the anchor and the click', () => {
+    expect(
+      keys(
+        tables.selectRange({
+          anchor: 'a',
+          checked: true,
+          key: 'd',
+          rows,
+          selected: new Set(['a']),
+        }),
+      ),
+    ).toEqual(['a', 'b', 'c', 'd']);
+  });
+
+  it('works upwards as well as down', () => {
+    // the anchor is where the range is measured from, not where it starts
+    expect(
+      keys(
+        tables.selectRange({
+          anchor: 'd',
+          checked: true,
+          key: 'b',
+          rows,
+          selected: new Set(['d']),
+        }),
+      ),
+    ).toEqual(['b', 'c', 'd']);
+  });
+
+  it('unticks a range when the click unticks', () => {
+    // always selecting would leave no way to take a run back out
+    expect(
+      keys(
+        tables.selectRange({
+          anchor: 'a',
+          checked: false,
+          key: 'c',
+          rows,
+          selected: new Set(['a', 'b', 'c', 'd']),
+        }),
+      ),
+    ).toEqual(['d']);
+  });
+
+  it('leaves rows outside the range alone', () => {
+    expect(
+      keys(
+        tables.selectRange({
+          anchor: 'b',
+          checked: true,
+          key: 'c',
+          rows,
+          selected: new Set(['e']),
+        }),
+      ),
+    ).toEqual(['b', 'c', 'e']);
+  });
+
+  it('is a plain toggle when the anchor is no longer listed', () => {
+    // a sort or a filter can remove it between the two clicks, and a range
+    // with one end missing would be measured from somewhere nobody pointed at
+    expect(
+      keys(
+        tables.selectRange({
+          anchor: 'gone',
+          checked: true,
+          key: 'c',
+          rows,
+          selected: new Set(),
+        }),
+      ),
+    ).toEqual(['c']);
+  });
+
+  it('measures in the order the rows are drawn', () => {
+    // "between" means between on screen, so it follows the sort in force
+    const sorted = ['e', 'd', 'c', 'b', 'a'].map((key) => ({ key }));
+
+    expect(
+      keys(
+        tables.selectRange({
+          anchor: 'e',
+          checked: true,
+          key: 'c',
+          rows: sorted,
+          selected: new Set(),
+        }),
+      ),
+    ).toEqual(['c', 'd', 'e']);
+  });
+
+  it('does not disturb the caller\u2019s set', () => {
+    const selected = new Set(['a']);
+
+    tables.selectRange({
+      anchor: 'a',
+      checked: true,
+      key: 'c',
+      rows,
+      selected,
+    });
+
+    expect([...selected]).toEqual(['a']);
+  });
+});
+
 describe('describeEmpty', () => {
   it('says there are none when there are none', () => {
     expect(tables.describeEmpty({ noun: 'downloads', total: 0 })).toBe(
