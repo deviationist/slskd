@@ -18,7 +18,6 @@ import {
   sortRows,
   sortStateOf,
   sortToQuery,
-  withColumn,
 } from '../../lib/tables';
 import * as transfers from '../../lib/transfers';
 import { userPath } from '../../lib/users';
@@ -31,7 +30,7 @@ import {
   offsetWithin,
   scrollParentOf,
 } from '../../lib/util';
-import { EmptyTableRow, SortHint, SortRank } from '../Shared';
+import { ColumnPicker, EmptyTableRow, SortHint, SortRank } from '../Shared';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -236,12 +235,14 @@ const FlatFileList = ({
   };
 
   const [columns, setColumns] = useState(readStoredColumns);
-  const shown = COLUMNS.filter((col) => columns.includes(col.key));
+  // in the order they are shown, not this file's: the order is a choice now,
+  // and rebuilding the list from the canonical one would quietly undo it
+  const shown = columns
+    .map((key) => COLUMNS.find((col) => col.key === key))
+    .filter(Boolean);
   const show = (key) => columns.includes(key);
 
-  const setColumn = (key, on) => {
-    const next = withColumn({ all: COLUMNS, columns, key, on });
-
+  const applyColumns = (next) => {
     setColumns(next);
     storeColumns(next);
   };
@@ -490,16 +491,11 @@ const FlatFileList = ({
          */}
         <Popup
           content={
-            <div className="flatlist-columns-menu">
-              {COLUMNS.map((col) => (
-                <Checkbox
-                  checked={show(col.key)}
-                  key={col.key}
-                  label={col.label}
-                  onChange={() => setColumn(col.key, !show(col.key))}
-                />
-              ))}
-            </div>
+            <ColumnPicker
+              all={COLUMNS}
+              columns={columns}
+              onChange={applyColumns}
+            />
           }
           on="click"
           position="bottom right"

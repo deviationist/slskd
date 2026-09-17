@@ -715,6 +715,101 @@ describe('selectRange', () => {
   });
 });
 
+describe('moveColumn', () => {
+  const columns = ['name', 'path', 'user', 'size'];
+
+  it('moves a column one place left', () => {
+    expect(tables.moveColumn({ by: -1, columns, key: 'user' })).toEqual([
+      'name',
+      'user',
+      'path',
+      'size',
+    ]);
+  });
+
+  it('moves a column one place right', () => {
+    expect(tables.moveColumn({ by: 1, columns, key: 'path' })).toEqual([
+      'name',
+      'user',
+      'path',
+      'size',
+    ]);
+  });
+
+  it('clamps rather than wrapping at each end', () => {
+    // a column at the end that jumps to the front because its owner pressed
+    // the arrow once too often has not done what the arrow says
+    expect(tables.moveColumn({ by: -1, columns, key: 'name' })).toEqual(
+      columns,
+    );
+    expect(tables.moveColumn({ by: 1, columns, key: 'size' })).toEqual(columns);
+  });
+
+  it('leaves a column it does not have alone', () => {
+    expect(tables.moveColumn({ by: 1, columns, key: 'speed' })).toEqual(
+      columns,
+    );
+  });
+
+  it('does not disturb the caller’s array', () => {
+    const original = [...columns];
+
+    tables.moveColumn({ by: 1, columns, key: 'name' });
+
+    expect(columns).toEqual(original);
+  });
+});
+
+describe('withColumn, once the order is a choice', () => {
+  it('puts a column back where this file would have it', () => {
+    // switching Speed on should put it where Speed goes, which is what
+    // appending would fail to do for anyone who has never reordered anything
+    expect(
+      tables.withColumn({
+        all: COLUMNS,
+        columns: ['name', 'user', 'size'],
+        key: 'path',
+        on: true,
+      }),
+    ).toEqual(['name', 'path', 'user', 'size']);
+  });
+
+  it('leaves a reordered list reordered', () => {
+    // it reads the shown order rather than rebuilding from the canonical one,
+    // so a column an operator has moved stays moved
+    expect(
+      tables.withColumn({
+        all: COLUMNS,
+        columns: ['user', 'name'],
+        key: 'size',
+        on: true,
+      }),
+    ).toEqual(['user', 'name', 'size']);
+  });
+
+  it('appends where nothing shown comes after it', () => {
+    expect(
+      tables.withColumn({
+        all: COLUMNS,
+        columns: ['name'],
+        key: 'queue',
+        on: true,
+      }),
+    ).toEqual(['name', 'queue']);
+  });
+
+  it('removes without disturbing the order of the rest', () => {
+    expect(
+      tables.withColumn({
+        all: COLUMNS,
+        columns: ['user', 'name', 'size'],
+        key: 'name',
+        on: false,
+      }),
+    ).toEqual(['user', 'size']);
+  });
+});
+
 describe('describeEmpty', () => {
   it('says there are none when there are none', () => {
     expect(tables.describeEmpty({ noun: 'downloads', total: 0 })).toBe(
@@ -771,12 +866,20 @@ describe('parseColumns / withColumn', () => {
     ).toEqual(['name', 'size', 'speed']);
   });
 
-  it('keeps this file’s order, not the stored one', () => {
-    // a column list is a set; letting a saved value decide the order would
-    // leave a reordering nobody asked for alive in a browser forever
+  it('keeps the stored order, which is the order they are drawn', () => {
+    // it used to re-sort into this file's order on the way out, on the
+    // grounds that a column list is a set -- true until the order became
+    // something an operator could choose, at which point discarding it
+    // discards the choice
     expect(
       tables.parseColumns({ all: COLUMNS, stored: 'queue,name,size' }),
-    ).toEqual(['name', 'size', 'queue']);
+    ).toEqual(['queue', 'name', 'size']);
+  });
+
+  it('keeps the first mention of a column stored twice', () => {
+    expect(
+      tables.parseColumns({ all: COLUMNS, stored: 'name,size,name' }),
+    ).toEqual(['name', 'size']);
   });
 
   it('drops a column it no longer has', () => {

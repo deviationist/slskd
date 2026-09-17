@@ -1,5 +1,6 @@
 export { default as BrowseLink } from './BrowseLink';
 export { default as CodeEditor } from './CodeEditor';
+export { default as ColumnPicker } from './ColumnPicker';
 export { default as Div } from './Div';
 export { default as EmptyTableRow } from './EmptyTableRow';
 export { default as ErrorSegment } from './ErrorSegment';

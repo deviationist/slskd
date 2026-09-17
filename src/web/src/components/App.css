@@ -571,6 +571,41 @@ body {
     flex-direction: column;
     gap: 8px;
     padding: 2px;
+    min-width: 190px;
+}
+
+/* A column's name on the left and its arrows hard right, so the arrows line up
+   down the list however long the names are -- a moving target is a poor thing
+   to aim at, and this list is aimed at repeatedly. */
+.flatlist-columns-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+/* The arrows are a step down in weight from the name they belong to: the name
+   is what is being read, and there is a pair of these on every row. */
+.flatlist-columns-row .ui.buttons {
+    opacity: 0.55;
+}
+
+.flatlist-columns-row:hover .ui.buttons {
+    opacity: 1;
+}
+
+/* Between the columns being shown and the ones that are not. They are one list
+   -- a checkbox each, doing the same thing -- but the order above the line is
+   the table's, and below it means nothing. */
+.flatlist-columns-divider {
+    border-top: 1px solid rgba(34, 36, 38, 0.15);
+    margin: 2px 0;
+}
+
+.flatlist-columns-hidden {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
 .flatlist-selector,

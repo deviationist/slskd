@@ -466,13 +466,29 @@ export const parseColumns = ({ stored, all = [] }) => {
     return defaultColumns(all);
   }
 
-  const asked = new Set(stored.split(',').filter(Boolean));
-  const known = all.filter((c) => asked.has(c.key)).map((c) => c.key);
+  const known = new Set(all.map((c) => c.key));
+  const seen = new Set();
+
+  // in the stored order, which is the order they are drawn in. It used to be
+  // re-sorted into this file's order on the way out, on the grounds that a
+  // column list is a set -- true until the order became something an operator
+  // could choose, at which point discarding it discards the choice
+  const asked = stored
+    .split(',')
+    .filter(Boolean)
+    .filter((key) => {
+      if (!known.has(key) || seen.has(key)) {
+        return false;
+      }
+
+      seen.add(key);
+      return true;
+    });
 
   // every known column switched off is a choice, but a stored value naming
   // *nothing* known is a value from another version or a typo, and the
   // defaults are the better answer to it
-  return known.length > 0 || asked.size === 0 ? known : defaultColumns(all);
+  return asked.length > 0 || stored === '' ? asked : defaultColumns(all);
 };
 
 /**
@@ -485,13 +501,64 @@ export const parseColumns = ({ stored, all = [] }) => {
  * @returns {string[]} The new list.
  */
 export const withColumn = ({ columns = [], key, on, all = [] }) => {
-  const wanted = new Set(columns);
-
-  if (on) {
-    wanted.add(key);
-  } else {
-    wanted.delete(key);
+  if (!on) {
+    return columns.filter((shown) => shown !== key);
   }
 
-  return all.filter((c) => wanted.has(c.key)).map((c) => c.key);
+  const order = all.map((c) => c.key);
+
+  // a key this table does not have is not a column: it comes from a stored
+  // value written by another version, and adding it would put a cell in every
+  // row that nothing knows how to draw
+  if (columns.includes(key) || !order.includes(key)) {
+    return [...columns];
+  }
+
+  /*
+   * Into the place this file would have put it: before the first shown column
+   * that follows it here, or last if none does. The alternative -- appending
+   * -- would be simpler and would move a column for someone who has never
+   * reordered anything, which is most people: switching Speed on should put it
+   * where Speed goes.
+   *
+   * It reads the shown order rather than rebuilding from this file's, so a
+   * column an operator has moved stays moved.
+   */
+  const at = columns.findIndex(
+    (shown) => order.indexOf(shown) > order.indexOf(key),
+  );
+
+  if (at < 0) {
+    return [...columns, key];
+  }
+
+  return [...columns.slice(0, at), key, ...columns.slice(at)];
+};
+
+/**
+ * The columns with one of them moved a place left or right.
+ *
+ * Clamped rather than wrapped: a column at the end that jumps to the front
+ * because its owner pressed the arrow once too often has not done what the
+ * arrow says, and the arrow is drawn disabled at the ends for the same reason.
+ * @param {object} params
+ * @param {string[]} params.columns - The columns shown, in order.
+ * @param {string} params.key - The one to move.
+ * @param {number} params.by - How far, and which way. -1 is left.
+ * @returns {string[]} The new order.
+ */
+export const moveColumn = ({ columns = [], key, by = 0 }) => {
+  const from = columns.indexOf(key);
+  const to = from + by;
+
+  if (from < 0 || to < 0 || to >= columns.length) {
+    return [...columns];
+  }
+
+  const next = [...columns];
+
+  next.splice(from, 1);
+  next.splice(to, 0, key);
+
+  return next;
 };
