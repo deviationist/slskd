@@ -5,7 +5,7 @@ import PlaceholderSegment from '../Shared/PlaceholderSegment';
 import DirectoryTree from './DirectoryTree';
 import Selection from './Selection';
 import React, { Component } from 'react';
-import { withRouter } from 'react-router-dom';
+import { Link, withRouter } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { Card, Icon, Input, Loader, Segment } from 'semantic-ui-react';
 
@@ -493,7 +493,13 @@ class Browse extends Component {
                 color="green"
                 name="circle"
               />
-              {username}
+              {/*
+                The other direction of the link the user card carries. This
+                page answers "what do they have"; who they are is the next
+                question, and the answer was another page and the name typed
+                into it again.
+              */}
+              <Link to={users.userPath(username)}>{username}</Link>
             </Card.Header>
             <Card.Meta className="browse-meta">
               <span>{formatBrowseSummary(info)}</span>

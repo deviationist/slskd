@@ -107,6 +107,31 @@ body {
     background-color: var(--background-color);
 }
 
+/* Semantic hard-codes the colour of a sortable table's headers --
+   `rgba(0,0,0,.87)`, and .8 and .95 for hover and for the sorted one -- rather
+   than taking it from a variable, so the theme patch never reached them.
+   Measured in dark mode: black on `rgb(22,27,33)`, a contrast ratio of 1.21,
+   which is not a dim header but an invisible one.
+
+   This fork is what made these tables sortable, so this is ours to answer. It
+   is scoped to `.ui.sortable` because that is exactly the rule being answered:
+   an ordinary table's header already follows `--smui-table-color`. */
+:root.dark .ui.sortable.table thead th,
+:root.dark .ui.sortable.table thead th:hover,
+:root.dark .ui.sortable.table thead th.sorted,
+:root.dark .ui.sortable.table thead th.sorted:hover {
+    color: var(--smui-site-body-text-color);
+}
+
+/* The same omission on a basic button, which is `rgba(0,0,0,.6) !important`:
+   measured at 1.11 against the segment behind it. Scoped to the bar rather
+   than to every basic button, because Semantic colours a *coloured* basic
+   button with a rule of the same shape -- a blanket override would turn the
+   red one grey. */
+:root.dark .flatlist-summary .ui.basic.button {
+    color: var(--smui-site-body-text-color) !important;
+}
+
 /* Restore the left border on the first button of a group.
 
    The dark theme gives every button a border (--smui-button-border), but
