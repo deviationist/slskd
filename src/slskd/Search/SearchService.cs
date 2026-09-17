@@ -129,16 +129,19 @@ namespace slskd.Search
         /// <param name="optionsMonitor"></param>
         /// <param name="soulseekClient"></param>
         /// <param name="contextFactory">The database context to use.</param>
+        /// <param name="searchExistence">Answers whether a search still exists, and is told when one stops.</param>
         public SearchService(
             IHubContext<SearchHub> searchHub,
             IOptionsMonitor<Options> optionsMonitor,
             ISoulseekClient soulseekClient,
-            IDbContextFactory<SearchDbContext> contextFactory)
+            IDbContextFactory<SearchDbContext> contextFactory,
+            SearchExistence searchExistence)
         {
             SearchHub = searchHub;
             OptionsMonitor = optionsMonitor;
             Client = soulseekClient;
             ContextFactory = contextFactory;
+            Existence = searchExistence;
         }
 
         private ConcurrentDictionary<Guid, CancellationTokenSource> CancellationTokens { get; }
@@ -146,6 +149,7 @@ namespace slskd.Search
 
         private ISoulseekClient Client { get; }
         private IDbContextFactory<SearchDbContext> ContextFactory { get; }
+        private SearchExistence Existence { get; }
         private ILogger Log { get; set; } = Serilog.Log.ForContext<Application>();
         private IOptionsMonitor<Options> OptionsMonitor { get; }
         private IHubContext<SearchHub> SearchHub { get; set; }
@@ -169,6 +173,11 @@ namespace slskd.Search
                 using var context = ContextFactory.CreateDbContext();
                 context.Searches.Remove(search);
                 context.SaveChanges();
+
+                // downloads started from this search name it, and a link to a search that is gone leads nowhere.
+                // the answer is cached to survive a list polled once a second; this is what keeps it from being
+                // wrong for the length of that window right after the deletion that made it wrong
+                Existence.Forget();
 
                 await SearchHub.BroadcastDeleteAsync(search);
             }
@@ -281,6 +290,10 @@ namespace slskd.Search
 
                 context.Add(search);
                 context.SaveChanges();
+
+                // the same reason as the deletion below: a download enqueued from this search names it
+                // immediately, and a cached set of ids taken a moment ago does not have it yet
+                Existence.Forget();
 
                 searchCreated = true;
 

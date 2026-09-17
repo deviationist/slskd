@@ -71,12 +71,14 @@ namespace slskd.Transfers.API
         /// <param name="fileService"></param>
         /// <param name="downloadTicketService"></param>
         /// <param name="downloadFileAvailability"></param>
+        /// <param name="searchExistence"></param>
         public TransfersController(
             TransferService transferService,
             IUserService userService,
             FileService fileService,
             DownloadTicketService downloadTicketService,
             DownloadFileAvailability downloadFileAvailability,
+            slskd.Search.SearchExistence searchExistence,
             IOptionsSnapshot<Options> optionsSnapshot)
         {
             Transfers = transferService;
@@ -84,6 +86,7 @@ namespace slskd.Transfers.API
             Files = fileService;
             Tickets = downloadTicketService;
             FileAvailability = downloadFileAvailability;
+            SearchExistence = searchExistence;
             OptionsSnapshot = optionsSnapshot;
         }
 
@@ -109,6 +112,7 @@ namespace slskd.Transfers.API
         private FileService Files { get; }
         private DownloadTicketService Tickets { get; }
         private DownloadFileAvailability FileAvailability { get; }
+        private slskd.Search.SearchExistence SearchExistence { get; }
         private IOptionsSnapshot<Options> OptionsSnapshot { get; }
         private ILogger Log { get; set; } = Serilog.Log.ForContext<TransfersController>();
 
@@ -701,7 +705,7 @@ namespace slskd.Transfers.API
         [HttpGet("downloads")]
         [Authorize(Policy = AuthPolicy.Any)]
         [ProducesResponseType(200)]
-        public IActionResult GetDownloadsAsync([FromQuery] bool includeRemoved = false)
+        public async Task<IActionResult> GetDownloadsAsync([FromQuery] bool includeRemoved = false)
         {
             if (Program.IsRelayAgent)
             {
@@ -710,16 +714,7 @@ namespace slskd.Transfers.API
 
             var downloads = Transfers.Downloads.List(includeRemoved: includeRemoved);
 
-            // say whether each finished download's file is still there, rather than leaving the UI to find out by
-            // being refused. the answer is cached; see DownloadFileAvailability for why it is not a stat per row per
-            // poll, and why it is a stat rather than an open
-            foreach (var download in downloads)
-            {
-                if (download.State.HasFlag(TransferStates.Completed) && download.State.HasFlag(TransferStates.Succeeded))
-                {
-                    download.LocalFileExists = FileAvailability.Exists(download.LocalFilename);
-                }
-            }
+            await AnnotateAsync(downloads);
 
             var response = downloads.GroupBy(t => t.Username).Select(grouping => new UserResponse()
             {
@@ -785,7 +780,7 @@ namespace slskd.Transfers.API
         [HttpGet("downloads/{username}")]
         [Authorize(Policy = AuthPolicy.Any)]
         [ProducesResponseType(200)]
-        public IActionResult GetDownloadsAsync([FromRoute, UrlEncoded, Required] string username)
+        public async Task<IActionResult> GetDownloadsAsync([FromRoute, UrlEncoded, Required] string username)
         {
             if (Program.IsRelayAgent)
             {
@@ -798,6 +793,8 @@ namespace slskd.Transfers.API
             {
                 return NotFound();
             }
+
+            await AnnotateAsync(downloads);
 
             var response = new UserResponse()
             {
@@ -817,7 +814,7 @@ namespace slskd.Transfers.API
         [Authorize(Policy = AuthPolicy.Any)]
         [ProducesResponseType(typeof(Transfer), 200)]
         [ProducesResponseType(404)]
-        public IActionResult GetDownload([FromRoute, UrlEncoded, Required] string username, [FromRoute, Required] string id)
+        public async Task<IActionResult> GetDownload([FromRoute, UrlEncoded, Required] string username, [FromRoute, Required] string id)
         {
             if (Program.IsRelayAgent)
             {
@@ -835,6 +832,8 @@ namespace slskd.Transfers.API
             {
                 return NotFound();
             }
+
+            await AnnotateAsync([download]);
 
             return Ok(download);
         }
@@ -1509,6 +1508,44 @@ namespace slskd.Transfers.API
             if (feature is not null)
             {
                 feature.RawTarget = HttpContext.Request.Path;
+            }
+        }
+
+        /// <summary>
+        ///     Fills in the fields a download record cannot answer for itself.
+        /// </summary>
+        /// <remarks>
+        ///     Both are questions about the world rather than about the record, and both are asked of a cache: see
+        ///     <see cref="DownloadFileAvailability"/> and <see cref="slskd.Search.SearchExistence"/> for why neither
+        ///     is a lookup per row per poll.
+        ///
+        ///     Here rather than in the service that lists them, for the same reason `LocalFileExists` was: they are
+        ///     not persisted, they are not derivable from anything that is, and nothing but a caller drawing a list
+        ///     has any use for them.
+        /// </remarks>
+        /// <param name="downloads">The downloads about to be served. Qualified because `Transfer` in this file is Soulseek's.</param>
+        /// <returns>The operation context.</returns>
+        private async Task AnnotateAsync(IEnumerable<slskd.Transfers.Transfer> downloads)
+        {
+            foreach (var download in downloads)
+            {
+                // say whether each finished download's file is still there, rather than leaving the UI to find out
+                // by being refused
+                if (download.State.HasFlag(TransferStates.Completed) && download.State.HasFlag(TransferStates.Succeeded))
+                {
+                    download.LocalFileExists = FileAvailability.Exists(download.LocalFilename);
+                }
+
+                /*
+                    drop the id of a search that has since been deleted, and keep its text. The batch records both,
+                    and only the id stops being true when the search goes: what was searched for still is, and it is
+                    the more useful half. A caller can then tell the three cases apart -- no search, a search it can
+                    still open, and a search that is gone -- which an empty field could not.
+                */
+                if (download.SearchId.HasValue && !await SearchExistence.ExistsAsync(download.SearchId.Value))
+                {
+                    download.SearchId = null;
+                }
             }
         }
     }
