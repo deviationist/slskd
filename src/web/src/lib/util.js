@@ -200,6 +200,29 @@ export const getFileName = (fullPath) => {
   return fullPath.split('\\').pop().split('/').pop();
 };
 
+/**
+ * The file's extension, lowercased and without its dot.
+ *
+ * Read from the *name* rather than from the whole path: a peer's folder is
+ * routinely called something like `Artist - Album (1998) [FLAC]`, and a dot in
+ * it has nothing to say about the file inside it. A name with no dot, or one
+ * ending in a dot, has no extension rather than an empty one -- there is
+ * nothing to show and nothing to sort on.
+ * @param {string} fullPath - The file's name or its whole remote path.
+ * @returns {string} The extension, or '' where there is none.
+ */
+export const getFileExtension = (fullPath) => {
+  const name = getFileName(String(fullPath ?? ''));
+  const dot = name.lastIndexOf('.');
+
+  // a leading dot is a hidden file, not an extension: `.sync` is the whole name
+  if (dot <= 0 || dot === name.length - 1) {
+    return '';
+  }
+
+  return name.slice(dot + 1).toLowerCase();
+};
+
 export const getDirectoryName = (fullPath) => {
   let path = fullPath;
 

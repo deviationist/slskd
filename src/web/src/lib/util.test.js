@@ -1,5 +1,33 @@
 import * as utils from './util';
 
+describe('getFileExtension', () => {
+  it('reads the extension off a remote path', () => {
+    expect(utils.getFileExtension('@@music\\Artist\\01 Track.FLAC')).toBe(
+      'flac',
+    );
+    expect(utils.getFileExtension('/home/x/y/track.mp3')).toBe('mp3');
+  });
+
+  it('reads it from the name, never from the folder', () => {
+    // a peer's folder routinely carries a dot -- and a format in brackets that
+    // the file itself may not agree with
+    expect(utils.getFileExtension('@@x\\Album (1998) [FLAC]\\track')).toBe('');
+    expect(utils.getFileExtension('/x/v1.5/track.aiff')).toBe('aiff');
+  });
+
+  it('has nothing to say about a name without one', () => {
+    expect(utils.getFileExtension('track')).toBe('');
+    expect(utils.getFileExtension('track.')).toBe('');
+    expect(utils.getFileExtension('.sync')).toBe('');
+    expect(utils.getFileExtension('')).toBe('');
+    expect(utils.getFileExtension(undefined)).toBe('');
+  });
+
+  it('takes the last dot, not the first', () => {
+    expect(utils.getFileExtension('01. Artist - Track.mp3')).toBe('mp3');
+  });
+});
+
 describe('formatBytesAsUnit', () => {
   it('converts bytes to specified unit', () => {
     expect(utils.formatBytesAsUnit(1_234_567, 'MB', 2)).toBe(1.18);

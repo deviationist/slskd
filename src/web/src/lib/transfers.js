@@ -1,6 +1,6 @@
 import { apiBaseUrl } from '../config';
 import api from './api';
-import { downloadFile, getFileName } from './util';
+import { downloadFile, getFileExtension, getFileName } from './util';
 
 export const getAll = async ({ direction }) => {
   const response = (
@@ -798,6 +798,7 @@ export const flattenTransfers = (users = []) =>
  */
 export const TRANSFER_COLUMNS = [
   { key: 'name', label: 'File', className: 'flatlist-filename' },
+  { key: 'ext', label: 'Ext', className: 'flatlist-ext', optional: true },
   { key: 'path', label: 'Path', className: 'flatlist-path' },
   { key: 'user', label: 'User', className: 'flatlist-user' },
   { key: 'state', label: 'Progress', className: 'flatlist-progress' },
@@ -821,6 +822,7 @@ export const TRANSFER_COLUMNS = [
  */
 export const TRANSFER_SORT_COLUMNS = {
   attempts: { kind: 'number', of: (row) => row.attempts },
+  ext: { kind: 'text', of: (row) => getFileExtension(row.filename ?? '') },
   name: { kind: 'text', of: (row) => getFileName(row.filename ?? '') },
   path: { kind: 'text', of: (row) => row.directory },
   size: { kind: 'number', of: (row) => row.size },

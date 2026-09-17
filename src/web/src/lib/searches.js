@@ -1,6 +1,11 @@
 import api from './api';
 import { defaultColumns } from './tables';
-import { formatAttributes, getDirectoryName, getFileName } from './util';
+import {
+  formatAttributes,
+  getDirectoryName,
+  getFileExtension,
+  getFileName,
+} from './util';
 
 /**
  * Whether a phrase can be searched for.
@@ -467,6 +472,7 @@ export const pathOf = ({ filename }) => {
  */
 export const SORT_COLUMNS = {
   attributes: { kind: 'text', of: (row) => formatAttributes(row) },
+  ext: { kind: 'text', of: (row) => getFileExtension(row.filename ?? '') },
   length: { kind: 'number', of: (row) => row.length },
   name: { kind: 'text', of: (row) => getFileName(row.filename ?? '') },
   path: { kind: 'text', of: (row) => pathOf(row) },
@@ -500,6 +506,7 @@ export const SORT_COLUMNS = {
  */
 export const COLUMNS = [
   { key: 'name', label: 'File', className: 'flatlist-filename' },
+  { key: 'ext', label: 'Ext', className: 'flatlist-ext', optional: true },
   { key: 'path', label: 'Path', className: 'flatlist-path' },
   { key: 'user', label: 'User', className: 'flatlist-user' },
   { key: 'size', label: 'Size', className: 'flatlist-size' },
