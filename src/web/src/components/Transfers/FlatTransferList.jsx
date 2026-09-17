@@ -700,7 +700,16 @@ const FlatTransferList = ({
           />,
           footerSlot,
         )}
-      <div ref={listRef}>
+      {/*
+        The table scrolls sideways on a phone rather than being cut off. See
+        `.flatlist-scroll`: the overflow is on this element, which is the one
+        `scrollParentOf` starts *above*, so it cannot be mistaken for the
+        element that scrolls the page.
+      */}
+      <div
+        className="flatlist-scroll"
+        ref={listRef}
+      >
         <Table
           className="flatlist"
           compact
