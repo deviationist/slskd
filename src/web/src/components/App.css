@@ -107,6 +107,19 @@ body {
     background-color: var(--background-color);
 }
 
+/* An item's header, which is the username on the Users page.
+
+   The same omission as the sortable table headers below, and in the theme
+   patch's own file: it defines `--smui-item-meta-color` and
+   `--smui-item-description-color` and no header colour at all, so
+   `.ui.items > .item > .content > .header` keeps Semantic's `#000000d9` and
+   the one line naming who the card is about is the one line that cannot be
+   read. Its description, directly underneath, follows the theme correctly --
+   which is what makes it look like a styling choice rather than a gap. */
+:root.dark .ui.items > .item > .content > .header {
+    color: var(--smui-site-body-text-color);
+}
+
 /* Semantic hard-codes the colour of a sortable table's headers --
    `rgba(0,0,0,.87)`, and .8 and .95 for hover and for the sorted one -- rather
    than taking it from a variable, so the theme patch never reached them.
