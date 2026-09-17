@@ -1,5 +1,6 @@
 import { urlBase } from '../../config';
 import {
+  describeEmpty,
   describeSelection,
   nextSort,
   parseColumns,
@@ -20,7 +21,7 @@ import {
   offsetWithin,
   scrollParentOf,
 } from '../../lib/util';
-import { SortRank } from '../Shared';
+import { EmptyTableRow, SortRank } from '../Shared';
 import TransferDetails from './TransferDetails';
 import {
   ConfirmRemovalModal,
@@ -235,6 +236,7 @@ const SelectionActions = ({
  * @param {object} params
  * @param {boolean} params.deleteFileOnRemoval - Whether a removal takes the file with it.
  * @param {string} params.direction - 'download' or 'upload'.
+ * @param {string} params.filterQuery - The filter in force, for an emptied table to quote.
  * @param {Function} params.onCancelAll - Cancels a selection.
  * @param {Function} params.onRemoveAll - Removes a selection.
  * @param {Function} params.onRetryAll - Retries a selection.
@@ -242,12 +244,14 @@ const SelectionActions = ({
  * @param {Function} params.onRemoveRequested - Removes one transfer.
  * @param {Function} params.onRetryRequested - Retries one transfer.
  * @param {boolean} params.retrievalEnabled - Whether a finished file can be fetched to the browser.
+ * @param {number} params.total - How many transfers there are before the filter.
  * @param {object[]} params.users - The transfers, grouped as the API returns them.
  * @returns {object} The list.
  */
 const FlatTransferList = ({
   deleteFileOnRemoval,
   direction,
+  filterQuery,
   onCancelAll,
   onPlaceInQueueRequested,
   onRemoveAll,
@@ -255,6 +259,7 @@ const FlatTransferList = ({
   onRetryAll,
   onRetryRequested,
   retrievalEnabled,
+  total,
   users,
 }) => {
   const [selected, setSelected] = useState(() => new Set());
@@ -715,6 +720,15 @@ const FlatTransferList = ({
             </Table.Row>
           </Table.Header>
           <Table.Body>
+            {rows.length === 0 && (
+              <EmptyTableRow columns={shown.length + 2}>
+                {describeEmpty({
+                  noun: `${direction}s`,
+                  query: filterQuery,
+                  total,
+                })}
+              </EmptyTableRow>
+            )}
             {paddingTop > 0 && (
               <Table.Row>
                 <Table.Cell

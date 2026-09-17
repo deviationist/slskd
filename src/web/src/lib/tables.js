@@ -364,6 +364,33 @@ export const describeSelection = ({ total = 0, selection, noun = 'file' }) => {
 };
 
 /**
+ * What a table with no rows should say for itself.
+ *
+ * A table that draws its header and then nothing looks like one still loading,
+ * or like a fault. The distinction worth drawing is *why* it is empty: nothing
+ * here at all is a different fact from nothing that matches, and only the
+ * second one is answered by clearing a filter.
+ * @param {object} params
+ * @param {number} params.total - How many rows there are before filtering.
+ * @param {string} params.noun - What the rows are, plural.
+ * @param {string} [params.query] - The filter in force, if there is one.
+ * @returns {string} The sentence.
+ */
+export const describeEmpty = ({ total = 0, noun = 'rows', query }) => {
+  if (total === 0) {
+    return `No ${noun}`;
+  }
+
+  if (query) {
+    return `None of the ${total} ${noun} match '${query}'`;
+  }
+
+  // filtered by something with no text to quote -- the searches page hides
+  // locked files and peers with no free slot, neither of which is a phrase
+  return `None of the ${total} ${noun} are shown by the filters in force`;
+};
+
+/**
  * Reads a stored column list, and copes with anything else.
  *
  * Nothing stored means the defaults rather than nothing: an empty table is a

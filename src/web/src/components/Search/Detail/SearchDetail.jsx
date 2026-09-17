@@ -509,9 +509,11 @@ const SearchDetail = ({
           <FlatFileList
             disabled={disabled}
             downloads={downloads}
+            filterQuery={resultFilters}
             retrievalEnabled={retrievalEnabled}
             rows={flatRows}
             searchId={search.id}
+            total={search.fileCount + search.lockedFileCount}
           />
         )}
         {loaded &&
