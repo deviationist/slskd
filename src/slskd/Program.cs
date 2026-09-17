@@ -802,6 +802,7 @@ namespace slskd
             services.AddSingleton<FileService>();
             services.AddSingleton<DownloadTicketService>();
             services.AddSingleton<DownloadFileAvailability>();
+            services.AddSingleton<slskd.Search.SearchExistence>();
 
             services.AddSingleton<IRelayService, RelayService>();
 

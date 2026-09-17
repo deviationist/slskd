@@ -13,7 +13,8 @@ namespace slskd.Tests.Unit.Transfers.API.Controllers
     using Microsoft.AspNetCore.Http.Features;
     using Microsoft.AspNetCore.Mvc;
     using Microsoft.Extensions.Options;
-    using Moq;
+    using Microsoft.EntityFrameworkCore;
+using Moq;
     using slskd.Files;
     using slskd.Transfers;
     using slskd.Transfers.API;
@@ -373,6 +374,10 @@ namespace slskd.Tests.Unit.Transfers.API.Controllers
                 fileService: FileService,
                 downloadTicketService: tickets ?? Tickets,
                 downloadFileAvailability: new DownloadFileAvailability(),
+
+                // never consulted by anything these tests call: a transfer with no SearchId is never asked about
+                searchExistence: new slskd.Search.SearchExistence(
+                    new Mock<IDbContextFactory<slskd.Search.SearchDbContext>>().Object),
                 optionsSnapshot: OptionsSnapshotMock.Object)
             {
                 ControllerContext = new ControllerContext { HttpContext = httpContext },

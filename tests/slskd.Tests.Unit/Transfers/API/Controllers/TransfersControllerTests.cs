@@ -40,7 +40,8 @@ namespace slskd.Tests.Unit.Transfers.API.Controllers
     using System.Threading.Tasks;
     using Microsoft.AspNetCore.Mvc;
     using Microsoft.Extensions.Options;
-    using Moq;
+    using Microsoft.EntityFrameworkCore;
+using Moq;
     using OneOf;
     using slskd.Files;
     using slskd.Transfers;
@@ -100,6 +101,10 @@ namespace slskd.Tests.Unit.Transfers.API.Controllers
             fileService: FileServiceMock.Object,
             downloadTicketService: new DownloadTicketService(),
             downloadFileAvailability: new DownloadFileAvailability(),
+
+            // never consulted by anything these tests call: a transfer with no SearchId is never asked about
+            searchExistence: new slskd.Search.SearchExistence(
+                new Mock<IDbContextFactory<slskd.Search.SearchDbContext>>().Object),
             optionsSnapshot: OptionsSnapshotMock.Object);
 
         private void GivenDownload(Guid id, string localFilename, Soulseek.TransferStates state = Soulseek.TransferStates.Completed | Soulseek.TransferStates.Succeeded, long bytesTransferred = 1024)

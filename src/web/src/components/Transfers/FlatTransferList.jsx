@@ -507,8 +507,8 @@ const FlatTransferList = ({
             title={
               row.searchText
                 ? row.searchId
-                  ? `Found by searching for '${row.searchText}'`
-                  : `Found by searching for '${row.searchText}' (that search is no longer listed)`
+                  ? `Found by searching for '${row.searchText}' — click to open that search`
+                  : `Found by searching for '${row.searchText}' — that search has since been deleted, so there is nothing to open`
                 : undefined
             }
           >
