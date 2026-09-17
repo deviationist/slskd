@@ -396,30 +396,56 @@ body {
     white-space: nowrap;
 }
 
+/* Floors, so that the filename and its folder are not the only columns that
+   can give.
+
+   Every other column here carries a fixed width, and a table gives the sized
+   columns what they asked for and takes the shortfall out of the ones that did
+   not ask -- which was these two, and only these two. Measured at a 768px
+   window: File and Path were 60px each while User, Progress, Size and Attempts
+   sat at their full 180, 170, 100 and 96. With a floor the shortfall is shared:
+   the same window now gives File 220 and Path 120 while the four give up 79,
+   33, 24 and 39.
+
+   The filename's floor is the larger because a row is read by its name; the
+   folder is what it can afford to lose first. */
+.flatlist-filename {
+    min-width: 220px;
+}
+
+.flatlist-path {
+    min-width: 120px;
+}
+
+/* Sized to a Soulseek username rather than to the longest one imaginable: the
+   name is elided anyway, and the column was taking room from the filename to
+   hold whitespace. */
 .flatlist-user {
-    width: 180px;
+    width: 117px;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
 /* Narrow on purpose: three or four lowercase letters, and every row in a
-   sorted list says the same thing. */
+   sorted list says the same thing. Room for `flac` and its header, and nothing
+   beyond that -- whatever it does not take, the filename does. */
 .flatlist-ext {
-    width: 70px;
+    width: 42px;
 }
 
 /* The search a download came from. Fixed and elided rather than sized to its
    contents: a phrase can be a few words or a whole title, and a column that
-   grows with the longest one takes the room from the filename beside it. */
+   grows with the longest one takes the room from the filename beside it. Sized
+   to show enough of a phrase to recognise it, not to hold one whole. */
 .flatlist-search {
-    width: 190px;
+    width: 105px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
 .flatlist-size {
-    width: 100px;
+    width: 70px;
 }
 
 .flatlist-attributes {
@@ -456,6 +482,43 @@ body {
     text-align: center !important;
 }
 
+/* On a phone the fixed column widths no longer fit: they were measured for a
+   window several times wider, and together they are about 900px of a 380px
+   screen.
+
+   They are relaxed rather than scrolled sideways. A wrapper with
+   `overflow-x: auto` computes `overflow-y` to `auto` as well, which makes it a
+   scrolling ancestor -- and `scrollParentOf`, which is how the virtualiser
+   finds the element that actually scrolls, matches on exactly that. The list
+   would then measure its scrolling against a box that never scrolls and draw
+   the first screenful forever.
+
+   So the columns take what there is and the text truncates, which they are
+   already built to do. Anything still too cramped is what the column picker is
+   for: a phone wants three columns, not seven. */
+@media only screen and (max-width: 767px) {
+    .flatlist-user,
+    .flatlist-size,
+    .flatlist-speed,
+    .flatlist-attempts,
+    .flatlist-queue,
+    .flatlist-slot,
+    .flatlist-length,
+    .flatlist-ext,
+    .flatlist-search,
+    .flatlist-attributes,
+    .flatlist-progress {
+        width: auto;
+        min-width: 0;
+    }
+
+    /* the filename is what a row is read by, so it keeps the room the others
+       give up rather than being truncated first */
+    .flatlist-filename {
+        min-width: 90px;
+    }
+}
+
 /* Pushed to the end of the summary bar, away from the count and the clear. */
 .flatlist-columns {
     margin-left: auto !important;
@@ -490,16 +553,19 @@ body {
 
 /* One column for everything a row can be told to do -- retrieve, remove,
    details -- rather than a column each. Three single-icon columns cost three
-   lots of cell padding and read as three unrelated things. */
+   lots of cell padding and read as three unrelated things.
+
+   Sized to the three icons and the gaps between them, with the gap narrowed to
+   suit: whatever this column does not take, the filename does. */
 .flatlist-actions {
-    width: 96px;
+    width: 82px;
 }
 
 .flatlist-actions-row {
     display: flex;
     align-items: center;
     justify-content: flex-end;
-    gap: 10px;
+    gap: 7px;
 }
 
 /* Semantic gives .ui.checkbox `vertical-align: initial`, which is baseline, so
