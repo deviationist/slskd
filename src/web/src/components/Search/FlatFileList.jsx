@@ -7,6 +7,7 @@ import {
   SORT_COLUMNS,
 } from '../../lib/searches';
 import {
+  describeEmpty,
   describeSelection,
   nextSort,
   parseColumns,
@@ -29,7 +30,7 @@ import {
   offsetWithin,
   scrollParentOf,
 } from '../../lib/util';
-import { SortRank } from '../Shared';
+import { EmptyTableRow, SortRank } from '../Shared';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -191,9 +192,11 @@ const storeColumns = (columns) => {
 const FlatFileList = ({
   disabled,
   downloads,
+  filterQuery,
   retrievalEnabled,
   rows: unsorted,
   searchId,
+  total,
 }) => {
   const [selected, setSelected] = useState(() => new Set());
   const [downloading, setDownloading] = useState(false);
@@ -315,7 +318,7 @@ const FlatFileList = ({
   );
 
   const selection = selectionState({ rows, selected });
-  const selectedSize = selectedRows.reduce((total, row) => total + row.size, 0);
+  const selectedSize = selectedRows.reduce((sum, row) => sum + row.size, 0);
 
   const toggle = (key, checked) =>
     setSelected((old) => {
@@ -575,6 +578,11 @@ const FlatFileList = ({
             </Table.Row>
           </Table.Header>
           <Table.Body>
+            {rows.length === 0 && (
+              <EmptyTableRow columns={shown.length + 2}>
+                {describeEmpty({ noun: 'files', query: filterQuery, total })}
+              </EmptyTableRow>
+            )}
             {paddingTop > 0 && (
               <Table.Row>
                 <Table.Cell

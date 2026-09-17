@@ -1,5 +1,6 @@
 export { default as CodeEditor } from './CodeEditor';
 export { default as Div } from './Div';
+export { default as EmptyTableRow } from './EmptyTableRow';
 export { default as ErrorSegment } from './ErrorSegment';
 export { default as FileList } from './FileList';
 export { default as Graph, useDarkMode } from './Graph';

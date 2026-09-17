@@ -365,6 +365,16 @@ body {
     border: none;
 }
 
+/* The one row a table draws when it has none. Centred and quiet: it is a
+   statement about the table rather than a row of data, and it should not read
+   as the first item in a list. */
+.flatlist-empty {
+    text-align: center !important;
+    font-weight: 100;
+    padding: 2em 1em !important;
+    opacity: 0.75;
+}
+
 /* Which key of the sort a column is, beside its label and ahead of Semantic's
    arrow. Superscript-sized and dimmed: it is the answer to a question only
    asked once two columns are sorted at once, and the label is still the thing

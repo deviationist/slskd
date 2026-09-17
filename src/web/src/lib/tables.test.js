@@ -603,6 +603,38 @@ describe('the peer columns sort', () => {
   });
 });
 
+describe('describeEmpty', () => {
+  it('says there are none when there are none', () => {
+    expect(tables.describeEmpty({ noun: 'downloads', total: 0 })).toBe(
+      'No downloads',
+    );
+  });
+
+  it('says a filter is why, and quotes it', () => {
+    // the distinction the row exists to draw: this one is answered by
+    // clearing the filter, and the one above is not
+    expect(
+      tables.describeEmpty({ noun: 'files', query: 'flac', total: 1_170 }),
+    ).toBe("None of the 1170 files match 'flac'");
+  });
+
+  it('copes with a filter that has no phrase to quote', () => {
+    // hide-locked and hide-no-free-slots are filters with nothing to put in
+    // quotes, and a table emptied by them still owes an explanation
+    expect(tables.describeEmpty({ noun: 'files', total: 40 })).toBe(
+      'None of the 40 files are shown by the filters in force',
+    );
+  });
+
+  it('prefers "none at all" over "none match"', () => {
+    // an empty list with a filter typed into it has nothing to say about the
+    // filter: it would be empty either way
+    expect(
+      tables.describeEmpty({ noun: 'uploads', query: 'flac', total: 0 }),
+    ).toBe('No uploads');
+  });
+});
+
 describe('parseColumns / withColumn', () => {
   it('shows everything but the peer columns by default', () => {
     expect(DEFAULT_COLUMNS).toEqual([

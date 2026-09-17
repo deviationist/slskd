@@ -157,6 +157,13 @@ const Transfers = ({ direction, server }) => {
     [matching, sort],
   );
 
+  // every file this direction has, before the filter: what an emptied table
+  // says it was choosing between
+  const total = useMemo(
+    () => transfersLibrary.flattenTransfers(transfers).length,
+    [transfers],
+  );
+
   /*
    * Asking a peer where we are in its queue, which is what clicking a queued
    * row does. The card view has its own copy of this inside TransferGroup; the
@@ -335,7 +342,14 @@ const Transfers = ({ direction, server }) => {
         sort={sort}
         transfers={transfers}
       />
-      {sorted.length === 0 ? (
+      {/*
+        A table that a filter has emptied keeps its table: the control that
+        emptied it is one of the ones still on screen, and swapping the whole
+        thing for a notice takes the sort, the columns and the filter away at
+        the moment they are wanted. With nothing to filter in the first place
+        there is nothing to keep, so that case still gets the placeholder.
+      */}
+      {sorted.length === 0 && !(flat && transfers.length > 0) ? (
         <PlaceholderSegment
           caption={
             filter
@@ -348,6 +362,7 @@ const Transfers = ({ direction, server }) => {
         <FlatTransferList
           deleteFileOnRemoval={deleteFileOnRemoval}
           direction={direction}
+          filterQuery={filter}
           onCancelAll={cancelAll}
           onPlaceInQueueRequested={placeInQueue}
           onRemoveAll={askThenRemoveAll}
@@ -355,6 +370,7 @@ const Transfers = ({ direction, server }) => {
           onRetryAll={retryAll}
           onRetryRequested={retry}
           retrievalEnabled={retrievalEnabled}
+          total={total}
           users={sorted}
         />
       ) : (
