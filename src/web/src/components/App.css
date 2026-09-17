@@ -559,6 +559,24 @@ body {
     flex-wrap: wrap;
 }
 
+/* The line that says a sort can have more than one column. Quiet, because it
+   is help rather than data, and it sits among the counts that are.
+
+   Gone below 900px: the bar it shares is already wrapping there, and a hint is
+   the first thing that should give up its room. It is still on the headers as
+   a tooltip wherever it is not drawn here. */
+.flatlist-hint {
+    font-size: 0.9em;
+    opacity: 0.6;
+    margin-left: 1em;
+}
+
+@media (max-width: 900px) {
+    .flatlist-hint {
+        display: none;
+    }
+}
+
 /* Where a page hangs an action that must outlive its own scrolling. Pushed to
    the right of the transfer stats, left of the logo, and gone entirely when
    nothing has filled it. */
