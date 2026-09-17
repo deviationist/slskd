@@ -11,7 +11,6 @@ import {
   sortRows,
   sortStateOf,
   sortToQuery,
-  withColumn,
 } from '../../lib/tables';
 import * as transfersLibrary from '../../lib/transfers';
 import { userPath } from '../../lib/users';
@@ -22,7 +21,7 @@ import {
   offsetWithin,
   scrollParentOf,
 } from '../../lib/util';
-import { EmptyTableRow, SortHint, SortRank } from '../Shared';
+import { ColumnPicker, EmptyTableRow, SortHint, SortRank } from '../Shared';
 import TransferDetails from './TransferDetails';
 import {
   ConfirmRemovalModal,
@@ -298,19 +297,15 @@ const FlatTransferList = ({
     [sort, users],
   );
 
-  const shown = transfersLibrary.TRANSFER_COLUMNS.filter((col) =>
-    columns.includes(col.key),
-  );
-  const show = (key) => columns.includes(key);
+  // in the order they are shown, not the library's: the order is a choice now,
+  // and rebuilding the list from the canonical one would quietly undo it
+  const shown = columns
+    .map((key) =>
+      transfersLibrary.TRANSFER_COLUMNS.find((col) => col.key === key),
+    )
+    .filter(Boolean);
 
-  const setColumn = (key, on) => {
-    const next = withColumn({
-      all: transfersLibrary.TRANSFER_COLUMNS,
-      columns,
-      key,
-      on,
-    });
-
+  const applyColumns = (next) => {
     setColumns(next);
     storeColumns(direction, next);
   };
@@ -656,16 +651,11 @@ const FlatTransferList = ({
         )}
         <Popup
           content={
-            <div className="flatlist-columns-menu">
-              {transfersLibrary.TRANSFER_COLUMNS.map((col) => (
-                <Checkbox
-                  checked={show(col.key)}
-                  key={col.key}
-                  label={col.label}
-                  onChange={() => setColumn(col.key, !show(col.key))}
-                />
-              ))}
-            </div>
+            <ColumnPicker
+              all={transfersLibrary.TRANSFER_COLUMNS}
+              columns={columns}
+              onChange={applyColumns}
+            />
           }
           on="click"
           position="bottom right"
