@@ -211,6 +211,104 @@ describe('sortRows', () => {
     ).toEqual(['also', 'has', 'none']);
   });
 
+  it('breaks the first key’s ties with the second', () => {
+    // the whole point of a second key: the 320s together, and in order within
+    const tied = [
+      { filename: 'x\\c.mp3', bitRate: 320, username: 'carol' },
+      { filename: 'x\\a.mp3', bitRate: 128, username: 'alice' },
+      { filename: 'x\\b.mp3', bitRate: 320, username: 'bob' },
+    ];
+
+    expect(
+      tables
+        .sortRows({
+          columns: SORT_COLUMNS,
+          rows: tied,
+          sort: [
+            { column: 'attributes', direction: 'asc' },
+            { column: 'user', direction: 'asc' },
+          ],
+        })
+        .map((r) => r.username),
+    ).toEqual(['alice', 'bob', 'carol']);
+  });
+
+  it('leaves the first key’s order alone where it decides', () => {
+    // a second key may only break ties; reordering anything the first key
+    // already settled would make the sort unreadable
+    expect(
+      tables
+        .sortRows({
+          columns: SORT_COLUMNS,
+          rows,
+          sort: [
+            { column: 'user', direction: 'asc' },
+            { column: 'size', direction: 'desc' },
+          ],
+        })
+        .map((r) => r.username),
+    ).toEqual(['alice', 'bob', 'carol']);
+  });
+
+  it('sorts each key its own way around', () => {
+    const tied = [
+      { filename: 'x\\a.mp3', bitRate: 320, username: 'alice' },
+      { filename: 'x\\b.mp3', bitRate: 320, username: 'bob' },
+      { filename: 'x\\c.mp3', bitRate: 128, username: 'carol' },
+    ];
+
+    expect(
+      tables
+        .sortRows({
+          columns: SORT_COLUMNS,
+          rows: tied,
+          sort: [
+            { column: 'attributes', direction: 'desc' },
+            { column: 'user', direction: 'desc' },
+          ],
+        })
+        .map((r) => r.username),
+    ).toEqual(['bob', 'alice', 'carol']);
+  });
+
+  it('a row the first key cannot answer for still sorts by the second', () => {
+    // it goes last within that key, but it is not exiled from the list -- the
+    // keys after it still have something to say about where it lands
+    const withGaps = [
+      { filename: 'x\\b.mp3', username: 'bob' },
+      { filename: 'x\\a.mp3', length: 100, username: 'alice' },
+      { filename: 'x\\c.mp3', username: 'carol' },
+    ];
+
+    expect(
+      tables
+        .sortRows({
+          columns: SORT_COLUMNS,
+          rows: withGaps,
+          sort: [
+            { column: 'length', direction: 'asc' },
+            { column: 'user', direction: 'asc' },
+          ],
+        })
+        .map((r) => r.username),
+    ).toEqual(['alice', 'bob', 'carol']);
+  });
+
+  it('drops a key it does not know and honours the rest', () => {
+    expect(
+      tables
+        .sortRows({
+          columns: SORT_COLUMNS,
+          rows,
+          sort: [
+            { column: 'nonsense', direction: 'asc' },
+            { column: 'user', direction: 'asc' },
+          ],
+        })
+        .map((r) => r.username),
+    ).toEqual(['alice', 'bob', 'carol']);
+  });
+
   it('leaves the order alone for a column it does not know', () => {
     expect(
       tables
@@ -238,47 +336,178 @@ describe('sortRows', () => {
 describe('nextSort', () => {
   it('starts a new column ascending', () => {
     expect(
-      tables.nextSort({ column: 'size', current: 'name', direction: 'desc' }),
-    ).toEqual({
-      column: 'size',
-      direction: 'asc',
-    });
+      tables.nextSort({
+        column: 'size',
+        sort: [{ column: 'name', direction: 'desc' }],
+      }),
+    ).toEqual([{ column: 'size', direction: 'asc' }]);
   });
 
   it('turns the same column around', () => {
     expect(
-      tables.nextSort({ column: 'size', current: 'size', direction: 'asc' }),
-    ).toEqual({
-      column: 'size',
-      direction: 'desc',
-    });
+      tables.nextSort({
+        column: 'size',
+        sort: [{ column: 'size', direction: 'asc' }],
+      }),
+    ).toEqual([{ column: 'size', direction: 'desc' }]);
   });
 
   it('gives up on the third click', () => {
     // without this there is no way back to the order the results arrived in,
     // which is itself meaningful -- the peers as the dropdown ranked them
     expect(
-      tables.nextSort({ column: 'size', current: 'size', direction: 'desc' }),
-    ).toEqual({
-      column: undefined,
-      direction: undefined,
-    });
+      tables.nextSort({
+        column: 'size',
+        sort: [{ column: 'size', direction: 'desc' }],
+      }),
+    ).toEqual([]);
+  });
+
+  it('still understands a caller with a single column and no list', () => {
+    expect(
+      tables.nextSort({ column: 'size', current: 'size', direction: 'asc' }),
+    ).toEqual([{ column: 'size', direction: 'desc' }]);
+  });
+
+  it('appends a second key rather than replacing the first', () => {
+    expect(
+      tables.nextSort({
+        append: true,
+        column: 'name',
+        sort: [{ column: 'ext', direction: 'asc' }],
+      }),
+    ).toEqual([
+      { column: 'ext', direction: 'asc' },
+      { column: 'name', direction: 'asc' },
+    ]);
+  });
+
+  it('turns an appended key around in place, keeping its rank', () => {
+    // the key's *position* is what it means; turning it around must not
+    // promote it past the key it breaks the ties of
+    expect(
+      tables.nextSort({
+        append: true,
+        column: 'ext',
+        sort: [
+          { column: 'ext', direction: 'asc' },
+          { column: 'name', direction: 'asc' },
+        ],
+      }),
+    ).toEqual([
+      { column: 'ext', direction: 'desc' },
+      { column: 'name', direction: 'asc' },
+    ]);
+  });
+
+  it('drops one key of several, leaving the rest in order', () => {
+    expect(
+      tables.nextSort({
+        append: true,
+        column: 'name',
+        sort: [
+          { column: 'ext', direction: 'asc' },
+          { column: 'name', direction: 'desc' },
+          { column: 'size', direction: 'asc' },
+        ],
+      }),
+    ).toEqual([
+      { column: 'ext', direction: 'asc' },
+      { column: 'size', direction: 'asc' },
+    ]);
+  });
+
+  it('collapses a multi-key sort to the column plainly clicked', () => {
+    // a plain click means "sort by this", and answering it by turning the
+    // column around would be answering a different question
+    expect(
+      tables.nextSort({
+        column: 'name',
+        sort: [
+          { column: 'ext', direction: 'asc' },
+          { column: 'name', direction: 'desc' },
+        ],
+      }),
+    ).toEqual([{ column: 'name', direction: 'asc' }]);
+  });
+});
+
+describe('sortStateOf', () => {
+  const sort = [
+    { column: 'ext', direction: 'asc' },
+    { column: 'name', direction: 'desc' },
+  ];
+
+  it('gives Semantic the word it draws its arrow from', () => {
+    expect(tables.sortStateOf({ column: 'ext', sort }).sorted).toBe(
+      'ascending',
+    );
+    expect(tables.sortStateOf({ column: 'name', sort }).sorted).toBe(
+      'descending',
+    );
+    expect(tables.sortStateOf({ column: 'size', sort }).sorted).toBeUndefined();
+  });
+
+  it('ranks the keys when there is more than one', () => {
+    expect(tables.sortStateOf({ column: 'ext', sort }).rank).toBe(1);
+    expect(tables.sortStateOf({ column: 'name', sort }).rank).toBe(2);
+  });
+
+  it('says nothing about rank when there is only one key', () => {
+    // "1" beside the only sorted column answers a question nobody asked
+    expect(
+      tables.sortStateOf({
+        column: 'ext',
+        sort: [{ column: 'ext', direction: 'asc' }],
+      }).rank,
+    ).toBeUndefined();
   });
 });
 
 describe('sortFromQuery / sortToQuery', () => {
   it('round-trips a sort', () => {
     const query = tables.sortToQuery({
-      column: 'size',
-      direction: 'desc',
       search: '',
+      sort: [{ column: 'size', direction: 'desc' }],
     });
 
-    expect(query).toBe('?sort=size&dir=desc');
-    expect(tables.sortFromQuery(query, SORT_COLUMNS)).toEqual({
-      column: 'size',
-      direction: 'desc',
+    expect(query).toBe('?sort=size:desc');
+    expect(tables.sortFromQuery(query, SORT_COLUMNS)).toEqual([
+      { column: 'size', direction: 'desc' },
+    ]);
+  });
+
+  it('round-trips several keys, in order', () => {
+    const query = tables.sortToQuery({
+      search: '',
+      sort: [
+        { column: 'user', direction: 'asc' },
+        { column: 'size', direction: 'desc' },
+      ],
     });
+
+    expect(query).toBe('?sort=user:asc,size:desc');
+    expect(tables.sortFromQuery(query, SORT_COLUMNS)).toEqual([
+      { column: 'user', direction: 'asc' },
+      { column: 'size', direction: 'desc' },
+    ]);
+  });
+
+  it('still reads a link written before there was more than one key', () => {
+    expect(tables.sortFromQuery('?sort=size&dir=desc', SORT_COLUMNS)).toEqual([
+      { column: 'size', direction: 'desc' },
+    ]);
+  });
+
+  it('clears the older parameter when it writes', () => {
+    // a `dir` left behind would outlive the sort it described and be read as
+    // the direction of whatever came next
+    expect(
+      tables.sortToQuery({
+        search: '?sort=size&dir=desc',
+        sort: [{ column: 'user', direction: 'asc' }],
+      }),
+    ).toBe('?sort=user:asc');
   });
 
   it('ignores a column it does not know', () => {
@@ -286,38 +515,45 @@ describe('sortFromQuery / sortToQuery', () => {
     // empty the list or throw
     expect(
       tables.sortFromQuery('?sort=drop%20table&dir=desc', SORT_COLUMNS),
-    ).toEqual({
-      column: undefined,
-      direction: 'asc',
-    });
+    ).toEqual([]);
+    expect(
+      tables.sortFromQuery('?sort=nonsense:asc,user:desc', SORT_COLUMNS),
+    ).toEqual([{ column: 'user', direction: 'desc' }]);
+  });
+
+  it('keeps the first mention of a column repeated in the query', () => {
+    expect(
+      tables.sortFromQuery('?sort=user:asc,user:desc', SORT_COLUMNS),
+    ).toEqual([{ column: 'user', direction: 'asc' }]);
   });
 
   it('defaults an unknown direction to ascending', () => {
     expect(
-      tables.sortFromQuery('?sort=user&dir=sideways', SORT_COLUMNS).direction,
+      tables.sortFromQuery('?sort=user:sideways', SORT_COLUMNS)[0].direction,
+    ).toBe('asc');
+    expect(
+      tables.sortFromQuery('?sort=user&dir=sideways', SORT_COLUMNS)[0]
+        .direction,
     ).toBe('asc');
   });
 
   it('leaves other parameters alone', () => {
     expect(
       tables.sortToQuery({
-        column: 'user',
-        direction: 'asc',
         search: '?ignore=abc',
+        sort: [{ column: 'user', direction: 'asc' }],
       }),
-    ).toBe('?ignore=abc&sort=user&dir=asc');
+    ).toBe('?ignore=abc&sort=user:asc');
   });
 
   it('clears the sort without emptying the query', () => {
     expect(
       tables.sortToQuery({
-        column: undefined,
         search: '?ignore=abc&sort=user&dir=asc',
+        sort: [],
       }),
     ).toBe('?ignore=abc');
-    expect(
-      tables.sortToQuery({ column: undefined, search: '?sort=user' }),
-    ).toBe('');
+    expect(tables.sortToQuery({ search: '?sort=user', sort: [] })).toBe('');
   });
 });
 

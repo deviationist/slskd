@@ -365,6 +365,17 @@ body {
     border: none;
 }
 
+/* Which key of the sort a column is, beside its label and ahead of Semantic's
+   arrow. Superscript-sized and dimmed: it is the answer to a question only
+   asked once two columns are sorted at once, and the label is still the thing
+   being read. */
+.flatlist-sort-rank {
+    font-size: 0.75em;
+    opacity: 0.6;
+    margin-left: 3px;
+    vertical-align: super;
+}
+
 /* The folder path, whole. Given room to breathe in wide mode, where it is most
    of the reason to be in wide mode; still useful narrow, where it takes what is
    left after the fixed columns and truncates. */

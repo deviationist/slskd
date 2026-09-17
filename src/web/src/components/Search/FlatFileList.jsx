@@ -11,8 +11,10 @@ import {
   nextSort,
   parseColumns,
   selectionState,
+  SORT_HINT,
   sortFromQuery,
   sortRows,
+  sortStateOf,
   sortToQuery,
   withColumn,
 } from '../../lib/tables';
@@ -26,6 +28,7 @@ import {
   offsetWithin,
   scrollParentOf,
 } from '../../lib/util';
+import { SortRank } from '../Shared';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -201,20 +204,25 @@ const FlatFileList = ({
    */
   const location = useLocation();
   const history = useHistory();
-  const { column, direction } = sortFromQuery(location.search, SORT_COLUMNS);
-
-  const rows = useMemo(
-    () =>
-      sortRows({ column, columns: SORT_COLUMNS, direction, rows: unsorted }),
-    [column, direction, unsorted],
+  // memoised on the query string rather than rebuilt per render: it is the
+  // dependency the sorted rows are memoised on, and a fresh array every render
+  // would sort the whole list every render
+  const sort = useMemo(
+    () => sortFromQuery(location.search, SORT_COLUMNS),
+    [location.search],
   );
 
-  const sortBy = (key) => {
-    const next = nextSort({ column: key, current: column, direction });
+  const rows = useMemo(
+    () => sortRows({ columns: SORT_COLUMNS, rows: unsorted, sort }),
+    [sort, unsorted],
+  );
+
+  const sortBy = (key, append) => {
+    const next = nextSort({ append, column: key, sort });
 
     history.replace({
       pathname: location.pathname,
-      search: sortToQuery({ ...next, search: location.search }),
+      search: sortToQuery({ search: location.search, sort: next }),
     });
   };
 
@@ -524,18 +532,16 @@ const FlatFileList = ({
                   // checkbox that does nothing when clicked
                   className={`${col.className} flatlist-sortable`}
                   key={col.key}
-                  onClick={() => sortBy(col.key)}
+                  onClick={(event) => sortBy(col.key, event.shiftKey)}
                   // Semantic draws the arrow from this, and it doubles as the
                   // announcement to a screen reader
-                  sorted={
-                    column === col.key
-                      ? direction === 'desc'
-                        ? 'descending'
-                        : 'ascending'
-                      : undefined
-                  }
+                  sorted={sortStateOf({ column: col.key, sort }).sorted}
+                  title={SORT_HINT}
                 >
                   {col.label}
+                  <SortRank
+                    rank={sortStateOf({ column: col.key, sort }).rank}
+                  />
                 </Table.HeaderCell>
               ))}
               <Table.HeaderCell className="flatlist-download" />

@@ -40,118 +40,278 @@ const missing = (value, kind) =>
   (kind === 'number' && Number.isNaN(Number(value)));
 
 /**
- * The rows in the order a column asks for.
+ * A sort as a list of keys, whatever shape the caller had one in.
  *
- * A row the column cannot answer for sorts last in *both* directions rather
- * than at whichever end is smallest. Sorting by length to find the longest
- * track and being handed a screen of files whose length nobody reported is not
- * an answer to the question.
+ * Accepts the single-column shorthand as well, so a table with one key to
+ * sort on never has to build an array to say so.
+ * @param {object} params
+ * @param {object[]} params.sort - The keys, most significant first.
+ * @param {string} params.column - A single column, when there is no list.
+ * @param {string} params.direction - Its direction.
+ * @returns {{column: string, direction: string}[]} The keys.
+ */
+const sortKeys = ({ sort, column, direction }) => {
+  if (Array.isArray(sort)) {
+    return sort.filter((key) => key?.column);
+  }
+
+  return column ? [{ column, direction }] : [];
+};
+
+/**
+ * Two rows as one key of the sort orders them.
+ * @param {object} a - A row.
+ * @param {object} b - Another.
+ * @param {object} key - The column's spec, plus the direction as a sign.
+ * @returns {number} Negative, zero or positive, as a comparator wants.
+ */
+const compare = (a, b, key) => {
+  const left = key.of(a);
+  const right = key.of(b);
+  const leftMissing = missing(left, key.kind);
+  const rightMissing = missing(right, key.kind);
+
+  if (leftMissing || rightMissing) {
+    return leftMissing && rightMissing ? 0 : leftMissing ? 1 : -1;
+  }
+
+  if (key.kind === 'number') {
+    return key.sign * (Number(left) - Number(right));
+  }
+
+  return key.sign * collator.compare(String(left), String(right));
+};
+
+/**
+ * The rows in the order the sort asks for.
+ *
+ * Several keys, each breaking the ties the one before it left: sorting by
+ * extension and then by name is the difference between "the FLACs together"
+ * and "the FLACs together, in order". Every key after the first decides
+ * strictly fewer rows than the one before, so the list is self-limiting
+ * however long it is allowed to grow.
+ *
+ * A row a key cannot answer for sorts last *within that key*, in both
+ * directions, rather than at whichever end is smallest -- sorting by length to
+ * find the longest track and being handed a screen of files whose length
+ * nobody reported is not an answer to the question. It still takes part in the
+ * keys around it.
  * @param {object} params
  * @param {object[]} params.rows - The rows.
- * @param {string} params.column - A key of `columns`, or anything else for no sort.
+ * @param {object[]} params.sort - Keys of `{column, direction}`, most significant first.
+ * @param {string} params.column - A single column, for a table with one key; ignored when `sort` is given.
+ * @param {string} params.direction - Its direction, 'asc' or 'desc'.
  * @param {object} params.columns - The table's column specs, keyed by column.
- * @param {string} params.direction - 'asc' or 'desc'.
- * @returns {object[]} A new, sorted array; the input order where the column is unknown.
+ * @returns {object[]} A new, sorted array; the input order where no key is known.
  */
 export const sortRows = ({
   rows = [],
+  sort,
   column,
   direction = 'asc',
   columns = {},
 }) => {
-  const spec = columns[column];
+  const keys = sortKeys({ column, direction, sort })
+    .map((key) => ({
+      ...columns[key.column],
+      sign: key.direction === 'desc' ? -1 : 1,
+    }))
+    .filter((key) => key.of);
 
-  if (!spec) {
+  if (keys.length === 0) {
     return rows;
   }
-
-  const sign = direction === 'desc' ? -1 : 1;
 
   // a copy: the caller's array is memoised upstream and sorting in place would
   // quietly reorder it for everything else reading the same reference
   return [...rows].sort((a, b) => {
-    const left = spec.of(a);
-    const right = spec.of(b);
-    const leftMissing = missing(left, spec.kind);
-    const rightMissing = missing(right, spec.kind);
+    for (const key of keys) {
+      const answer = compare(a, b, key);
 
-    if (leftMissing || rightMissing) {
-      return leftMissing && rightMissing ? 0 : leftMissing ? 1 : -1;
+      if (answer !== 0) {
+        return answer;
+      }
     }
 
-    if (spec.kind === 'number') {
-      return sign * (Number(left) - Number(right));
-    }
-
-    return sign * collator.compare(String(left), String(right));
+    return 0;
   });
 };
 
 /**
  * What clicking a column header should do next.
  *
- * A new column starts ascending. The same column again turns around. A third
- * click gives up on it, because a sort that cannot be undone leaves no way
- * back to the order the results arrived in -- which is itself meaningful here,
- * being the peers ranked by whatever the dropdown last chose.
+ * A plain click starts over with that column: it becomes the whole sort,
+ * ascending. Clicking the column that is *already* the only one turns it
+ * around, and a third click gives up on it -- because a sort that cannot be
+ * undone leaves no way back to the order the rows arrived in, which is itself
+ * meaningful here, being the peers ranked by whatever the dropdown last chose.
+ *
+ * A click that asks to `append` adds the column as a further key instead,
+ * breaking the ties the keys before it leave. The same three clicks apply to
+ * that one key: ascending, descending, gone -- and removing the middle key of
+ * three leaves the other two in the order they were in.
  * @param {object} params
  * @param {string} params.column - The column that was clicked.
- * @param {string} params.current - The column currently sorted on, if any.
+ * @param {object[]} params.sort - The sort now, most significant first.
+ * @param {boolean} params.append - Whether to add to the sort rather than replace it.
+ * @param {string} params.current - A single sorted column, for a caller that has no list.
  * @param {string} params.direction - Its direction.
- * @returns {{column: string|undefined, direction: string|undefined}} The next state.
+ * @returns {{column: string, direction: string}[]} The new sort.
  */
-export const nextSort = ({ column, current, direction }) => {
-  if (column !== current) {
-    return { column, direction: 'asc' };
+export const nextSort = ({
+  column,
+  sort,
+  append = false,
+  current,
+  direction,
+}) => {
+  const keys = sortKeys({ column: current, direction, sort });
+  const existing = keys.find((key) => key.column === column);
+
+  // asc -> desc -> gone, for the key that was clicked
+  const turned = (key) =>
+    key?.direction === 'asc'
+      ? { column, direction: 'desc' }
+      : key?.direction === 'desc'
+        ? undefined
+        : { column, direction: 'asc' };
+
+  if (append) {
+    const turnedKey = turned(existing);
+
+    if (!existing) {
+      return [...keys, turnedKey];
+    }
+
+    return keys
+      .map((key) => (key.column === column ? turnedKey : key))
+      .filter(Boolean);
   }
 
-  if (direction === 'asc') {
-    return { column, direction: 'desc' };
+  // a plain click on a column that shares the sort with others collapses to
+  // it rather than turning it around: "sort by this" is what the click means,
+  // and starting somewhere other than ascending would be answering a question
+  // nobody asked
+  const only = keys.length === 1 && existing;
+  const collapsed = only ? turned(existing) : { column, direction: 'asc' };
+
+  return collapsed ? [collapsed] : [];
+};
+
+/**
+ * What a sortable column header says it does, for anyone who has not guessed
+ * that a second key is a shift away.
+ */
+export const SORT_HINT =
+  'Click to sort by this column; shift-click to sort by it as well';
+
+/**
+ * How a column header should draw itself, given the sort.
+ *
+ * The rank is shown only once there is more than one key, because "1" beside
+ * the only sorted column answers a question nobody is asking; with two it is
+ * the whole of what distinguishes them.
+ * @param {object} params
+ * @param {object[]} params.sort - The sort, most significant first.
+ * @param {string} params.column - The column being drawn.
+ * @returns {{sorted: string|undefined, rank: number|undefined}} What Semantic's `sorted` prop wants, and the key's position.
+ */
+export const sortStateOf = ({ sort = [], column }) => {
+  const at = sort.findIndex((key) => key.column === column);
+
+  if (at < 0) {
+    return { rank: undefined, sorted: undefined };
   }
 
-  return { column: undefined, direction: undefined };
+  return {
+    rank: sort.length > 1 ? at + 1 : undefined,
+    sorted: sort[at].direction === 'desc' ? 'descending' : 'ascending',
+  };
 };
 
 /**
  * Reads the sort out of a query string, ignoring anything it does not know.
+ *
+ * `?sort=ext:asc,user:desc` -- and the older `?sort=ext&dir=desc`, which is
+ * what a link written before there was more than one key looks like. An
+ * unknown column is dropped rather than honoured: the parameter comes from a
+ * url someone else wrote, and a typo should not empty the list.
  * @param {string} search - `location.search`.
  * @param {object} columns - The table's column specs, so an unknown one is refused.
- * @returns {{column: string|undefined, direction: string}} The sort.
+ * @returns {{column: string, direction: string}[]} The sort, most significant first.
  */
 export const sortFromQuery = (search, columns = {}) => {
   const params = new URLSearchParams(search ?? '');
-  const column = params.get('sort');
-  const direction = params.get('dir') === 'desc' ? 'desc' : 'asc';
+  const raw = params.get('sort') ?? '';
+  const fallback = params.get('dir') === 'desc' ? 'desc' : 'asc';
+  const seen = new Set();
 
-  // an unknown column is dropped rather than honoured: the parameter comes
-  // from a url someone else wrote, and a typo should not empty the list
-  return columns[column]
-    ? { column, direction }
-    : { column: undefined, direction: 'asc' };
+  return raw
+    .split(',')
+    .filter(Boolean)
+    .map((part) => {
+      const [column, direction] = part.split(':');
+
+      return {
+        column,
+        // the legacy `dir` applies to the one column that shape could carry
+        direction: direction ? direction : fallback,
+      };
+    })
+    .filter((key) => {
+      if (!columns[key.column] || seen.has(key.column)) {
+        return false;
+      }
+
+      seen.add(key.column);
+      return true;
+    })
+    .map((key) => ({
+      column: key.column,
+      direction: key.direction === 'desc' ? 'desc' : 'asc',
+    }));
 };
 
 /**
  * Writes the sort into a query string, leaving every other parameter alone.
+ *
+ * Always the `column:direction` form, and the older `dir` parameter is cleared
+ * with it -- one shape written, two read, so a stale `dir` left in the url
+ * cannot outlive the sort it described.
  * @param {object} params
  * @param {string} params.search - The current `location.search`.
- * @param {string} params.column - The column, or nothing to clear it.
- * @param {string} params.direction - The direction.
+ * @param {object[]} params.sort - The keys, or nothing to clear the sort.
+ * @param {string} params.column - A single column, for a caller that has no list.
+ * @param {string} params.direction - Its direction.
  * @returns {string} The new query string, with a leading '?' or empty.
  */
-export const sortToQuery = ({ search, column, direction }) => {
+export const sortToQuery = ({ search, sort, column, direction }) => {
   const params = new URLSearchParams(search ?? '');
+  const keys = sortKeys({ column, direction, sort });
 
-  if (column) {
-    params.set('sort', column);
-    params.set('dir', direction === 'desc' ? 'desc' : 'asc');
+  params.delete('dir');
+
+  if (keys.length > 0) {
+    params.set(
+      'sort',
+      keys
+        .map(
+          (key) => `${key.column}:${key.direction === 'desc' ? 'desc' : 'asc'}`,
+        )
+        .join(','),
+    );
   } else {
     params.delete('sort');
-    params.delete('dir');
   }
 
   const next = params.toString();
 
-  return next ? `?${next}` : '';
+  // URLSearchParams escapes the two characters this format is punctuated with,
+  // leaving `?sort=ext%3Aasc%2Cname%3Aasc` in the address bar. Both are legal
+  // raw inside a query *value* and neither delimits anything -- `&` and `=`
+  // do, and those stay escaped -- so putting these two back is readable
+  // without being wrong, for this parameter or for any other the query holds.
+  return next ? `?${next.replaceAll('%3A', ':').replaceAll('%2C', ',')}` : '';
 };
 
 /**
