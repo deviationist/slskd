@@ -12,6 +12,7 @@ import {
   withColumn,
 } from '../../lib/tables';
 import * as transfersLibrary from '../../lib/transfers';
+import { userPath } from '../../lib/users';
 import {
   formatBytes,
   getFileExtension,
@@ -479,7 +480,12 @@ const FlatTransferList = ({
             className="flatlist-user"
             key={key}
           >
-            {row.username}
+            <Link
+              title={`Look up ${row.username}`}
+              to={userPath(row.username)}
+            >
+              {row.username}
+            </Link>
           </Table.Cell>
         );
       }

@@ -19,6 +19,7 @@ import {
   withColumn,
 } from '../../lib/tables';
 import * as transfers from '../../lib/transfers';
+import { userPath } from '../../lib/users';
 import {
   formatAttributes,
   formatBytes,
@@ -32,7 +33,7 @@ import { SortRank } from '../Shared';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useHistory, useLocation } from 'react-router-dom';
+import { Link, useHistory, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import {
   Button,
@@ -673,13 +674,19 @@ const FlatFileList = ({
                         content={`Upload speed ${formatBytes(row.uploadSpeed)}/s · Free upload slot ${row.hasFreeUploadSlot ? 'YES' : 'NO'} · Queue length ${row.queueLength}`}
                         position="top left"
                         trigger={
+                          // the name is the link and the row is not: the
+                          // popup needs the whole cell to hover, and a cell
+                          // that navigates wherever it is clicked would take
+                          // the page away from anyone aiming at the checkbox
                           <span>
                             <Icon
                               color={row.hasFreeUploadSlot ? 'green' : 'yellow'}
                               name="circle"
                               size="small"
                             />
-                            {row.username}
+                            <Link to={userPath(row.username)}>
+                              {row.username}
+                            </Link>
                           </span>
                         }
                       />
