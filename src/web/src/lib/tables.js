@@ -536,7 +536,12 @@ export const withColumn = ({ columns = [], key, on, all = [] }) => {
 };
 
 /**
- * The columns with one of them moved a place left or right.
+ * The columns with one of them moved a place earlier or later.
+ *
+ * Earlier and later rather than left and right: the picker is a vertical list
+ * and its arrows point up and down, while the effect on the table is
+ * sideways. The position in this array is the one thing both descriptions
+ * agree on.
  *
  * Clamped rather than wrapped: a column at the end that jumps to the front
  * because its owner pressed the arrow once too often has not done what the
@@ -544,7 +549,7 @@ export const withColumn = ({ columns = [], key, on, all = [] }) => {
  * @param {object} params
  * @param {string[]} params.columns - The columns shown, in order.
  * @param {string} params.key - The one to move.
- * @param {number} params.by - How far, and which way. -1 is left.
+ * @param {number} params.by - How far, and which way. -1 is earlier.
  * @returns {string[]} The new order.
  */
 export const moveColumn = ({ columns = [], key, by = 0 }) => {

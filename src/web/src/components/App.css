@@ -576,7 +576,8 @@ body {
 
 /* A column's name on the left and its arrows hard right, so the arrows line up
    down the list however long the names are -- a moving target is a poor thing
-   to aim at, and this list is aimed at repeatedly. */
+   to aim at, and this list is aimed at repeatedly. The pair reads as one
+   control on the row it belongs to, which is what the arrows move. */
 .flatlist-columns-row {
     display: flex;
     align-items: center;
