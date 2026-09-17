@@ -555,6 +555,16 @@ const FlatFileList = ({
           // a sorted column live under `.ui.sortable.table`, so the `sorted`
           // prop below was setting a class nothing was listening to
           sortable
+          /*
+           * Semantic stacks a table into blocks below 768px -- every cell
+           * `display: block; width: 100%` -- which is a reasonable default for
+           * a table of prose and ruinous for this one: the rows are positioned
+           * by arithmetic on a fixed height, so a row that becomes seven
+           * stacked blocks puts every row below it in the wrong place.
+           * Measured at 600px, each header cell was 538px wide inside a 540px
+           * table while File and Path were 19px.
+           */
+          unstackable
         >
           <Table.Header>
             <Table.Row>
