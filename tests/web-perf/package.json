@@ -1,0 +1,9 @@
+{
+  "name": "slskd-web-perf",
+  "private": true,
+  "type": "module",
+  "description": "Playwright probes for the web UI, run by hand against a running slskd.",
+  "devDependencies": {
+    "playwright": "^1.56.0"
+  }
+}
