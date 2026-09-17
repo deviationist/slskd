@@ -5,7 +5,7 @@ import PlaceholderSegment from '../Shared/PlaceholderSegment';
 import User from './User';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useHistory, useLocation, useParams } from 'react-router-dom';
-import { Icon, Input, Item, Loader, Segment } from 'semantic-ui-react';
+import { Icon, Input, Item, Loader, Message, Segment } from 'semantic-ui-react';
 
 /**
  * The username a route parameter names.
@@ -28,12 +28,32 @@ const usernameFrom = (parameter) => {
   }
 };
 
+/**
+ * One of `Promise.allSettled`'s results, as `describeLookup` wants it.
+ *
+ * The API's own words where it refused -- `data` is the message it sent, and
+ * a request that never reached it has only the axios error to offer.
+ * @param {object} result - The settled result.
+ * @returns {{ok: boolean, data?: object, reason?: string}} The outcome.
+ */
+const settled = (result) =>
+  result.status === 'fulfilled'
+    ? { data: result.value.data, ok: true }
+    : {
+        ok: false,
+        reason:
+          result.reason?.response?.data ??
+          result.reason?.message ??
+          'see the log',
+      };
+
 const Users = () => {
   const location = useLocation();
   const history = useHistory();
   const { username: usernameParameter } = useParams();
   const inputRef = useRef();
   const [user, setUser] = useState();
+  const [note, setNote] = useState();
   const [usernameInput, setUsernameInput] = useState();
 
   /*
@@ -66,6 +86,7 @@ const Users = () => {
   const clear = () => {
     localStorage.removeItem(activeUserInfoKey);
     setUser(undefined);
+    setNote(undefined);
     setInputText('');
     setInputFocus();
     history.push(`${urlBase}/users`);
@@ -109,6 +130,7 @@ const Users = () => {
     }
 
     setUser(undefined);
+    setNote(undefined);
     setInputText('');
   }, [selectedUsername]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -119,20 +141,38 @@ const Users = () => {
       }
 
       setStatus({ error: undefined, fetching: true });
+      setNote(undefined);
 
-      try {
-        const [info, status, endpoint] = await Promise.all([
-          users.getInfo({ username: selectedUsername }),
-          users.getStatus({ username: selectedUsername }),
-          users.getEndpoint({ username: selectedUsername }),
-        ]);
+      /*
+       * Settled rather than all: the three requests do not fail together, and
+       * the two that fail for an offline user are the two the server cannot
+       * answer on their behalf. `Promise.all` threw away the one that
+       * succeeded -- the one that knew the user was offline -- and reported
+       * the lookup as broken.
+       */
+      const [info, status, endpoint] = await Promise.allSettled([
+        users.getInfo({ username: selectedUsername }),
+        users.getStatus({ username: selectedUsername }),
+        users.getEndpoint({ username: selectedUsername }),
+      ]);
 
-        localStorage.setItem(activeUserInfoKey, selectedUsername);
-        setUser({ ...info.data, ...status.data, ...endpoint.data });
-        setStatus({ error: undefined, fetching: false });
-      } catch (fetchError) {
-        setStatus({ error: fetchError, fetching: false });
+      const outcome = users.describeLookup({
+        endpoint: settled(endpoint),
+        info: settled(info),
+        status: settled(status),
+        username: selectedUsername,
+      });
+
+      if (outcome.error) {
+        setUser(undefined);
+        setStatus({ error: outcome.error, fetching: false });
+        return;
       }
+
+      localStorage.setItem(activeUserInfoKey, selectedUsername);
+      setUser(outcome.user);
+      setNote(outcome.note);
+      setStatus({ error: undefined, fetching: false });
     };
 
     fetchUser();
@@ -190,21 +230,33 @@ const Users = () => {
       ) : (
         <div>
           {error ? (
-            <span>Failed to retrieve information for {selectedUsername}</span>
+            <Message
+              content={error}
+              negative
+            />
           ) : user == null ? (
             <PlaceholderSegment
               caption="No user info to display"
               icon="users"
             />
           ) : (
-            <Segment
-              className="users-user"
-              raised
-            >
-              <Item.Group>
-                <User {...user} />
-              </Item.Group>
-            </Segment>
+            <>
+              <Segment
+                className="users-user"
+                raised
+              >
+                <Item.Group>
+                  <User {...user} />
+                </Item.Group>
+              </Segment>
+              {note && (
+                <Message
+                  content={note.body}
+                  header={note.heading}
+                  info
+                />
+              )}
+            </>
           )}
         </div>
       )}
