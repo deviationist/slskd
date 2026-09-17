@@ -3,8 +3,10 @@ import {
   nextSort,
   parseColumns,
   selectionState,
+  SORT_HINT,
   sortFromQuery,
   sortRows,
+  sortStateOf,
   sortToQuery,
   withColumn,
 } from '../../lib/tables';
@@ -16,6 +18,7 @@ import {
   offsetWithin,
   scrollParentOf,
 } from '../../lib/util';
+import { SortRank } from '../Shared';
 import TransferDetails from './TransferDetails';
 import {
   ConfirmRemovalModal,
@@ -265,20 +268,23 @@ const FlatTransferList = ({
 
   const location = useLocation();
   const history = useHistory();
-  const { column, direction: order } = sortFromQuery(
-    location.search,
-    transfersLibrary.TRANSFER_SORT_COLUMNS,
+  // memoised on the query string rather than rebuilt per render: it is the
+  // dependency the sorted rows are memoised on, and a fresh array every render
+  // would sort the whole list every render
+  const sort = useMemo(
+    () =>
+      sortFromQuery(location.search, transfersLibrary.TRANSFER_SORT_COLUMNS),
+    [location.search],
   );
 
   const rows = useMemo(
     () =>
       sortRows({
-        column,
         columns: transfersLibrary.TRANSFER_SORT_COLUMNS,
-        direction: order,
         rows: transfersLibrary.flattenTransfers(users),
+        sort,
       }),
-    [column, order, users],
+    [sort, users],
   );
 
   const shown = transfersLibrary.TRANSFER_COLUMNS.filter((col) =>
@@ -298,12 +304,12 @@ const FlatTransferList = ({
     storeColumns(direction, next);
   };
 
-  const sortBy = (key) => {
-    const next = nextSort({ column: key, current: column, direction: order });
+  const sortBy = (key, append) => {
+    const next = nextSort({ append, column: key, sort });
 
     history.replace({
       pathname: location.pathname,
-      search: sortToQuery({ ...next, search: location.search }),
+      search: sortToQuery({ search: location.search, sort: next }),
     });
   };
 
@@ -655,16 +661,14 @@ const FlatTransferList = ({
                 <Table.HeaderCell
                   className={`${col.className} flatlist-sortable`}
                   key={col.key}
-                  onClick={() => sortBy(col.key)}
-                  sorted={
-                    column === col.key
-                      ? order === 'desc'
-                        ? 'descending'
-                        : 'ascending'
-                      : undefined
-                  }
+                  onClick={(event) => sortBy(col.key, event.shiftKey)}
+                  sorted={sortStateOf({ column: col.key, sort }).sorted}
+                  title={SORT_HINT}
                 >
                   {col.label}
+                  <SortRank
+                    rank={sortStateOf({ column: col.key, sort }).rank}
+                  />
                 </Table.HeaderCell>
               ))}
               <Table.HeaderCell className="flatlist-actions" />
