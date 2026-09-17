@@ -21,6 +21,7 @@ import {
   formatAttributes,
   formatBytes,
   formatSeconds,
+  getFileExtension,
   getFileName,
   offsetWithin,
   scrollParentOf,
@@ -617,6 +618,11 @@ const FlatFileList = ({
                           {getFileName(row.filename)}
                         </span>
                       </div>
+                    </Table.Cell>
+                  )}
+                  {show('ext') && (
+                    <Table.Cell className="flatlist-ext">
+                      {getFileExtension(row.filename)}
                     </Table.Cell>
                   )}
                   {show('path') && (

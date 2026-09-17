@@ -381,6 +381,12 @@ body {
     text-overflow: ellipsis;
 }
 
+/* Narrow on purpose: three or four lowercase letters, and every row in a
+   sorted list says the same thing. */
+.flatlist-ext {
+    width: 70px;
+}
+
 .flatlist-size {
     width: 100px;
 }

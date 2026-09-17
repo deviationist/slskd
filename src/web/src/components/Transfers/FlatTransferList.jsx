@@ -11,6 +11,7 @@ import {
 import * as transfersLibrary from '../../lib/transfers';
 import {
   formatBytes,
+  getFileExtension,
   getFileName,
   offsetWithin,
   scrollParentOf,
@@ -438,6 +439,17 @@ const FlatTransferList = ({
             <div className="flatlist-cell">
               <span className="flatlist-name">{getFileName(row.filename)}</span>
             </div>
+          </Table.Cell>
+        );
+      }
+
+      case 'ext': {
+        return (
+          <Table.Cell
+            className="flatlist-ext"
+            key={key}
+          >
+            {getFileExtension(row.filename)}
           </Table.Cell>
         );
       }
