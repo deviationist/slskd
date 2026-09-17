@@ -10,6 +10,11 @@ import { Button, Checkbox, Icon } from 'semantic-ui-react';
  * where. Arrows rather than dragging, because a drag needs a pointer and this
  * list is read on a phone as often as anywhere else.
  *
+ * They point up and down, not left and right. What moves is the row being
+ * pointed at, in the vertical list it sits in; that the column then moves left
+ * in the table is the consequence rather than the gesture, and an arrow should
+ * describe the thing it is attached to.
+ *
  * Shown columns come first, in the order they are drawn, so the list reads as
  * the table does. The rest follow under a rule: they have no position to
  * change until they are switched on, and arrows against them would be arrows
@@ -46,22 +51,22 @@ const ColumnPicker = ({ all = [], columns = [], onChange }) => {
             size="mini"
           >
             <Button
-              aria-label={`Move ${col.label} left`}
+              aria-label={`Move ${col.label} earlier`}
               disabled={index === 0}
               icon
               onClick={() => move(col.key, -1)}
               type="button"
             >
-              <Icon name="chevron left" />
+              <Icon name="chevron up" />
             </Button>
             <Button
-              aria-label={`Move ${col.label} right`}
+              aria-label={`Move ${col.label} later`}
               disabled={index === shown.length - 1}
               icon
               onClick={() => move(col.key, 1)}
               type="button"
             >
-              <Icon name="chevron right" />
+              <Icon name="chevron down" />
             </Button>
           </Button.Group>
         </div>
