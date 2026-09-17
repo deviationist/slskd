@@ -70,12 +70,17 @@ public class BatchService : IBatchService
     ///     Initializes a new instance of the <see cref="BatchService"/> class.
     /// </summary>
     /// <param name="contextFactory">The database context factory to use.</param>
-    public BatchService(IDbContextFactory<TransfersDbContext> contextFactory)
+    /// <param name="searchService">The search service, for labelling a batch with its search's text.</param>
+    public BatchService(
+        IDbContextFactory<TransfersDbContext> contextFactory,
+        slskd.Search.ISearchService searchService)
     {
         ContextFactory = contextFactory;
+        Searches = searchService;
     }
 
     private IDbContextFactory<TransfersDbContext> ContextFactory { get; }
+    private slskd.Search.ISearchService Searches { get; }
     private ILogger Log { get; } = Serilog.Log.ForContext<BatchService>();
 
     /// <summary>
@@ -93,6 +98,30 @@ public class BatchService : IBatchService
         if (batch.Id == Guid.Empty)
         {
             throw new ArgumentOutOfRangeException(nameof(batch.Id), message: $"Batch ID may not be an empty uuid ({Guid.Empty})");
+        }
+
+        /*
+            stamp the search's text on the batch, here rather than at each caller: the label has to be taken at
+            the moment of the enqueue to be worth recording at all -- resolving it later through SearchId gives
+            nothing once the search has been deleted or pruned, which is exactly when a download's origin is
+            worth asking about.
+
+            a caller may supply its own text, and one that does is left alone. a search that cannot be found
+            leaves it null; the batch is still created, because failing an enqueue over a missing label would
+            be refusing the download for the sake of the annotation on it.
+        */
+        if (batch.SearchId.HasValue && string.IsNullOrEmpty(batch.SearchText))
+        {
+            try
+            {
+                var search = await Searches.FindAsync(s => s.Id == batch.SearchId.Value);
+
+                batch = batch with { SearchText = search?.SearchText };
+            }
+            catch (Exception ex)
+            {
+                Log.Warning("Failed to resolve the text of search {SearchId} for batch {BatchId}: {Message}", batch.SearchId, batch.Id, ex.Message);
+            }
         }
 
         try

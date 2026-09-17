@@ -192,6 +192,28 @@ public class Transfer
     [NotMapped]
     public bool? LocalFileExists { get; set; }
 
+    /// <summary>
+    ///     Gets or sets the <see cref="slskd.Search.Search.Id"/> this download was started from, or null where
+    ///     it did not come from a search.
+    /// </summary>
+    /// <remarks>
+    ///     Not persisted here: the association is the Batch's, and this is it read back. Filled in when a list is
+    ///     served, so a row can say where it came from without the caller resolving a batch per row.
+    /// </remarks>
+    [NotMapped]
+    public Guid? SearchId { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the text of the search this download was started from, as it was at the time.
+    /// </summary>
+    /// <remarks>
+    ///     Recorded on the Batch rather than resolved through <see cref="SearchId"/>, so it survives the search
+    ///     being deleted or pruned. The id may therefore point at a search that no longer exists while this still
+    ///     says what was searched for -- which is the answer the question wanted; the link is the convenience.
+    /// </remarks>
+    [NotMapped]
+    public string SearchText { get; set; }
+
     [NotMapped]
     public long BytesRemaining => Size - BytesTransferred;
     [NotMapped]

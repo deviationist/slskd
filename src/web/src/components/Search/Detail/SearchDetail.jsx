@@ -511,6 +511,7 @@ const SearchDetail = ({
             downloads={downloads}
             retrievalEnabled={retrievalEnabled}
             rows={flatRows}
+            searchId={search.id}
           />
         )}
         {loaded &&
@@ -522,6 +523,7 @@ const SearchDetail = ({
               key={r.username}
               onHide={() => setHiddenResults([...hiddenResults, r.username])}
               response={r}
+              searchId={search.id}
             />
           ))}
         {loaded && !flatResults && (

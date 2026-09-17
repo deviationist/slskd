@@ -59,6 +59,55 @@ export const enqueueBatch = ({
 };
 
 /**
+ * Enqueues one peer's files, recording the search they were started from.
+ *
+ * A batch rather than the per-user endpoint, which is obsolete upstream and,
+ * more to the point here, records nothing about where the download came from:
+ * the association between a download and its search lives on the batch.
+ *
+ * Reports what the batch says rather than only whether the request was
+ * accepted. The batch endpoint answers **200** when every file was refused --
+ * which axios does not treat as an error, and which the older endpoint could
+ * not express at all: it answered 201 whether a file was queued or turned away
+ * for being queued already, so asking twice for the same file looked exactly
+ * like asking once.
+ * @param {object} params
+ * @param {string} params.username - The peer to download from.
+ * @param {{filename: string, size: number}[]} params.files - The files.
+ * @param {string} [params.searchId] - The search they were found in, if they were.
+ * @returns {Promise<{enqueued: number, failures: {filename: string, message: string}[]}>} What became of them.
+ */
+export const enqueueFromSearch = async ({ username, files = [], searchId }) => {
+  const response = await enqueueBatch({ files, searchId, username });
+  const failures = response?.data?.failures ?? [];
+
+  return { enqueued: files.length - failures.length, failures };
+};
+
+/**
+ * Why an enqueue that put nothing in the queue put nothing in the queue.
+ *
+ * The server's own words where every file was refused for the same reason --
+ * which is nearly always "already in progress", and is the useful half of the
+ * sentence. Where they differ, the count is all that can honestly be said in
+ * one line.
+ * @param {object} params
+ * @param {string} params.username - The peer.
+ * @param {{filename: string, message: string}[]} params.failures - What came back.
+ * @returns {string} The sentence.
+ */
+export const describeEnqueueFailures = ({ username, failures = [] }) => {
+  const reasons = [...new Set(failures.map((f) => f?.message).filter(Boolean))];
+  const files = `${failures.length} file${failures.length === 1 ? '' : 's'}`;
+
+  if (reasons.length === 1) {
+    return `Could not enqueue ${files} from ${username}: ${reasons[0].replace(/^Skipped:\s*/u, '')}`;
+  }
+
+  return `Could not enqueue ${files} from ${username}`;
+};
+
+/**
  * Cancels a transfer, optionally removing the record of it.
  *
  * Whether a removal takes the file with it is the server's decision, made from
@@ -801,6 +850,12 @@ export const TRANSFER_COLUMNS = [
   { key: 'ext', label: 'Ext', className: 'flatlist-ext', optional: true },
   { key: 'path', label: 'Path', className: 'flatlist-path' },
   { key: 'user', label: 'User', className: 'flatlist-user' },
+  {
+    key: 'search',
+    label: 'Search',
+    className: 'flatlist-search',
+    optional: true,
+  },
   { key: 'state', label: 'Progress', className: 'flatlist-progress' },
   { key: 'size', label: 'Size', className: 'flatlist-size' },
   { key: 'speed', label: 'Speed', className: 'flatlist-speed', optional: true },
@@ -825,6 +880,7 @@ export const TRANSFER_SORT_COLUMNS = {
   ext: { kind: 'text', of: (row) => getFileExtension(row.filename ?? '') },
   name: { kind: 'text', of: (row) => getFileName(row.filename ?? '') },
   path: { kind: 'text', of: (row) => row.directory },
+  search: { kind: 'text', of: (row) => row.searchText },
   size: { kind: 'number', of: (row) => row.size },
   speed: { kind: 'number', of: (row) => row.averageSpeed },
   state: { kind: 'text', of: (row) => row.state },

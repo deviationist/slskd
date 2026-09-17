@@ -192,6 +192,7 @@ const FlatFileList = ({
   downloads,
   retrievalEnabled,
   rows: unsorted,
+  searchId,
 }) => {
   const [selected, setSelected] = useState(() => new Set());
   const [downloading, setDownloading] = useState(false);
@@ -366,8 +367,24 @@ const FlatFileList = ({
 
     try {
       const [group] = groupByUser([row]);
+      const { enqueued, failures } = await transfers.enqueueFromSearch({
+        ...group,
+        searchId,
+      });
 
-      await transfers.download(group);
+      // a batch that queued nothing answers 200 and throws nothing; saying
+      // "Enqueued" over it would be reporting the request rather than what
+      // became of the file
+      if (enqueued === 0) {
+        toast.error(
+          transfers.describeEnqueueFailures({
+            failures,
+            username: row.username,
+          }),
+        );
+        return;
+      }
+
       toast.success(`Enqueued ${getFileName(row.filename)}`);
     } catch (error) {
       console.error(error);
@@ -388,7 +405,16 @@ const FlatFileList = ({
     for (const group of groups) {
       try {
         // eslint-disable-next-line no-await-in-loop
-        await transfers.download(group);
+        const { enqueued } = await transfers.enqueueFromSearch({
+          ...group,
+          searchId,
+        });
+
+        // a peer that refused every file is a failure, and one the request
+        // itself reports as a success -- see `enqueueFromSearch`
+        if (enqueued === 0) {
+          failed.push(group.username);
+        }
       } catch (error) {
         console.error(error);
         failed.push(group.username);

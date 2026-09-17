@@ -6,6 +6,26 @@ import React, { Component } from 'react';
 import { toast } from 'react-toastify';
 import { Button, Card, Icon, Label, Popup } from 'semantic-ui-react';
 
+/**
+ * What went wrong with a request, in one line.
+ *
+ * The shape the label used to assemble inline, kept here so that a transport
+ * failure still reads the way it did while an enqueue that queued nothing --
+ * which answers 200 and throws nothing at all -- can say something of its own
+ * in the same place.
+ * @param {object} error - The axios error.
+ * @returns {string} The sentence.
+ */
+const describeRequestError = (error) => {
+  const response = error?.response;
+
+  if (!response) {
+    return error?.message ?? 'see the log';
+  }
+
+  return `${response.data} (HTTP ${response.status} ${response.statusText})`;
+};
+
 const buildTree = (response) => {
   let { files = [] } = response;
   const { lockedFiles = [] } = response;
@@ -64,12 +84,29 @@ class Response extends Component {
           filename,
           size,
         }));
-        await transfers.download({ files: requests, username });
+        const { enqueued, failures } = await transfers.enqueueFromSearch({
+          files: requests,
+          searchId: this.props.searchId,
+          username,
+        });
+
+        // nothing queued is not a success, however the request went. the
+        // batch endpoint answers 200 for it, so there is no error to catch
+        if (enqueued === 0) {
+          this.setState({
+            downloadError: transfers.describeEnqueueFailures({
+              failures,
+              username,
+            }),
+            downloadRequest: 'error',
+          });
+          return;
+        }
 
         this.setState({ downloadRequest: 'complete' });
       } catch (error) {
         this.setState({
-          downloadError: error.response,
+          downloadError: describeRequestError(error),
           downloadRequest: 'error',
         });
       }
@@ -259,10 +296,7 @@ class Response extends Component {
                     name="x"
                     size="large"
                   />
-                  <Label>
-                    {downloadError.data +
-                      ` (HTTP ${downloadError.status} ${downloadError.statusText})`}
-                  </Label>
+                  <Label>{downloadError}</Label>
                 </span>
               )}
             </span>

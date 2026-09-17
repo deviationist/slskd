@@ -1,3 +1,4 @@
+import { urlBase } from '../../config';
 import {
   describeSelection,
   nextSort,
@@ -29,7 +30,7 @@ import {
 import { useVirtualizer } from '@tanstack/react-virtual';
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useHistory, useLocation } from 'react-router-dom';
+import { Link, useHistory, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import {
   Button,
@@ -479,6 +480,39 @@ const FlatTransferList = ({
             key={key}
           >
             {row.username}
+          </Table.Cell>
+        );
+      }
+
+      case 'search': {
+        /*
+         * The search this download was started from, and a link to it while
+         * it is still there. A batch records the *text* as well as the id, so
+         * a download whose search has since been deleted or pruned still says
+         * what was searched for -- it simply stops being a link. Which is the
+         * distinction worth drawing: an empty cell then means "this did not
+         * come from a search", rather than meaning both that and "it did, and
+         * the search is gone".
+         */
+        return (
+          <Table.Cell
+            className="flatlist-search"
+            key={key}
+            title={
+              row.searchText
+                ? row.searchId
+                  ? `Found by searching for '${row.searchText}'`
+                  : `Found by searching for '${row.searchText}' (that search is no longer listed)`
+                : undefined
+            }
+          >
+            {row.searchId && row.searchText ? (
+              <Link to={`${urlBase}/searches/${row.searchId}`}>
+                {row.searchText}
+              </Link>
+            ) : (
+              row.searchText
+            )}
           </Table.Cell>
         );
       }

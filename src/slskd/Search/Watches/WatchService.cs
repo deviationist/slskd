@@ -421,7 +421,7 @@ public class WatchService
 
                 if (watch.AutoDownload && isNew.Count > 0)
                 {
-                    run.EnqueuedCount = await EnqueueAsync(isNew);
+                    run.EnqueuedCount = await EnqueueAsync(isNew, watch.SearchId);
                 }
 
                 if (added > 0)
@@ -585,11 +585,13 @@ public class WatchService
     /// <summary>
     ///     Queues the chosen files for download, and returns how many were accepted.
     /// </summary>
+    /// <param name="isNew">The files this run found that the last one did not.</param>
+    /// <param name="searchId">The watched search, recorded against the batch so the downloads can name their origin.</param>
     /// <remarks>
     ///     A failure here is recorded and not thrown: the point of a watch is to say what it found, and a peer that
     ///     went offline between answering and being asked must not cost the notification that would have told you.
     /// </remarks>
-    private async Task<int> EnqueueAsync(List<Match> isNew)
+    private async Task<int> EnqueueAsync(List<Match> isNew, Guid searchId)
     {
         var chosen = AutoDownload.Choose(isNew, WatchOptions.DownloadLimit);
         var enqueued = 0;
@@ -599,7 +601,24 @@ public class WatchService
             try
             {
                 var files = group.Select(match => (match.Filename, match.Size));
-                var (accepted, failed) = await Transfers.Downloads.EnqueueAsync(group.Key, files);
+
+                /*
+                    in a batch, so these downloads can say where they came from. a watch *is* a search -- the one
+                    it re-runs -- and a file queued unattended is the one most likely to be found later with no
+                    memory of why it is there.
+
+                    one batch per peer, because a batch carries a username. a failure here is caught below with
+                    the enqueue itself: a batch record is an annotation, and losing it is not worth losing the
+                    download it describes.
+                */
+                var batch = await Transfers.Downloads.Batches.CreateAsync(new()
+                {
+                    Id = Guid.NewGuid(),
+                    SearchId = searchId,
+                    Username = group.Key,
+                });
+
+                var (accepted, failed) = await Transfers.Downloads.EnqueueAsync(group.Key, files, batchId: batch.Id);
 
                 enqueued += accepted.Count;
 
