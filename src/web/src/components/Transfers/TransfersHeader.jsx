@@ -169,8 +169,18 @@ const TransfersHeader = ({
           value={filter}
         />
       </Div>
+      {/*
+       * A break, so that the view toggle and the actions take a line of their
+       * own on a narrow window. An empty full-width flex item is how a flex
+       * container is told where to wrap -- there is no `break-before` for flex
+       * items -- and it is display:none above the width where it is wanted.
+       */}
       <Div
-        className="transfers-header-buttons"
+        className="transfers-header-break"
+        hidden={empty}
+      />
+      <Div
+        className="transfers-header-view"
         hidden={empty}
       >
         {/*
@@ -181,7 +191,9 @@ const TransfersHeader = ({
          *
          * Beside the actions rather than beside the sort, because it is the
          * control an operator reaches for, and the sort it replaces is hidden
-         * while it is on.
+         * while it is on. Its own element rather than the first of them, so
+         * that on a line of their own it can sit at one end and they at the
+         * other.
          */}
         <Checkbox
           checked={flat}
@@ -190,6 +202,11 @@ const TransfersHeader = ({
           onChange={() => onFlatChange(!flat)}
           toggle
         />
+      </Div>
+      <Div
+        className="transfers-header-buttons"
+        hidden={empty}
+      >
         <ShrinkableDropdownButton
           color="green"
           disabled={working || empty || !server.isConnected}
