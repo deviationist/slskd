@@ -512,14 +512,16 @@ body {
    forever. `hidden` keeps it out of that search and clips nothing, since the
    box is as tall as the table inside it.
 
-   Only on a phone: at any width where the columns fit there is nothing to
-   scroll, and a scroll container that never scrolls is a scroll container that
-   can still surprise someone. */
-@media only screen and (max-width: 767px) {
-    .flatlist-scroll {
-        overflow-x: auto;
-        overflow-y: hidden;
-    }
+   At every width, not below a breakpoint. Whether the table fits depends on
+   which columns are shown rather than on how wide the window is, so no
+   breakpoint can answer it -- measured at exactly 768px, one pixel outside the
+   phone rule this started as, the table wanted 743px of a 708px box and the
+   last 35px were clipped with nothing to scroll. `overflow-x: auto` asks the
+   question the right way round: it scrolls when there is something to scroll
+   and does nothing when there is not. */
+.flatlist-scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
 }
 
 @media only screen and (max-width: 767px) {
