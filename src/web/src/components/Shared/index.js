@@ -1,3 +1,4 @@
+export { default as BrowseLink } from './BrowseLink';
 export { default as CodeEditor } from './CodeEditor';
 export { default as Div } from './Div';
 export { default as EmptyTableRow } from './EmptyTableRow';

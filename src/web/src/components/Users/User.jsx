@@ -1,3 +1,4 @@
+import BrowseLink from '../Shared/BrowseLink';
 import { Icon, Item } from 'semantic-ui-react';
 
 const ImagePlaceholder = () => (
@@ -120,6 +121,12 @@ const User = ({
       <Item.Header>
         <Presence presence={presence} />
         {username}
+        {/*
+          The same link a search result carries. This page answers "who is
+          this"; their shares are the obvious next question, and the answer
+          was another page and the name typed into it again.
+        */}
+        <BrowseLink username={username} />
       </Item.Header>
       <Facts {...facts} />
       <Item.Description>{description || 'No user info.'}</Item.Description>
