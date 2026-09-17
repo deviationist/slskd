@@ -38,12 +38,32 @@ const measure = () => {
     return Math.round(el.getBoundingClientRect().width);
   };
 
+  // where an element sits within the segment, so that "left-aligned" and
+  // "right-aligned" are things this can check rather than describe
+  const edges = (selector) => {
+    const el = seg.querySelector(selector);
+
+    if (!el || el.offsetParent === null) {
+      return null;
+    }
+
+    const r = el.getBoundingClientRect();
+
+    return {
+      left: Math.round(r.left - segRect.left),
+      right: Math.round(segRect.right - r.right),
+      top: Math.round(r.top - segRect.top),
+    };
+  };
+
   return {
     seg: { h: Math.round(segRect.height), w: Math.round(segRect.width) },
     overflow: seg.scrollWidth - seg.clientWidth,
     filter: box('.transfers-header-filter'),
     input: box('.transfers-header-filter input'),
     buttons: box('.transfers-header-buttons'),
+    view: edges('.transfers-header-view'),
+    actions: edges('.transfers-header-buttons'),
 
     // against the segment's right *edge*, not its width: the segment is
     // centred in the viewport, so a coordinate compared to a width reads as a
@@ -84,7 +104,10 @@ const run = async (flat) => {
   }
 
   console.log(`\n=== ${flat ? 'table view' : 'card view'} ===`);
-  console.log('width  segW  segH lines overflow  filter  input  buttons  spill');
+  console.log(
+    'width  segW  segH lines overflow  filter  input  buttons  spill   ' +
+      'toggle(left,top)  actions(right,top)',
+  );
 
   for (const width of WIDTHS) {
     await page.setViewportSize({ height: 900, width });
@@ -104,7 +127,8 @@ const run = async (flat) => {
     console.log(
       `${pad(width, 5)} ${pad(m.seg.w, 5)} ${pad(m.seg.h, 5)} ${pad(lines, 5)}  ` +
         `${(m.overflow > 0 ? `OVER ${m.overflow}` : 'ok').padEnd(8)} ` +
-        `${pad(m.filter ?? '-', 6)} ${pad(m.input ?? '-', 6)} ${pad(m.buttons ?? '-', 7)} ${pad(m.spill, 6)}`,
+        `${pad(m.filter ?? '-', 6)} ${pad(m.input ?? '-', 6)} ${pad(m.buttons ?? '-', 7)} ${pad(m.spill, 6)}   ` +
+        `${pad(m.view ? `${m.view.left},${m.view.top}` : '-', 11)}  ${pad(m.actions ? `${m.actions.right},${m.actions.top}` : '-', 12)}`,
     );
   }
 

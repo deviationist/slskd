@@ -146,7 +146,11 @@
   flex: 0 0 auto;
   flex-wrap: nowrap;
   gap: 8px;
-  margin-left: auto;
+
+  /* while they share a line with the toggle the toggle carries the automatic
+     margin and these simply follow it; on a line of their own they take it
+     back -- see `.transfers-header-view` */
+  margin-left: 0;
 }
 
 /* Sits between the direction icon and the action buttons. It takes no
@@ -185,13 +189,52 @@
   white-space: nowrap;
 }
 
-/* The Table View toggle sits inside the header's button group, so it needs the
-   vertical centring the buttons get from their own layout and a little air
-   before the first of them. */
+/* The Table View toggle. It needs the vertical centring the buttons get from
+   their own layout, and a little air before whatever follows it. */
 .transfers-header-flat {
     display: inline-flex !important;
     align-items: center;
     margin-right: 12px;
+}
+
+/* Which side of the line each of the two ends up on.
+
+   Sharing a line, the toggle carries the automatic margin and the actions
+   follow it, so the pair sits hard right together. On a line of their own the
+   automatic margin moves to the actions, which puts the toggle at the left and
+   the actions at the right -- the line then reads as what is being shown on
+   the left and what can be done about it on the right, rather than as a
+   huddle in one corner. */
+.transfers-header-view {
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    margin-left: auto;
+}
+
+/* The break itself: nothing, until it is a full-width item and everything
+   after it is pushed past it. 1300px is where the two stop sharing a line
+   comfortably -- above it the row has room for the filter at its full width
+   and both of them; below it the filter was the only thing left to squeeze. */
+.transfers-header-break {
+    display: none;
+}
+
+@media (max-width: 1300px) {
+    .transfers-header-break {
+        display: block;
+        flex-basis: 100%;
+        height: 0;
+        margin: 0;
+    }
+
+    .transfers-header-view {
+        margin-left: 0;
+    }
+
+    .transfers-header-buttons {
+        margin-left: auto;
+    }
 }
 
 /* Between the sort and the action buttons. Capped so it does not crowd the
