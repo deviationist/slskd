@@ -95,7 +95,7 @@ const context = await browser.newContext({
 });
 const page = await context.newPage();
 
-await page.goto(`${BASE}/`, { waitUntil: 'networkidle' });
+await page.goto(`${BASE}/`, { waitUntil: 'domcontentloaded' });
 await page.evaluate(() => localStorage.setItem('slskd-theme', 'dark'));
 
 const report = async (label) => {
@@ -116,8 +116,14 @@ const report = async (label) => {
   }
 };
 
+/*
+ * `domcontentloaded` rather than `networkidle`: the rooms and chat pages hold
+ * a live connection open, so nothing is ever idle there and a sweep that waits
+ * for it stops at the third page with a timeout. The settle is what waits for
+ * the view to draw.
+ */
 const visit = async (path, label, settle = 2500) => {
-  await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}${path}`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(settle);
   await report(label ?? path);
 };
@@ -134,11 +140,11 @@ await visit('/system', '/system', 3500);
 
 // a search's results, in both views
 for (const flat of [false, true]) {
-  await page.goto(`${BASE}/searches`, { waitUntil: 'networkidle' });
+  await page.goto(`${BASE}/searches`, { waitUntil: 'domcontentloaded' });
   await page.evaluate((f) => {
     localStorage.setItem('slskd-search-flat-results', String(f));
   }, flat);
-  await page.reload({ waitUntil: 'networkidle' });
+  await page.reload({ waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(2500);
 
   const index = await page.evaluate(() => {
