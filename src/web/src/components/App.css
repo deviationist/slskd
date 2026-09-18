@@ -1,5 +1,6 @@
 :root {
     --background-color: #c8c8c8 !important;
+    --slskd-divider-color: rgba(34, 36, 38, 0.15);
     --slskd-browse-folderlist-header-color:  black;
     --slskd-browse-folderlist-header-selected-color: #0E6EB8;
 }
@@ -16,6 +17,7 @@
     --slskd-hover-background: #30363d;
     --slskd-color-inset: #010409;
     --slskd-emphasis-background: #1f6feb;
+    --slskd-divider-color: var(--slskd-tertiary-border-color);
 
     --background-color: var(--slskd-primary-background) !important;
 
@@ -107,6 +109,19 @@ body {
     background-color: var(--background-color);
 }
 
+/* An item's header, which is the username on the Users page.
+
+   The same omission as the sortable table headers below, and in the theme
+   patch's own file: it defines `--smui-item-meta-color` and
+   `--smui-item-description-color` and no header colour at all, so
+   `.ui.items > .item > .content > .header` keeps Semantic's `#000000d9` and
+   the one line naming who the card is about is the one line that cannot be
+   read. Its description, directly underneath, follows the theme correctly --
+   which is what makes it look like a styling choice rather than a gap. */
+:root.dark .ui.items > .item > .content > .header {
+    color: var(--smui-site-body-text-color);
+}
+
 /* Semantic hard-codes the colour of a sortable table's headers --
    `rgba(0,0,0,.87)`, and .8 and .95 for hover and for the sorted one -- rather
    than taking it from a variable, so the theme patch never reached them.
@@ -128,8 +143,46 @@ body {
    than to every basic button, because Semantic colours a *coloured* basic
    button with a rule of the same shape -- a blanket override would turn the
    red one grey. */
-:root.dark .flatlist-summary .ui.basic.button {
+:root.dark .flatlist-summary .ui.basic.button,
+:root.dark .flatlist-columns-menu .ui.basic.button {
     color: var(--smui-site-body-text-color) !important;
+}
+
+/* And its border, which is `rgba(34,36,38,.15)` -- a hairline meant to sit on
+   white. On the popup's own background it is neither visible nor absent, just
+   muddy. */
+:root.dark .flatlist-columns-menu .ui.basic.buttons,
+:root.dark .flatlist-columns-menu .ui.basic.buttons .button {
+    border-color: var(--slskd-tertiary-border-color);
+}
+
+/* Semantic's row states are a pale tint meant for a white table: `positive` is
+   `#fcfff5` with `#2c662d` text and `active` is `#e0e0e0` with near-black,
+   which in a dark table is a near-white band across it. The theme patch
+   answers `warning` -- `rgba(187,128,9,.15)`, the colour laid over what is
+   behind rather than replacing it -- and stops there, so these two follow that
+   pattern rather than inventing another.
+
+   `!important` because Semantic's own rules carry it. */
+:root.dark .ui.table tr.positive,
+:root.dark .ui.table tr.positive:hover,
+:root.dark .ui.table td.positive {
+    background: rgba(46, 160, 67, 0.15) !important;
+    color: var(--smui-site-body-text-color) !important;
+}
+
+:root.dark .ui.table tr.active,
+:root.dark .ui.table tr.active:hover,
+:root.dark .ui.table td.active {
+    background: var(--slskd-subtle-background) !important;
+    color: var(--smui-site-body-text-color) !important;
+}
+
+/* The conversation and room lists, whose items keep Semantic's
+   `rgba(0,0,0,.87)`: measured at 1.72 against the menu behind them, which is
+   black text on a dark panel. */
+:root.dark .menu-item {
+    color: var(--smui-site-body-text-color);
 }
 
 /* Restore the left border on the first button of a group.
@@ -624,7 +677,7 @@ body {
    -- a checkbox each, doing the same thing -- but the order above the line is
    the table's, and below it means nothing. */
 .flatlist-columns-divider {
-    border-top: 1px solid rgba(34, 36, 38, 0.15);
+    border-top: 1px solid var(--slskd-divider-color);
     margin: 2px 0;
 }
 
