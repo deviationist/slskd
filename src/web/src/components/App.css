@@ -149,6 +149,28 @@ body {
     color: var(--smui-site-body-text-color);
 }
 
+/* A toggle's label, which the patched stylesheet gives
+   `var(--slskd-color-subtle, var(--smui-input-focus-color, ...))`.
+
+   In light that variable does not exist, so an unchecked label falls through
+   to the focus colour and reads exactly like a checked one -- measured, both
+   are `rgba(0,0,0,.95)`. In dark the variable *is* defined, so the fallback
+   never fires and an unchecked label comes out at the subtle colour while a
+   checked one is the full body colour. Table View therefore dimmed whenever
+   it was off, which light mode never does.
+
+   A toggle's label is the name of a control rather than meta text about one:
+   it says what the switch beside it would do, and that does not become less
+   true while the switch is off. The switch itself is what shows the state.
+
+   Both states take the body colour, which is what light mode has always
+   done -- this is the difference between the themes being removed, not a new
+   one being introduced. */
+:root.dark .ui.toggle.checkbox label,
+:root.dark .ui.toggle.checkbox .box {
+    color: var(--smui-site-body-text-color);
+}
+
 /* A sortable header's hover, which Semantic paints `rgba(0,0,0,.05)` in both
    themes. Over the light header's `rgb(249,250,251)` that is a visible step
    down; over the dark one's `rgb(22,27,33)` it darkens something already dark
