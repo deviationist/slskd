@@ -206,6 +206,23 @@ public class WatchService
     {
         using var context = ContextFactory.CreateDbContext();
 
+        await DeleteRowsAsync(context, searchId);
+    }
+
+    /// <summary>
+    ///     Deletes every row a watch owns, in a context the caller already holds.
+    /// </summary>
+    /// <remarks>
+    ///     Static, and takes the context, so that deleting a *search* can take its watch with it without the search
+    ///     service having to depend on this one -- it depends on the search service already, and the two tables live
+    ///     in the same database. One place knows which tables a watch owns, which is what stops the next one added
+    ///     from being cleaned up in one path and left behind in the other.
+    /// </remarks>
+    /// <param name="context">The database context to delete through.</param>
+    /// <param name="searchId">The id of the search the watch is on.</param>
+    /// <returns>The operation context.</returns>
+    public static async Task DeleteRowsAsync(SearchDbContext context, Guid searchId)
+    {
         await context.Watches.Where(w => w.SearchId == searchId).ExecuteDeleteAsync();
         await context.WatchFiles.Where(f => f.SearchId == searchId).ExecuteDeleteAsync();
         await context.WatchRuns.Where(r => r.SearchId == searchId).ExecuteDeleteAsync();
@@ -360,6 +377,18 @@ public class WatchService
             run.Error = "The search this watch belongs to no longer exists";
 
             await SaveRunAsync(run);
+
+            /*
+                Rescheduled, unlike the disconnected case above, which is left due on purpose so that it runs once
+                on reconnect. A missing search does not come back, and leaving this due meant the scheduler picked
+                it up every minute and wrote another failed run -- 1,440 a day, in a table nothing prunes, for a
+                watch that is invisible because the list badges it from a search row that is gone.
+
+                Deleting a search takes its watch with it now, so this should be unreachable. It is the backstop
+                for a watch that was orphaned before that, and for any path that removes a search without saying so.
+            */
+            await RescheduleAsync(watch);
+
             return run;
         }
 
