@@ -6,6 +6,7 @@ import ErrorSegment from '../Shared/ErrorSegment';
 import LoaderSegment from '../Shared/LoaderSegment';
 import PlaceholderSegment from '../Shared/PlaceholderSegment';
 import SearchDetail from './Detail/SearchDetail';
+import ClearSearchesModal from './List/ClearSearchesModal';
 import SearchList from './List/SearchList';
 import WatchModal from './WatchModal';
 import React, { useEffect, useRef, useState } from 'react';
@@ -24,6 +25,8 @@ const Searches = ({ server } = {}) => {
   const [creating, setCreating] = useState(false);
   const [watchDraft, setWatchDraft] = useState(undefined);
   const [watches, setWatches] = useState({});
+  const [clearing, setClearing] = useState(false);
+  const [confirmingClear, setConfirmingClear] = useState(false);
 
   const inputRef = useRef();
 
@@ -219,6 +222,51 @@ const Searches = ({ server } = {}) => {
     }
   };
 
+  /*
+   * Clear the searches that are finished and not being watched.
+   *
+   * One request each rather than a bulk endpoint, because there is not one --
+   * and the hub reports each deletion as it lands, so the list empties as it
+   * goes rather than in a jump at the end. Failures are counted and named
+   * once: a peer's search that will not delete is not a reason to stop
+   * deleting the other forty.
+   */
+  const clear = async () => {
+    const doomed = library.clearableSearches({ searches, watches });
+
+    setClearing(true);
+    setConfirmingClear(false);
+
+    const failed = [];
+
+    for (const search of doomed) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        await library.remove({ id: search.id });
+        setSearches((old) => {
+          delete old[search.id];
+          return { ...old };
+        });
+      } catch (clearError) {
+        console.error(clearError);
+        failed.push(search.searchText);
+      }
+    }
+
+    setClearing(false);
+
+    if (failed.length > 0) {
+      toast.error(
+        `Could not remove ${failed.length} of ${doomed.length}: ${failed.slice(0, 3).join(', ')}`,
+      );
+      return;
+    }
+
+    toast.success(
+      `Removed ${doomed.length} search${doomed.length === 1 ? '' : 'es'}`,
+    );
+  };
+
   // stop an in-progress search
   const stop = async (search) => {
     try {
@@ -356,12 +404,27 @@ const Searches = ({ server } = {}) => {
         />
       ) : (
         <SearchList
+          clearable={library.clearableSearches({ searches, watches }).length}
+          clearing={clearing}
           connecting={connecting}
           error={error}
+          onClear={() => setConfirmingClear(true)}
           onRemove={remove}
           onStop={stop}
           searches={searches}
           watches={watches}
+        />
+      )}
+      {confirmingClear && (
+        <ClearSearchesModal
+          busy={clearing}
+          onCancel={() => setConfirmingClear(false)}
+          onConfirm={clear}
+          plan={library.describeClear({
+            clearable: library.clearableSearches({ searches, watches }),
+            searches,
+            watches,
+          })}
         />
       )}
       {watchDraft && (

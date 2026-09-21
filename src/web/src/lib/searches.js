@@ -8,6 +8,64 @@ import {
 } from './util';
 
 /**
+ * The searches a Clear would take, and only those.
+ *
+ * Completed, because the row's own control refuses to delete one that is not:
+ * it offers Stop instead, and a button that does in bulk what the single
+ * action will not is a surprise rather than a convenience.
+ *
+ * Unwatched, because deleting a watched search orphans its watch. Nothing
+ * cascades -- `SearchService.DeleteAsync` removes the search and leaves the
+ * schedule, the memory of what it has already reported and its notifications
+ * behind, pointed at a search that is gone. The pruner excludes watched
+ * searches for exactly this reason and says so in its own comment; this is the
+ * same rule for the same reason, applied to the button rather than the timer.
+ * @param {object} params
+ * @param {object} params.searches - Every search, keyed by id.
+ * @param {object} params.watches - The watches, keyed by the id they watch.
+ * @returns {object[]} The ones a Clear would remove.
+ */
+export const clearableSearches = ({ searches = {}, watches = {} }) =>
+  Object.values(searches).filter(
+    (search) => search.state?.includes('Completed') && !watches[search.id],
+  );
+
+/**
+ * What the Clear button should say it is about to do.
+ *
+ * Names what is kept as well as what goes, because that is the question
+ * somebody about to press it is asking -- and the two reasons a search is kept
+ * are different enough to be worth telling apart.
+ * @param {object} params
+ * @param {object[]} params.clearable - What would be removed.
+ * @param {object} params.searches - Every search.
+ * @param {object} params.watches - The watches.
+ * @returns {{prompt: string, kept: string|undefined}} The sentences.
+ */
+export const describeClear = ({
+  clearable = [],
+  searches = {},
+  watches = {},
+}) => {
+  const total = Object.keys(searches).length;
+  const watched = Object.values(searches).filter((s) => watches[s.id]).length;
+  const running = Object.values(searches).filter(
+    (s) => !s.state?.includes('Completed') && !watches[s.id],
+  ).length;
+
+  const count = `${clearable.length} search${clearable.length === 1 ? '' : 'es'}`;
+  const reasons = [
+    watched > 0 && `${watched} being watched`,
+    running > 0 && `${running} still running`,
+  ].filter(Boolean);
+
+  return {
+    prompt: `Remove ${count} of ${total}?`,
+    kept: reasons.length > 0 ? `Keeping ${reasons.join(' and ')}.` : undefined,
+  };
+};
+
+/**
  * Whether a phrase can be searched for.
  *
  * The plus and magnifier buttons learn this from the server, which refuses the

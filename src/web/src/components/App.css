@@ -13,7 +13,18 @@
     --slskd-tertiary-border-color: rgba(240,246,252,0.1);
     --slskd-subtle-background: rgba(110,118,129,0.1);
     --slskd-color: #c9d1d9;
-    --slskd-color-subtle: #6e7681;
+    /* Raised from #6e7681, which measured 4.12 against the primary background,
+       3.77 against the secondary and 3.31 against the tertiary -- under the
+       4.5 that body text wants on all three. It is not only decoration: the
+       patched stylesheet gives it to every toggle's label
+       (`.ui.toggle.checkbox label`), so Table View and Hide Results with No
+       Free Slots were reading at 4.12 as well as the card and item meta.
+
+       #8b949e measures 6.16 / 5.63 / 4.95 on those same three, and still sits
+       at 1.99 against the body colour -- visibly dimmer, which is the whole
+       point of a subtle colour. It is GitHub's own muted foreground, which is
+       where the rest of this palette comes from. */
+    --slskd-color-subtle: #8b949e;
     --slskd-hover-background: #30363d;
     --slskd-color-inset: #010409;
     --slskd-emphasis-background: #1f6feb;
