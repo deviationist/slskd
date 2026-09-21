@@ -171,6 +171,23 @@ namespace slskd.Search
             async Task DoDeleteAsync(Search search)
             {
                 using var context = ContextFactory.CreateDbContext();
+
+                /*
+                    The watch goes with it. Nothing cascaded before, so deleting a watched search left the schedule,
+                    the record of what it had already reported and its notifications behind, pointing at a search
+                    that was gone -- and the watch was then invisible, because the list badges one from the search
+                    row. Removing the watch first and then the search was clean; doing it in the other order, which
+                    is the order the trash icon offers, was not.
+
+                    Here rather than at the caller so that every path gets it: the API's delete, and the pruner,
+                    which excludes watched searches today but should not have to be the reason this is safe.
+
+                    Not reached by a watch re-running its own search: `StartAsync(replaceExisting: true)` removes
+                    the row through the context directly rather than through here, which is what makes this safe to
+                    do unconditionally.
+                */
+                await slskd.Search.Watches.WatchService.DeleteRowsAsync(context, search.Id);
+
                 context.Searches.Remove(search);
                 context.SaveChanges();
 
