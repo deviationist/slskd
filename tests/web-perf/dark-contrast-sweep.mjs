@@ -27,20 +27,51 @@ const collect = () => {
     return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
   };
 
+  const parse = (colour) => {
+    const parts = colour.match(/[\d.]+/g).map(Number);
+
+    return { r: parts[0], g: parts[1], b: parts[2], a: parts[3] ?? 1 };
+  };
+
+  /*
+   * The colour actually behind an element, composited.
+   *
+   * A translucent background has to be laid over what is behind it rather than
+   * read as if it were opaque: the theme paints a row state as a 15% tint over
+   * the table, and measuring the tint alone reported `rgb(201,209,217)` at
+   * 2.19 against a green it never sits on. Every such row was a false finding,
+   * and a probe that cries wolf is one nobody reads.
+   */
   const backgroundOf = (element) => {
+    const stack = [];
     let node = element;
 
     while (node) {
-      const colour = getComputedStyle(node).backgroundColor;
+      const colour = parse(getComputedStyle(node).backgroundColor);
 
-      if (colour && !colour.startsWith('rgba(0, 0, 0, 0')) {
-        return colour;
+      if (colour.a > 0) {
+        stack.push(colour);
+
+        if (colour.a === 1) {
+          break;
+        }
       }
 
       node = node.parentElement;
     }
 
-    return 'rgb(255, 255, 255)';
+    // nothing opaque underneath: the page's own white
+    if (stack.length === 0 || stack.at(-1).a < 1) {
+      stack.push({ r: 255, g: 255, b: 255, a: 1 });
+    }
+
+    // back to front, each layer over the one below it
+    return stack.reduceRight((under, over) => ({
+      r: over.r * over.a + under.r * (1 - over.a),
+      g: over.g * over.a + under.g * (1 - over.a),
+      b: over.b * over.a + under.b * (1 - over.a),
+      a: 1,
+    }));
   };
 
   const found = new Map();
@@ -57,8 +88,14 @@ const collect = () => {
     }
 
     const style = getComputedStyle(element);
-    const fg = style.color;
-    const bg = backgroundOf(element);
+    const behind = backgroundOf(element);
+    const bg = `rgb(${[behind.r, behind.g, behind.b].map(Math.round).join(', ')})`;
+
+    // the text's own alpha counts too: `rgba(0,0,0,.6)` is not black
+    const ink = parse(style.color);
+    const fg = `rgb(${['r', 'g', 'b']
+      .map((k) => Math.round(ink[k] * ink.a + behind[k] * (1 - ink.a)))
+      .join(', ')})`;
     const a = lum(fg);
     const b = lum(bg);
     const ratio = (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
@@ -73,7 +110,7 @@ const collect = () => {
     if (!found.has(key)) {
       found.set(key, {
         ratio: Math.round(ratio * 100) / 100,
-        fg,
+        fg: style.color,
         bg,
         tag: element.tagName,
         cls: String(element.className).slice(0, 44),
