@@ -149,13 +149,21 @@ body {
     color: var(--smui-site-body-text-color);
 }
 
-/* The same omission on a basic button, which is `rgba(0,0,0,.6) !important`:
-   measured at 1.11 against the segment behind it. Scoped to the bar rather
-   than to every basic button, because Semantic colours a *coloured* basic
-   button with a rule of the same shape -- a blanket override would turn the
-   red one grey. */
-:root.dark .flatlist-summary .ui.basic.button,
-:root.dark .flatlist-columns-menu .ui.basic.button {
+/* The same omission on a basic button, which is `rgba(0,0,0,.6) !important`.
+
+   Every basic button, rather than the places one has been noticed. This was
+   scoped first to the transfers summary bar and then to the column picker,
+   and the Clear on the searches list -- added later, in a third place --
+   arrived at 1.07, which is the worst contrast in the app. A rule that has to
+   be extended for each new control is a rule that will be wrong again.
+
+   The exclusions are the reason it was scoped in the first place: Semantic
+   colours a *coloured* basic button with a rule of the same shape but higher
+   specificity, and a blanket override would beat it and turn the red one
+   grey. Naming them keeps this rule to the buttons that have no colour of
+   their own. */
+:root.dark
+    .ui.basic.button:not(.inverted):not(.primary):not(.secondary):not(.positive):not(.negative):not(.red):not(.orange):not(.yellow):not(.olive):not(.green):not(.teal):not(.blue):not(.violet):not(.purple):not(.pink):not(.brown):not(.grey):not(.black) {
     color: var(--smui-site-body-text-color) !important;
 }
 
@@ -163,12 +171,14 @@ body {
    where Semantic gives a basic button a white background and keeps the text
    colour it had. Light on white: measured `rgb(255,255,255)` behind
    `rgb(201,209,217)` with the Columns menu open. Light mode is unaffected --
-   there the text goes to `rgba(0,0,0,.8)` and white is the right answer. */
-:root.dark .flatlist-summary .ui.basic.button:hover,
-:root.dark .flatlist-summary .ui.basic.button:focus,
-:root.dark .flatlist-summary .ui.basic.button:active {
+   there the text goes to `rgba(0,0,0,.8)` and white is the right answer.
+
+   No exclusions here: a dark background under a pressed button suits a
+   coloured one as well, and the colour it keeps is its own text. */
+:root.dark .ui.basic.button:hover,
+:root.dark .ui.basic.button:focus,
+:root.dark .ui.basic.button:active {
     background: var(--slskd-hover-background) !important;
-    color: var(--smui-site-body-text-color) !important;
 }
 
 /* The picker's arrows.
