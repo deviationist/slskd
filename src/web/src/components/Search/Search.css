@@ -278,3 +278,11 @@
   font-family: monospace;
   word-break: break-all;
 }
+
+/* The list's own controls, above it and hard right -- the box above the card
+   is about adding a search, this is about the ones already there. */
+.search-list-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-bottom: 8px;
+}

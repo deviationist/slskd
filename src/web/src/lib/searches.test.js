@@ -638,3 +638,86 @@ describe('rowActionOf', () => {
     expect(search.rowActionOf({ row }).kind).toBe('enqueue');
   });
 });
+
+// / A finished search, one still running, and the map the page keeps them in.
+// / `byId` rather than `index`, which a test above already uses for something
+// / else entirely.
+const done = (id, text = id) => ({
+  id,
+  searchText: text,
+  state: 'Completed, Succeeded',
+});
+const running = (id, text = id) => ({
+  id,
+  searchText: text,
+  state: 'InProgress',
+});
+const byId = (list) => Object.fromEntries(list.map((s) => [s.id, s]));
+
+describe('clearableSearches', () => {
+  it('takes the finished, unwatched ones', () => {
+    const searches = byId([done('a', 'one'), done('b', 'two')]);
+
+    expect(
+      search.clearableSearches({ searches, watches: {} }).map((s) => s.id),
+    ).toEqual(['a', 'b']);
+  });
+
+  it('keeps a watched search', () => {
+    // deleting it orphans the watch: nothing cascades, so the schedule, what
+    // it has already reported and its notifications would be left pointing at
+    // a search that is gone
+    const searches = byId([done('a', 'one'), done('b', 'two')]);
+
+    expect(
+      search
+        .clearableSearches({ searches, watches: { b: { searchId: 'b' } } })
+        .map((s) => s.id),
+    ).toEqual(['a']);
+  });
+
+  it('keeps one that has not finished', () => {
+    // the row's own control refuses to delete it too, and offers Stop
+    const searches = byId([done('a', 'one'), running('b', 'two')]);
+
+    expect(
+      search.clearableSearches({ searches, watches: {} }).map((s) => s.id),
+    ).toEqual(['a']);
+  });
+
+  it('has nothing to take from nothing', () => {
+    expect(search.clearableSearches({ searches: {}, watches: {} })).toEqual([]);
+  });
+});
+
+describe('describeClear', () => {
+  it('counts what goes against what there is', () => {
+    const searches = byId([done('a'), done('b'), done('c')]);
+    const clearable = search.clearableSearches({ searches, watches: {} });
+
+    expect(search.describeClear({ clearable, searches, watches: {} })).toEqual({
+      kept: undefined,
+      prompt: 'Remove 3 searches of 3?',
+    });
+  });
+
+  it('says why the rest are staying, and tells the two reasons apart', () => {
+    const searches = byId([done('a'), done('b'), running('c')]);
+    const watches = { b: { searchId: 'b' } };
+    const clearable = search.clearableSearches({ searches, watches });
+
+    expect(search.describeClear({ clearable, searches, watches })).toEqual({
+      kept: 'Keeping 1 being watched and 1 still running.',
+      prompt: 'Remove 1 search of 3?',
+    });
+  });
+
+  it('gets the singular right', () => {
+    const searches = byId([done('a')]);
+    const clearable = search.clearableSearches({ searches, watches: {} });
+
+    expect(
+      search.describeClear({ clearable, searches, watches: {} }).prompt,
+    ).toBe('Remove 1 search of 1?');
+  });
+});
