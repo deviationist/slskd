@@ -159,12 +159,41 @@ body {
     color: var(--smui-site-body-text-color) !important;
 }
 
-/* And its border, which is `rgba(34,36,38,.15)` -- a hairline meant to sit on
-   white. On the popup's own background it is neither visible nor absent, just
-   muddy. */
+/* ...and while it is being pressed, or holding focus with its menu open,
+   where Semantic gives a basic button a white background and keeps the text
+   colour it had. Light on white: measured `rgb(255,255,255)` behind
+   `rgb(201,209,217)` with the Columns menu open. Light mode is unaffected --
+   there the text goes to `rgba(0,0,0,.8)` and white is the right answer. */
+:root.dark .flatlist-summary .ui.basic.button:hover,
+:root.dark .flatlist-summary .ui.basic.button:focus,
+:root.dark .flatlist-summary .ui.basic.button:active {
+    background: var(--slskd-hover-background) !important;
+    color: var(--smui-site-body-text-color) !important;
+}
+
+/* The picker's arrows.
+
+   They are not `.ui.basic.button`, which is why the rule above missed them:
+   in a `Button.Group basic` the *group* carries `basic` and each child is a
+   plain `.ui.icon.button`. Measured `rgba(0,0,0,.6)` on both the button and
+   its caret -- black arrows on a dark popup.
+
+   The group's outline goes with them. At `rgba(240,246,252,.1)` it is the
+   faintest thing on the popup, so a pair of arrows reads as a smudge rather
+   than as a control; light mode draws the same pair against a proper border
+   and legible carets, and this is what that looks like in dark. */
+:root.dark .flatlist-columns-menu .ui.buttons .button,
+:root.dark .flatlist-columns-menu .ui.buttons .button i.icon {
+    color: var(--smui-site-body-text-color) !important;
+}
+
+:root.dark .flatlist-columns-menu .ui.buttons .button:hover {
+    background: var(--slskd-hover-background) !important;
+}
+
 :root.dark .flatlist-columns-menu .ui.basic.buttons,
 :root.dark .flatlist-columns-menu .ui.basic.buttons .button {
-    border-color: var(--slskd-tertiary-border-color);
+    border-color: rgba(240, 246, 252, 0.25);
 }
 
 /* Semantic's row states are a pale tint meant for a white table: `positive` is
