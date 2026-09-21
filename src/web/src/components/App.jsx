@@ -36,6 +36,44 @@ import {
   Sidebar,
 } from 'semantic-ui-react';
 
+/*
+ * The two preferences this browser holds about how the app is drawn.
+ *
+ * Module functions rather than methods so the constructor can seed state from
+ * them without depending on when class fields are initialised. That seeding is
+ * the point: these used to be read at render only, as defaults for a
+ * destructuring of `this.state`, which left `this.state.wide` undefined until
+ * something wrote to it -- and the toggler reads `this.state`.
+ *
+ * Guarded, because localStorage throws outright where site data is blocked and
+ * this runs before the first render.
+ */
+const savedWide = () => {
+  try {
+    return localStorage.getItem('slskd-wide') === 'true';
+  } catch {
+    return false;
+  }
+};
+
+const savedTheme = () => {
+  try {
+    return localStorage.getItem('slskd-theme');
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * The theme to start in: the saved one, or whatever the system asks for.
+ * @returns {string} 'dark' or 'light'.
+ */
+const preferredTheme = () =>
+  savedTheme() ??
+  (window.matchMedia('(prefers-color-scheme: dark)').matches
+    ? 'dark'
+    : 'light');
+
 const initialState = {
   applicationOptions: {},
   applicationState: {},
@@ -157,7 +195,18 @@ class App extends Component {
   constructor(props) {
     super(props);
 
-    this.state = initialState;
+    /*
+       Seeded with the preferences rather than leaving them undefined until
+       something writes to them: `toggleWide` derives the next value from the
+       current one, and `!undefined` is `true` whatever the current one is.
+       Reloading while wide therefore took two clicks to narrow -- the first
+       set wide to what it already was.
+    */
+    this.state = {
+      ...initialState,
+      theme: preferredTheme(),
+      wide: savedWide(),
+    };
     this.hubConnections = {};
   }
 
@@ -181,7 +230,7 @@ class App extends Component {
     */
     window.slskdToast = toast;
 
-    if (this.getSavedTheme() == null) {
+    if (savedTheme() == null) {
       window
         .matchMedia('(prefers-color-scheme: dark)')
         .addEventListener(
@@ -248,9 +297,10 @@ class App extends Component {
           await metricsHub.start();
         }
 
-        const savedTheme = this.getSavedTheme();
-        if (savedTheme != null) {
-          this.setState({ theme: savedTheme });
+        const stored = savedTheme();
+
+        if (stored != null) {
+          this.setState({ theme: stored });
         }
 
         this.setState({
@@ -263,26 +313,6 @@ class App extends Component {
         this.setState({ initialized: true });
       }
     });
-  };
-
-  getSavedTheme = () => {
-    return localStorage.getItem('slskd-theme');
-  };
-
-  /*
-   * Whether the content is allowed past the 1200px it is otherwise held to.
-   *
-   * Kept beside the theme, and for the same reason: it is a preference about
-   * how this browser draws the app rather than anything the server has an
-   * opinion on. Guarded, because localStorage throws outright where site data
-   * is blocked and this runs before the first render.
-   */
-  getSavedWide = () => {
-    try {
-      return localStorage.getItem('slskd-wide') === 'true';
-    } catch {
-      return false;
-    }
   };
 
   toggleWide = () => {
@@ -352,12 +382,9 @@ class App extends Component {
       initialized,
       login,
       retriesExhausted,
-      theme = this.getSavedTheme() ||
-        (window.matchMedia('(prefers-color-scheme: dark)').matches
-          ? 'dark'
-          : 'light'),
+      theme,
       transferMetrics = {},
-      wide = this.getSavedWide(),
+      wide,
     } = this.state;
     const {
       connectionWatchdog = {},
