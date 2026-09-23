@@ -1240,3 +1240,264 @@ describe('filterTransfers', () => {
     expect(users[0].directories[0].files).toHaveLength(2);
   });
 });
+
+describe('instantOf', () => {
+  const now = Date.parse('2026-09-23T12:00:00Z');
+
+  it('reads a timestamp with a zone as that instant', () => {
+    expect(transfers.instantOf('2026-09-17T00:02:33.8265042Z', now)).toBe(
+      Date.parse('2026-09-17T00:02:33.826Z'),
+    );
+  });
+
+  it('reads one with no zone as UTC, not as local time', () => {
+    // the server writes every one of these as UTC; the database used to hand
+    // some back without the Z, and read as local they are off by the offset
+    expect(transfers.instantOf('2026-09-17T00:00:49.5357429', now)).toBe(
+      Date.parse('2026-09-17T00:00:49.535Z'),
+    );
+  });
+
+  it('respects an explicit offset', () => {
+    expect(transfers.instantOf('2026-09-17T02:00:00+02:00', now)).toBe(
+      Date.parse('2026-09-17T00:00:00Z'),
+    );
+  });
+
+  it.each([
+    ['nothing', undefined],
+    ['null', null],
+    ['an empty string', ''],
+    ['something that is not a date', 'soon'],
+    ['an unset DateTime', '0001-01-01T00:00:00'],
+    ['a moment before slskd existed', '2019-01-01T00:00:00Z'],
+    ['a moment well in the future', '2026-09-24T12:00:00Z'],
+  ])('refuses %s', (_, value) => {
+    expect(transfers.instantOf(value, now)).toBeNull();
+  });
+
+  it('allows a few minutes of disagreement between the two clocks', () => {
+    expect(transfers.instantOf('2026-09-23T12:03:00Z', now)).not.toBeNull();
+  });
+});
+
+const today = (hms) => `2026-09-23T${hms}Z`;
+const todayMs = (hms) => Date.parse(today(hms));
+
+describe('timingOf', () => {
+  const now = Date.parse('2026-09-23T12:00:00Z');
+
+  it('reports all four for a download that went as it should', () => {
+    expect(
+      transfers.timingOf(
+        {
+          endedAt: today('11:03:00'),
+          requestedAt: today('11:00:00'),
+          startedAt: today('11:01:30'),
+          state: 'Completed, Succeeded',
+        },
+        now,
+      ),
+    ).toEqual({
+      finished: todayMs('11:03:00'),
+      requested: todayMs('11:00:00'),
+      took: 90,
+      tookLive: false,
+      waited: 90,
+      waitedLive: false,
+    });
+  });
+
+  it('does not believe a start stamped at the same tick as the end', () => {
+    // measured on a live row that errored: startedAt and endedAt identical to
+    // the tick. a start copied from the end would say it "took 0s" after
+    // "waiting" the whole time it sat before failing
+    const timing = transfers.timingOf(
+      {
+        endedAt: '2026-09-17T00:02:33.8265042Z',
+        requestedAt: '2026-09-17T00:00:49.5357429',
+        startedAt: '2026-09-17T00:02:33.8265042Z',
+        state: 'Completed, Errored',
+      },
+      now,
+    );
+
+    expect(timing.took).toBeNull();
+    expect(timing.waited).toBeNull();
+
+    // when it ended is still true, and still worth saying
+    expect(timing.finished).toBe(Date.parse('2026-09-17T00:02:33.826Z'));
+  });
+
+  it('keeps the time a failed transfer really spent receiving', () => {
+    // one that ran for a minute and then broke did take a minute
+    const timing = transfers.timingOf(
+      {
+        endedAt: today('11:02:00'),
+        requestedAt: today('11:00:00'),
+        startedAt: today('11:01:00'),
+        state: 'Completed, Errored',
+      },
+      now,
+    );
+
+    expect(timing.took).toBe(60);
+    expect(timing.waited).toBe(60);
+  });
+
+  it('reports no duration measured backwards', () => {
+    const timing = transfers.timingOf(
+      {
+        endedAt: today('11:00:00'),
+        requestedAt: today('11:05:00'),
+        startedAt: today('11:04:00'),
+        state: 'Completed, Succeeded',
+      },
+      now,
+    );
+
+    expect(timing.waited).toBeNull();
+    expect(timing.took).toBeNull();
+
+    // an end before the request is not an end that can be placed either
+    expect(timing.finished).toBeNull();
+
+    // the request itself is not contradicted by anything but the others
+    expect(timing.requested).toBe(todayMs('11:05:00'));
+  });
+
+  it('counts the wait so far for a download still in the queue', () => {
+    const timing = transfers.timingOf(
+      { requestedAt: today('11:50:00'), state: 'Queued, Remotely' },
+      now,
+    );
+
+    expect(timing.waited).toBe(600);
+    expect(timing.waitedLive).toBe(true);
+    expect(timing.took).toBeNull();
+    expect(timing.finished).toBeNull();
+  });
+
+  it('counts the time so far for a download still receiving', () => {
+    const timing = transfers.timingOf(
+      {
+        requestedAt: today('11:50:00'),
+        startedAt: today('11:59:00'),
+        state: 'InProgress',
+      },
+      now,
+    );
+
+    expect(timing.waited).toBe(540);
+    expect(timing.waitedLive).toBe(false);
+    expect(timing.took).toBe(60);
+    expect(timing.tookLive).toBe(true);
+  });
+
+  it('ignores an end on a row that has not finished', () => {
+    // a row the list is still polling can carry a stale end from an earlier
+    // attempt; it is not finished until its state says so
+    expect(
+      transfers.timingOf(
+        {
+          endedAt: today('11:55:00'),
+          requestedAt: today('11:50:00'),
+          startedAt: today('11:59:00'),
+          state: 'InProgress',
+        },
+        now,
+      ).finished,
+    ).toBeNull();
+  });
+
+  it('is not live when there is nothing to count from', () => {
+    const timing = transfers.timingOf({ state: 'Queued, Remotely' }, now);
+
+    expect(timing.waited).toBeNull();
+    expect(timing.waitedLive).toBe(false);
+  });
+});
+
+describe('speedOf', () => {
+  it.each([
+    ['a real speed', 125_000, 125_000],
+    ['a negative one, seen on a live errored row', -635_672_000, null],
+    ['zero', 0, null],
+    ['nothing', undefined, null],
+    ['something that is not a number', 'fast', null],
+    ['infinity', Number.POSITIVE_INFINITY, null],
+  ])('%s', (_, averageSpeed, expected) => {
+    expect(transfers.speedOf({ averageSpeed })).toBe(expected);
+  });
+});
+
+describe('the timing columns', () => {
+  const now = Date.now();
+  const ago = (seconds) => new Date(now - seconds * 1_000).toISOString();
+
+  it('are all off until they are asked for', () => {
+    for (const key of ['requested', 'waited', 'took', 'finished']) {
+      expect(transfers.TRANSFER_COLUMNS.find((c) => c.key === key)).toEqual(
+        expect.objectContaining({ optional: true }),
+      );
+    }
+  });
+
+  it('sort a row with nothing believable last, in both directions', () => {
+    const rows = [
+      {
+        endedAt: ago(10),
+        id: 'garbage',
+        requestedAt: ago(100),
+        startedAt: ago(10),
+        state: 'Completed, Errored',
+      },
+      {
+        endedAt: ago(10),
+        id: 'slow',
+        requestedAt: ago(100),
+        startedAt: ago(70),
+        state: 'Completed, Succeeded',
+      },
+      {
+        endedAt: ago(10),
+        id: 'fast',
+        requestedAt: ago(100),
+        startedAt: ago(20),
+        state: 'Completed, Succeeded',
+      },
+    ];
+
+    const order = (direction) =>
+      tables
+        .sortRows({
+          column: 'took',
+          columns: transfers.TRANSFER_SORT_COLUMNS,
+          direction,
+          rows,
+        })
+        .map((r) => r.id);
+
+    expect(order('asc')).toEqual(['fast', 'slow', 'garbage']);
+    expect(order('desc')).toEqual(['slow', 'fast', 'garbage']);
+  });
+
+  it('sort speed on the speed that is shown', () => {
+    const rows = [
+      { averageSpeed: -635_672_000, id: 'garbage' },
+      { averageSpeed: 200, id: 'fast' },
+      { averageSpeed: 100, id: 'slow' },
+    ];
+
+    expect(
+      tables
+        .sortRows({
+          column: 'speed',
+          columns: transfers.TRANSFER_SORT_COLUMNS,
+          direction: 'asc',
+          rows,
+        })
+        .map((r) => r.id),
+    ).toEqual(['slow', 'fast', 'garbage']);
+  });
+});

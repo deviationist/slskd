@@ -16,6 +16,9 @@ import * as transfersLibrary from '../../lib/transfers';
 import { userPath } from '../../lib/users';
 import {
   formatBytes,
+  formatDate,
+  formatDuration,
+  formatWhen,
   getFileExtension,
   getFileName,
   offsetWithin,
@@ -83,6 +86,96 @@ const storeColumns = (direction, columns) => {
   } catch {
     // a preference that cannot be saved is still a preference for this tab
   }
+};
+
+/**
+ * When a download was asked for, or finished.
+ *
+ * Blank rather than guessed: `timingOf` refuses an instant it cannot believe,
+ * and says why in its own comment. The full date is the tooltip, since the
+ * cell drops the year and, for anything today, the date.
+ * @param {object} params
+ * @param {number|null} params.at - The instant, in ms.
+ * @param {number} params.now - The present, in ms.
+ * @returns {object} The cell.
+ */
+const WhenCell = ({ at, now }) => (
+  <Table.Cell
+    className="flatlist-when"
+    title={at === null ? undefined : formatDate(at)}
+  >
+    {at !== null && (
+      <time dateTime={new Date(at).toISOString()}>{formatWhen(at, now)}</time>
+    )}
+  </Table.Cell>
+);
+
+const STILL_GOING = {
+  took: 'Still receiving — this is how long so far',
+  waited: 'Still waiting — this is how long so far',
+};
+
+/**
+ * How long a download waited, or how long it took -- set apart while the
+ * number is still growing, so three minutes *so far* does not read the same as
+ * three minutes and done.
+ * @param {object} params
+ * @param {string} params.column - 'waited' or 'took'.
+ * @param {boolean} params.live - Whether the duration is still growing.
+ * @param {number|null} params.seconds - The duration.
+ * @returns {object} The cell.
+ */
+const DurationCell = ({ column, live, seconds }) => (
+  <Table.Cell
+    className={live ? 'flatlist-duration flatlist-live' : 'flatlist-duration'}
+    title={live ? STILL_GOING[column] : undefined}
+  >
+    {seconds === null ? '' : formatDuration(seconds)}
+  </Table.Cell>
+);
+
+/**
+ * The speed column's text: blank where `speedOf` refuses the number.
+ * @param {object} row - The transfer.
+ * @returns {string} The speed, formatted, or ''.
+ */
+const speedText = (row) => {
+  const speed = transfersLibrary.speedOf(row);
+
+  return speed === null ? '' : `${formatBytes(speed)}/s`;
+};
+
+const TIMING_COLUMNS = new Set(['finished', 'requested', 'took', 'waited']);
+
+/**
+ * The cell for one of the four timing columns.
+ * @param {object} params
+ * @param {string} params.key - The column.
+ * @param {number} params.now - The present, in ms, shared by the whole render.
+ * @param {object} params.row - The transfer.
+ * @returns {object} The cell.
+ */
+const timingCell = ({ key, now, row }) => {
+  const timing = transfersLibrary.timingOf(row, now);
+
+  if (key === 'requested' || key === 'finished') {
+    return (
+      <WhenCell
+        at={timing[key]}
+        key={key}
+        now={now}
+      />
+    );
+  }
+
+  return (
+    <DurationCell
+      column={key}
+      key={key}
+      live={timing[`${key}Live`]}
+      seconds={timing[key]}
+    />
+  );
 };
 
 /**
@@ -457,7 +550,15 @@ const FlatTransferList = ({
     return undefined;
   };
 
+  // one present for the whole render, so every live duration on screen is
+  // measured to the same instant rather than to whenever its cell was reached
+  const now = Date.now();
+
   const cell = (row, key) => {
+    if (TIMING_COLUMNS.has(key)) {
+      return timingCell({ key, now, row });
+    }
+
     switch (key) {
       case 'name': {
         return (
@@ -599,7 +700,7 @@ const FlatTransferList = ({
             className="flatlist-speed"
             key={key}
           >
-            {row.averageSpeed ? `${formatBytes(row.averageSpeed)}/s` : ''}
+            {speedText(row)}
           </Table.Cell>
         );
       }

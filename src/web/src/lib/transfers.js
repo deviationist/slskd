@@ -842,6 +842,165 @@ export const flattenTransfers = (users = []) =>
     ),
   );
 
+/*
+ * The window a transfer's instant has to fall in to be believed: no earlier
+ * than slskd existed (`Program.GenesisDateTime`), no later than now plus a
+ * little skew between the server's clock and the browser's. Anything outside
+ * it is a default that leaked -- `0001-01-01` is what an unset DateTime
+ * serializes as -- and not a moment anything happened.
+ */
+const EARLIEST_INSTANT = Date.UTC(2_020, 11, 30, 6, 22);
+const CLOCK_SKEW_MS = 5 * 60 * 1_000;
+
+// a trailing Z, or an offset such as +02:00 or -0530
+const HAS_ZONE = /(?:z|[+-]\d{2}:?\d{2})$/iu;
+
+/**
+ * A timestamp from the transfers API as milliseconds, or null if it is not one
+ * that can be believed.
+ *
+ * A string with no zone is read as UTC, not as local time as `Date.parse`
+ * would. The server writes every one of these as UTC, and the database used to
+ * hand some of them back without saying so -- read as local, those are off by
+ * the reader's offset, and every difference taken against one that did carry
+ * its Z is off by the same amount.
+ * @param {string} value - The API's value.
+ * @param {number} now - The present, in ms.
+ * @returns {number|null} The instant, or null.
+ */
+export const instantOf = (value, now = Date.now()) => {
+  if (typeof value !== 'string' || value === '') {
+    return null;
+  }
+
+  const at = Date.parse(HAS_ZONE.test(value) ? value : `${value}Z`);
+
+  if (Number.isNaN(at) || at < EARLIEST_INSTANT || at > now + CLOCK_SKEW_MS) {
+    return null;
+  }
+
+  return at;
+};
+
+/**
+ * Whole seconds from one instant to another, or null if either is missing or
+ * they are the wrong way round.
+ * @param {number|null} from - The earlier instant, in ms.
+ * @param {number|null} to - The later instant, in ms.
+ * @returns {number|null} The seconds between them.
+ */
+const seconds = (from, to) =>
+  from === null || to === null || to < from
+    ? null
+    : Math.floor((to - from) / 1_000);
+
+/**
+ * A transfer's start, unless it is the one the API copies from the end.
+ * @param {object} params
+ * @param {boolean} params.completed - Whether the transfer has finished.
+ * @param {number|null} params.ended - Its end, already believed or not.
+ * @param {object} params.file - The transfer.
+ * @param {number} params.now - The present, in ms.
+ * @returns {number|null} The start, in ms, or null.
+ */
+const believedStart = ({ completed, ended, file, now }) => {
+  const started = instantOf(file?.startedAt, now);
+
+  return completed && started !== null && started === ended ? null : started;
+};
+
+/**
+ * When a transfer was asked for, how long it waited, how long it took, and
+ * when it finished -- each only where the timestamps behind it make sense, and
+ * null wherever they do not.
+ *
+ * An empty cell is the honest answer to a question the data cannot answer.
+ * What it replaces is a confident wrong one, and the transfers API has several
+ * of those on offer:
+ *
+ * - A transfer that failed before any bytes moved comes back with `startedAt`
+ *   exactly equal to `endedAt`, to the tick -- a start copied from the end rather
+ *   than one that happened. Believing it produces a transfer that "took 0s"
+ *   after "waiting" however long it sat before failing. On a finished row that
+ *   exact equality is treated as no start at all.
+ * - Two instants in the wrong order produce a negative duration. Nothing
+ *   happens in negative time, so the duration is not reported.
+ * - An instant outside the window `instantOf` allows is not reported, and
+ *   neither is anything measured from it.
+ *
+ * Two of these are live. A download still in the remote queue is *still
+ * waiting*, so it reports how long it has waited so far; one still receiving
+ * reports how long it has taken so far. Each stops the moment the row moves
+ * on. `now` is a parameter rather than read here so the tests can hold it
+ * still.
+ * @param {object} file - The transfer.
+ * @param {number} now - The present, in ms.
+ * @returns {object} `requested` and `finished` as instants in ms, `waited`
+ *   and `took` as durations in seconds, each null where it cannot be believed;
+ *   and `waitedLive` / `tookLive`, true while that duration is still growing.
+ */
+export const timingOf = (file, now = Date.now()) => {
+  const state = String(file?.state ?? '');
+  const completed = state.startsWith('Completed');
+  const receiving = state === 'InProgress';
+
+  const requested = instantOf(file?.requestedAt, now);
+  const ended = completed ? instantOf(file?.endedAt, now) : null;
+  const started = believedStart({ completed, ended, file, now });
+
+  const waitedLive = started === null && !completed && !receiving;
+  const tookLive = receiving;
+
+  let waited = null;
+
+  if (started !== null) {
+    waited = seconds(requested, started);
+  } else if (waitedLive) {
+    waited = seconds(requested, now);
+  }
+
+  let took = null;
+
+  if (completed) {
+    // strictly after: an end *at* the start is the copied stamp again
+    took = ended !== null && ended > started ? seconds(started, ended) : null;
+  } else if (tookLive) {
+    took = seconds(started, now);
+  }
+
+  const finished =
+    ended !== null &&
+    (requested === null || ended >= requested) &&
+    (started === null || ended >= started)
+      ? ended
+      : null;
+
+  return {
+    finished,
+    requested,
+    took,
+    tookLive: tookLive && took !== null,
+    waited,
+    waitedLive: waitedLive && waited !== null,
+  };
+};
+
+/**
+ * A transfer's average speed, or null where the number is not a speed.
+ *
+ * The API reports whatever the transfer's counters produced, and for one that
+ * failed early that is routinely nonsense -- `-635672000` on a live row. A
+ * negative or non-finite speed is not slow, it is absent, and showing it as
+ * "0 B/s" states something that was never measured.
+ * @param {object} file - The transfer.
+ * @returns {number|null} Bytes per second, or null.
+ */
+export const speedOf = (file) => {
+  const speed = Number(file?.averageSpeed);
+
+  return Number.isFinite(speed) && speed > 0 ? speed : null;
+};
+
 /**
  * Every column the flat transfers table has, in the order they are drawn.
  */
@@ -865,6 +1024,33 @@ export const TRANSFER_COLUMNS = [
     className: 'flatlist-attempts',
     optional: true,
   },
+
+  // the four moments of a download, in the order they happen: asked for,
+  // waited in the peer's queue, received, done
+  {
+    key: 'requested',
+    label: 'Requested',
+    className: 'flatlist-when',
+    optional: true,
+  },
+  {
+    key: 'waited',
+    label: 'Waited',
+    className: 'flatlist-duration',
+    optional: true,
+  },
+  {
+    key: 'took',
+    label: 'Took',
+    className: 'flatlist-duration',
+    optional: true,
+  },
+  {
+    key: 'finished',
+    label: 'Finished',
+    className: 'flatlist-when',
+    optional: true,
+  },
 ];
 
 /**
@@ -882,9 +1068,16 @@ export const TRANSFER_SORT_COLUMNS = {
   path: { kind: 'text', of: (row) => row.directory },
   search: { kind: 'text', of: (row) => row.searchText },
   size: { kind: 'number', of: (row) => row.size },
-  speed: { kind: 'number', of: (row) => row.averageSpeed },
+  speed: { kind: 'number', of: (row) => speedOf(row) },
   state: { kind: 'text', of: (row) => row.state },
   user: { kind: 'text', of: (row) => row.username },
+
+  // on what the cell shows, so a row with nothing believable to say sorts
+  // last rather than taking its place from a number that was thrown away
+  finished: { kind: 'number', of: (row) => timingOf(row).finished },
+  requested: { kind: 'number', of: (row) => timingOf(row).requested },
+  took: { kind: 'number', of: (row) => timingOf(row).took },
+  waited: { kind: 'number', of: (row) => timingOf(row).waited },
 };
 
 /**

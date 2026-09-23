@@ -641,6 +641,30 @@ body {
     width: 70px;
 }
 
+/* When a download was asked for and when it finished. Sized to the longer of
+   the two forms `formatWhen` gives -- "17/09, 00:02" for another day, and
+   "14:02:33" for today -- with tabular figures so a column of times lines up
+   digit under digit. */
+.flatlist-when {
+    width: 105px;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+/* How long it waited and how long it took: at most "23h 59m". */
+.flatlist-duration {
+    width: 80px;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+/* A duration still growing. Set apart so a download waiting 3 minutes *so far*
+   does not read the same as one that waited 3 minutes and was done. */
+.flatlist-live {
+    font-style: italic;
+    color: var(--slskd-color-subtle, rgba(0, 0, 0, 0.6));
+}
+
 .flatlist-slot {
     width: 80px;
     text-align: center !important;
@@ -693,6 +717,8 @@ body {
     .flatlist-size,
     .flatlist-speed,
     .flatlist-attempts,
+    .flatlist-when,
+    .flatlist-duration,
     .flatlist-queue,
     .flatlist-slot,
     .flatlist-length,
