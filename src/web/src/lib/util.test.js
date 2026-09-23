@@ -213,10 +213,118 @@ describe('formatWhen', () => {
     expect(utils.formatWhen(at, now)).toBe(utils.formatTime(at));
   });
 
-  it('gives the day as well for anything earlier', () => {
+  it('gives the day as well for anything earlier this year', () => {
     const now = Date.parse('2026-09-23T00:05:00');
     const at = new Date('2026-09-22T23:58:00');
 
     expect(utils.formatWhen(at, now)).toBe(utils.formatDayTime(at));
+  });
+});
+
+describe('formatWhen across years', () => {
+  it('adds the year once the instant is from an earlier one', () => {
+    const now = Date.parse('2026-01-02T10:00:00');
+    const at = new Date('2025-12-31T23:30:00');
+
+    expect(utils.formatWhen(at, now)).toBe(
+      at.toLocaleString(utils.locale(), utils.DATE_TIME_SHORT_OPTIONS),
+    );
+    expect(utils.formatWhen(at, now)).toContain('2025');
+  });
+
+  it('leaves the year out for this year, and the date out for today', () => {
+    const now = Date.parse('2026-09-23T18:00:00');
+
+    expect(
+      utils.formatWhen(new Date('2026-01-05T09:00:00'), now),
+    ).not.toContain('2026');
+    expect(utils.formatWhen(new Date('2026-09-23T09:00:00'), now)).not.toMatch(
+      /\//u,
+    );
+  });
+
+  it('measures a year in whole calendar years, not in the last 365 days', () => {
+    // two days apart across new year is still a different year
+    const now = Date.parse('2026-01-01T00:30:00');
+
+    expect(utils.formatWhen(new Date('2025-12-31T23:00:00'), now)).toContain(
+      '2025',
+    );
+  });
+});
+
+describe('parseInstant', () => {
+  it('reads an ISO string with a Z', () => {
+    expect(utils.parseInstant('2026-09-23T20:35:04.3991269Z')).toBe(
+      Date.parse('2026-09-23T20:35:04.399Z'),
+    );
+  });
+
+  it('reads an explicit offset as that offset', () => {
+    // the logs endpoint sends +00:00 rather than Z
+    expect(utils.parseInstant('2026-09-23T22:35:00+02:00')).toBe(
+      Date.parse('2026-09-23T20:35:00Z'),
+    );
+  });
+
+  it('reads a date and time with no zone as UTC, not local', () => {
+    expect(utils.parseInstant('2026-09-17T00:00:49.5357429')).toBe(
+      Date.parse('2026-09-17T00:00:49.535Z'),
+    );
+  });
+
+  it('passes a number or a Date through', () => {
+    const ms = Date.parse('2026-09-23T20:35:00Z');
+
+    expect(utils.parseInstant(ms)).toBe(ms);
+    expect(utils.parseInstant(new Date(ms))).toBe(ms);
+  });
+
+  it.each([
+    ['nothing', undefined],
+    ['null', null],
+    ['an empty string', ''],
+    ['text that is not a date', 'soon'],
+    ['an invalid Date', new Date('soon')],
+    ['NaN', Number.NaN],
+  ])('is null for %s', (_, value) => {
+    expect(utils.parseInstant(value)).toBeNull();
+  });
+});
+
+describe('timestampParts', () => {
+  const now = Date.parse('2026-09-23T18:00:00');
+  const earlier = '2026-09-17T00:02:33Z';
+
+  it('gives the exact instant for the <time> element', () => {
+    expect(utils.timestampParts({ at: earlier, now }).dateTime).toBe(
+      '2026-09-17T00:02:33.000Z',
+    );
+  });
+
+  it('always carries the full date and time as the tooltip', () => {
+    const parts = utils.timestampParts({ at: earlier, now });
+
+    expect(parts.title).toBe(utils.formatDate(Date.parse(earlier)));
+  });
+
+  it('shortens the text by default', () => {
+    expect(utils.timestampParts({ at: earlier, now }).text).toBe(
+      utils.formatWhen(Date.parse(earlier), now),
+    );
+  });
+
+  it('shows the whole date and time when asked for the full variant', () => {
+    // today, where the short form would drop the date altogether
+    const today = new Date(now - 60_000).toISOString();
+
+    expect(utils.timestampParts({ at: today, now, variant: 'full' }).text).toBe(
+      utils.formatDate(Date.parse(today)),
+    );
+  });
+
+  it('is null with nothing to show, so the caller can say what that means', () => {
+    expect(utils.timestampParts({ at: null, now })).toBeNull();
+    expect(utils.timestampParts({ at: 'soon', now })).toBeNull();
   });
 });

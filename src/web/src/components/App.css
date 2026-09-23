@@ -641,6 +641,15 @@ body {
     width: 70px;
 }
 
+/* A timestamp never breaks across lines. "17/09, 00:02" wrapped at its space
+   reads as two values, and the columns that hold one -- Events, Ended -- are
+   shrink-to-fit, which is exactly where the wrap would happen. Every date in
+   the UI is a <time> drawn by the Timestamp component, so this one rule
+   covers all of them. */
+time {
+    white-space: nowrap;
+}
+
 /* When a download was asked for and when it finished. Sized to the longer of
    the two forms `formatWhen` gives -- "17/09, 00:02" for another day, and
    "14:02:33" for today -- with tabular figures so a column of times lines up

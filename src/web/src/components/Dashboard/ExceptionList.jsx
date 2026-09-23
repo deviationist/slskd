@@ -1,4 +1,5 @@
-import { formatDate, getFileName, truncate } from '../../lib/util';
+import { getFileName, truncate } from '../../lib/util';
+import { Timestamp } from '../Shared';
 import React from 'react';
 import {
   Button,
@@ -76,7 +77,7 @@ const ExceptionList = ({ direction, loading, onDirectionChange, rows }) => (
           rows.map((row) => (
             <Table.Row key={`${row.direction}-${row.endedAt}-${row.filename}`}>
               <Table.Cell style={{ whiteSpace: 'nowrap' }}>
-                {row.endedAt ? formatDate(row.endedAt) : ''}
+                <Timestamp at={row.endedAt} />
               </Table.Cell>
               <Table.Cell>{row.direction}</Table.Cell>
               <Table.Cell>{row.username}</Table.Cell>

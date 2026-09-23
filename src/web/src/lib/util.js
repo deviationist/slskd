@@ -191,21 +191,113 @@ export const formatDayMonth = (date) => {
 };
 
 /**
- * An instant for a table cell, as short as it can be without being ambiguous:
- * the time alone if it is today, the day and time if it is not.
+ * A date and time with a year but no seconds: the table form for anything
+ * from an earlier year, where the seconds are noise and the year is not.
+ */
+export const DATE_TIME_SHORT_OPTIONS = {
+  day: 'numeric',
+  hour: '2-digit',
+  hourCycle: HOUR_CYCLE,
+  minute: '2-digit',
+  month: 'numeric',
+  year: 'numeric',
+};
+
+// a trailing Z, or an offset such as +02:00 or -0530
+const HAS_ZONE = /(?:z|[+-]\d{2}:?\d{2})$/iu;
+
+/**
+ * A timestamp as milliseconds, or null if it is not one.
  *
- * "Today" is the reader's local day. The full date belongs in the cell's
- * tooltip (`formatDate`), since this form drops the year and the seconds.
+ * Accepts what the API sends -- an ISO string -- as well as a number or a
+ * Date. An ISO string with no zone is read as **UTC**, not as local time as
+ * `Date.parse` would: the server writes UTC throughout, and the one way a
+ * zone has gone missing is a database handing a UTC value back without
+ * saying so. Every endpoint carries a zone today; this is what keeps an
+ * older server, or the next column that loses one, from reading hours out.
+ * @param {string|number|Date} value - The timestamp.
+ * @returns {number|null} The instant, or null.
+ */
+export const parseInstant = (value) => {
+  if (value instanceof Date) {
+    const time = value.getTime();
+    return Number.isNaN(time) ? null : time;
+  }
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof value !== 'string' || value === '') {
+    return null;
+  }
+
+  // only a full date-and-time lacks a zone in a way that matters; a bare
+  // date is left to Date.parse, which already reads that as UTC
+  const zoneless = value.includes('T') && !HAS_ZONE.test(value);
+  const ms = Date.parse(zoneless ? `${value}Z` : value);
+
+  return Number.isNaN(ms) ? null : ms;
+};
+
+/**
+ * An instant for a table or a list, as short as it can be without being
+ * ambiguous -- which depends on how long ago it was:
+ *
+ * - today: the time alone, `14:02:33`
+ * - earlier this year: the day and time, `17/09, 00:02`
+ * - an earlier year: with the year, `17/09/2025, 00:02`
+ *
+ * "Today" and "this year" are the reader's local ones. The exact instant
+ * belongs in a tooltip (`formatDate`), which is what `timestampParts` puts
+ * there.
  * @param {number|string|Date} date - The instant.
  * @param {number} now - The present, in ms.
  * @returns {string} The instant, formatted.
  */
 export const formatWhen = (date, now = Date.now()) => {
   const at = new Date(date);
+  const today = new Date(now);
 
-  return at.toDateString() === new Date(now).toDateString()
-    ? formatTime(at)
-    : formatDayTime(at);
+  if (at.toDateString() === today.toDateString()) {
+    return formatTime(at);
+  }
+
+  if (at.getFullYear() === today.getFullYear()) {
+    return formatDayTime(at);
+  }
+
+  return at.toLocaleString(locale(), DATE_TIME_SHORT_OPTIONS);
+};
+
+/**
+ * Everything a rendered timestamp needs, in one place, so that every date in
+ * the UI is drawn the same way: the text to show, the exact instant for a
+ * `<time dateTime>`, and the full date and time for its tooltip.
+ *
+ * `short` is `formatWhen` -- for tables and lists, where it is read down a
+ * column. `full` is always the complete date and time -- for a detail view,
+ * where there is room and the row is read on its own.
+ * @param {object} params
+ * @param {string|number|Date} params.at - The timestamp.
+ * @param {string} params.variant - 'short' or 'full'.
+ * @param {number} params.now - The present, in ms.
+ * @returns {{dateTime: string, text: string, title: string}|null} The parts, or null if there is no instant.
+ */
+export const timestampParts = ({ at, variant = 'short', now = Date.now() }) => {
+  const ms = parseInstant(at);
+
+  if (ms === null) {
+    return null;
+  }
+
+  const full = formatDate(ms);
+
+  return {
+    dateTime: new Date(ms).toISOString(),
+    text: variant === 'full' ? full : formatWhen(ms, now),
+    title: full,
+  };
 };
 
 const pad = (n) => String(n).padStart(2, '0');

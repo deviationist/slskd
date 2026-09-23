@@ -1,6 +1,6 @@
 import '../System.css';
 import { createLogsHubConnection } from '../../../lib/hubFactory';
-import { LoaderSegment } from '../../Shared';
+import { LoaderSegment, Timestamp } from '../../Shared';
 import React, { Component } from 'react';
 import { Table } from 'semantic-ui-react';
 
@@ -49,11 +49,6 @@ class Logs extends Component {
     logsHub.start();
   }
 
-  formatTimestamp = (timestamp) => {
-    const date = new Date(timestamp);
-    return `${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}:${date.getSeconds().toString().padStart(2, '0')}`; // eslint-disable-line max-len
-  };
-
   render() {
     const { connected, logs } = this.state;
 
@@ -80,7 +75,9 @@ class Logs extends Component {
                   negative={log.level === 'Error'}
                   warning={log.level === 'Warning'}
                 >
-                  <Table.Cell>{this.formatTimestamp(log.timestamp)}</Table.Cell>
+                  <Table.Cell>
+                    <Timestamp at={log.timestamp} />
+                  </Table.Cell>
                   <Table.Cell>{levels[log.level] || log.level}</Table.Cell>
                   <Table.Cell className="logs-table-message">
                     {log.message}

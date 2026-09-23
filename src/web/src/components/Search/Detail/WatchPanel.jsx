@@ -1,5 +1,6 @@
-import { formatBytes, formatDate } from '../../../lib/util';
+import { formatBytes } from '../../../lib/util';
 import * as library from '../../../lib/watches';
+import { Timestamp } from '../../Shared';
 import WatchModal from '../WatchModal';
 import React, { useEffect, useState } from 'react';
 import { useHistory, useLocation } from 'react-router-dom';
@@ -13,8 +14,6 @@ import {
   Segment,
   Table,
 } from 'semantic-ui-react';
-
-const when = (iso) => (iso ? formatDate(iso) : '-');
 
 /**
  * The watch on a search: what it does, when it next runs, and what it has sent.
@@ -175,7 +174,12 @@ const WatchPanel = ({ onWatchChanged, searchId, searchText, watch }) => {
             </span>
             {lastRun && (
               <span>
-                {`Last run ${when(lastRun.startedAt)} · ${lastRun.newCount} new${
+                Last run{' '}
+                <Timestamp
+                  at={lastRun.startedAt}
+                  placeholder="-"
+                />
+                {` · ${lastRun.newCount} new${
                   lastRun.enqueuedCount > 0
                     ? ` · ${lastRun.enqueuedCount} queued`
                     : ''
@@ -293,7 +297,12 @@ const WatchPanel = ({ onWatchChanged, searchId, searchText, watch }) => {
                 {ignores.map((ignore) => (
                   <Table.Row key={ignore.id}>
                     <Table.Cell>{library.describeIgnore(ignore)}</Table.Cell>
-                    <Table.Cell collapsing>{when(ignore.createdAt)}</Table.Cell>
+                    <Table.Cell collapsing>
+                      <Timestamp
+                        at={ignore.createdAt}
+                        placeholder="-"
+                      />
+                    </Table.Cell>
                     <Table.Cell collapsing>
                       <Popup
                         content="Stop ignoring this. A watch will report it again the next time it finds it."
@@ -368,7 +377,12 @@ const WatchPanel = ({ onWatchChanged, searchId, searchText, watch }) => {
                             name={expanded ? 'chevron down' : 'chevron right'}
                           />
                         </Table.Cell>
-                        <Table.Cell>{when(notification.sentAt)}</Table.Cell>
+                        <Table.Cell>
+                          <Timestamp
+                            at={notification.sentAt}
+                            placeholder="-"
+                          />
+                        </Table.Cell>
                         <Table.Cell>{notification.recipient}</Table.Cell>
                         <Table.Cell>{notification.fileCount}</Table.Cell>
                         <Table.Cell>

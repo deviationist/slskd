@@ -1,6 +1,11 @@
 import { apiBaseUrl } from '../config';
 import api from './api';
-import { downloadFile, getFileExtension, getFileName } from './util';
+import {
+  downloadFile,
+  getFileExtension,
+  getFileName,
+  parseInstant,
+} from './util';
 
 export const getAll = async ({ direction }) => {
   const response = (
@@ -852,9 +857,6 @@ export const flattenTransfers = (users = []) =>
 const EARLIEST_INSTANT = Date.UTC(2_020, 11, 30, 6, 22);
 const CLOCK_SKEW_MS = 5 * 60 * 1_000;
 
-// a trailing Z, or an offset such as +02:00 or -0530
-const HAS_ZONE = /(?:z|[+-]\d{2}:?\d{2})$/iu;
-
 /**
  * A timestamp from the transfers API as milliseconds, or null if it is not one
  * that can be believed.
@@ -873,9 +875,9 @@ export const instantOf = (value, now = Date.now()) => {
     return null;
   }
 
-  const at = Date.parse(HAS_ZONE.test(value) ? value : `${value}Z`);
+  const at = parseInstant(value);
 
-  if (Number.isNaN(at) || at < EARLIEST_INSTANT || at > now + CLOCK_SKEW_MS) {
+  if (at === null || at < EARLIEST_INSTANT || at > now + CLOCK_SKEW_MS) {
     return null;
   }
 

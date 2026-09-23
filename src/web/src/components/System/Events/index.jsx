@@ -1,12 +1,9 @@
 import { list } from '../../../lib/events';
-import { LoaderSegment } from '../../Shared';
+import { LoaderSegment, Timestamp } from '../../Shared';
 import React, { useEffect, useState } from 'react';
 import { Icon, Pagination, Popup, Table } from 'semantic-ui-react';
 
 const PER_PAGE = 10;
-
-const replaceHyphensWithNonBreakingEquivalent = (string) =>
-  string?.replaceAll('-', '‑');
 
 const Events = () => {
   const [page, setPage] = useState(1);
@@ -100,7 +97,7 @@ const Events = () => {
                   />
                 </Table.Cell>
                 <Table.Cell>
-                  {replaceHyphensWithNonBreakingEquivalent(event.timestamp)}
+                  <Timestamp at={event.timestamp} />
                 </Table.Cell>
                 <Table.Cell>{event.type}</Table.Cell>
                 <Table.Cell className="events-table-data">
