@@ -1,4 +1,5 @@
-import { formatBytes, formatDate } from '../../lib/util';
+import { formatBytes } from '../../lib/util';
+import { Timestamp } from '../Shared';
 import { Table } from 'semantic-ui-react';
 
 // Regex patterns for field name formatting
@@ -34,7 +35,12 @@ const formatValue = (key, value) => {
     }
 
     // Otherwise it's a datetime
-    return formatDate(value);
+    return (
+      <Timestamp
+        at={value}
+        variant="full"
+      />
+    );
   }
 
   // Format byte-related fields

@@ -1,6 +1,6 @@
 import { deleteDirectory, deleteFile, list } from '../../../lib/files';
-import { formatBytes, formatDate } from '../../../lib/util';
-import { LoaderSegment } from '../../Shared';
+import { formatBytes } from '../../../lib/util';
+import { LoaderSegment, Timestamp } from '../../Shared';
 import React, { useEffect, useState } from 'react';
 import { Header, Icon, Modal, Table } from 'semantic-ui-react';
 
@@ -18,7 +18,9 @@ const FileRow = ({
       <Icon name="file outline" />
       {name}
     </Table.Cell>
-    <Table.Cell>{modifiedAt ? formatDate(modifiedAt) : ''}</Table.Cell>
+    <Table.Cell>
+      <Timestamp at={modifiedAt} />
+    </Table.Cell>
     <Table.Cell>{length ? formatBytes(length) : ''}</Table.Cell>
     <Table.Cell>
       {remoteFileManagement ? (
@@ -78,7 +80,9 @@ const DirectoryRow = ({
       <Icon name="folder" />
       {name}
     </Table.Cell>
-    <Table.Cell>{modifiedAt ? formatDate(modifiedAt) : ''}</Table.Cell>
+    <Table.Cell>
+      <Timestamp at={modifiedAt} />
+    </Table.Cell>
     <Table.Cell />
     <Table.Cell>
       {remoteFileManagement && deletable ? (

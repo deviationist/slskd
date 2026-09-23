@@ -1,7 +1,7 @@
 import { activeRoomKey } from '../../config';
 import * as rooms from '../../lib/rooms';
-import { formatDayTime } from '../../lib/util';
 import PlaceholderSegment from '../Shared/PlaceholderSegment';
+import Timestamp from '../Shared/Timestamp';
 import RoomMenu from './RoomMenu';
 import RoomUserList from './RoomUserList';
 import React, { Component, createRef } from 'react';
@@ -40,33 +40,31 @@ const initialState = {
   },
 };
 
-const RoomMessageHistory = React.memo(
-  ({ formatTimestamp, messages, onHandleContextMenu }) => {
-    return (
-      <>
-        {messages.map((message) => (
-          <div
-            key={`${message.timestamp}+${message.message}`}
-            onContextMenu={(clickEvent) =>
-              onHandleContextMenu(clickEvent, message)
-            }
+const RoomMessageHistory = React.memo(({ messages, onHandleContextMenu }) => {
+  return (
+    <>
+      {messages.map((message) => (
+        <div
+          key={`${message.timestamp}+${message.message}`}
+          onContextMenu={(clickEvent) =>
+            onHandleContextMenu(clickEvent, message)
+          }
+        >
+          <List.Content
+            className={`room-message ${message.self ? 'room-message-self' : ''}`}
           >
-            <List.Content
-              className={`room-message ${message.self ? 'room-message-self' : ''}`}
-            >
-              <span className="room-message-time">
-                {formatTimestamp(message.timestamp)}
-              </span>
-              <span className="room-message-name">{message.username}: </span>
-              <span className="room-message-message">{message.message}</span>
-            </List.Content>
-          </div>
-        ))}
-        <List.Content id="room-history-scroll-anchor" />
-      </>
-    );
-  },
-);
+            <span className="room-message-time">
+              <Timestamp at={message.timestamp} />
+            </span>
+            <span className="room-message-name">{message.username}: </span>
+            <span className="room-message-message">{message.message}</span>
+          </List.Content>
+        </div>
+      ))}
+      <List.Content id="room-history-scroll-anchor" />
+    </>
+  );
+});
 
 RoomMessageHistory.displayName = 'RoomMessageHistory';
 
@@ -194,8 +192,6 @@ class Rooms extends Component {
   focusInput = () => {
     this.messageRef.current.focus();
   };
-
-  formatTimestamp = (timestamp) => formatDayTime(timestamp);
 
   sendMessage = async () => {
     const { active, message } = this.state;
@@ -347,7 +343,6 @@ class Rooms extends Component {
                         <Ref innerRef={this.listRef}>
                           <List>
                             <RoomMessageHistory
-                              formatTimestamp={this.formatTimestamp}
                               messages={room.messages}
                               onHandleContextMenu={this.handleContextMenu}
                             />

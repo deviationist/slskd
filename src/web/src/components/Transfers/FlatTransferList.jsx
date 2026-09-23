@@ -16,15 +16,19 @@ import * as transfersLibrary from '../../lib/transfers';
 import { userPath } from '../../lib/users';
 import {
   formatBytes,
-  formatDate,
   formatDuration,
-  formatWhen,
   getFileExtension,
   getFileName,
   offsetWithin,
   scrollParentOf,
 } from '../../lib/util';
-import { ColumnPicker, EmptyTableRow, SortHint, SortRank } from '../Shared';
+import {
+  ColumnPicker,
+  EmptyTableRow,
+  SortHint,
+  SortRank,
+  Timestamp,
+} from '../Shared';
 import TransferDetails from './TransferDetails';
 import {
   ConfirmRemovalModal,
@@ -92,21 +96,19 @@ const storeColumns = (direction, columns) => {
  * When a download was asked for, or finished.
  *
  * Blank rather than guessed: `timingOf` refuses an instant it cannot believe,
- * and says why in its own comment. The full date is the tooltip, since the
- * cell drops the year and, for anything today, the date.
+ * and says why in its own comment. `Timestamp` draws the rest, as it draws
+ * every date in the UI.
  * @param {object} params
  * @param {number|null} params.at - The instant, in ms.
  * @param {number} params.now - The present, in ms.
  * @returns {object} The cell.
  */
 const WhenCell = ({ at, now }) => (
-  <Table.Cell
-    className="flatlist-when"
-    title={at === null ? undefined : formatDate(at)}
-  >
-    {at !== null && (
-      <time dateTime={new Date(at).toISOString()}>{formatWhen(at, now)}</time>
-    )}
+  <Table.Cell className="flatlist-when">
+    <Timestamp
+      at={at}
+      now={now}
+    />
   </Table.Cell>
 );
 

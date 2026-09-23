@@ -1,5 +1,5 @@
-import { formatTime } from '../../../lib/util';
 import * as watchLibrary from '../../../lib/watches';
+import { Timestamp } from '../../Shared';
 import SearchStatusIcon from '../SearchStatusIcon';
 import SearchActionIcon from './SearchActionIcon';
 import React, { useState } from 'react';
@@ -60,7 +60,10 @@ const SearchListRow = ({ onRemove, onStop, search, watch = undefined }) => {
       </Table.Cell>
       <Table.Cell>{search.responseCount}</Table.Cell>
       <Table.Cell>
-        {search.endedAt ? formatTime(search.endedAt) : '-'}
+        <Timestamp
+          at={search.endedAt}
+          placeholder="-"
+        />
       </Table.Cell>
       <Table.Cell>
         <SearchActionIcon

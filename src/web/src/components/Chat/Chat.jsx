@@ -1,8 +1,8 @@
 import './Chat.css';
 import { activeChatKey } from '../../config';
 import * as chat from '../../lib/chat';
-import { formatDayTime } from '../../lib/util';
 import PlaceholderSegment from '../Shared/PlaceholderSegment';
+import Timestamp from '../Shared/Timestamp';
 import ChatMenu from './ChatMenu';
 import React, { Component, createRef } from 'react';
 import {
@@ -24,29 +24,27 @@ const initialState = {
   message: '',
 };
 
-const ChatMessageHistory = React.memo(
-  ({ formatTimestamp, messages, selfUsername }) => {
-    return (
-      <>
-        {messages.map((message) => (
-          <List.Content
-            className={`chat-message ${message.direction === 'Out' ? 'chat-message-self' : ''}`}
-            key={`${message.timestamp}+${message.message}`}
-          >
-            <span className="chat-message-time">
-              {formatTimestamp(message.timestamp)}
-            </span>
-            <span className="chat-message-name">
-              {message.direction === 'Out' ? selfUsername : message.username}:
-            </span>
-            <span className="chat-message-message">{message.message}</span>
-          </List.Content>
-        ))}
-        <List.Content id="chat-history-scroll-anchor" />
-      </>
-    );
-  },
-);
+const ChatMessageHistory = React.memo(({ messages, selfUsername }) => {
+  return (
+    <>
+      {messages.map((message) => (
+        <List.Content
+          className={`chat-message ${message.direction === 'Out' ? 'chat-message-self' : ''}`}
+          key={`${message.timestamp}+${message.message}`}
+        >
+          <span className="chat-message-time">
+            <Timestamp at={message.timestamp} />
+          </span>
+          <span className="chat-message-name">
+            {message.direction === 'Out' ? selfUsername : message.username}:
+          </span>
+          <span className="chat-message-message">{message.message}</span>
+        </List.Content>
+      ))}
+      <List.Content id="chat-history-scroll-anchor" />
+    </>
+  );
+});
 
 ChatMessageHistory.displayName = 'ChatMessageHistory';
 
@@ -164,8 +162,6 @@ class Chat extends Component {
     this.messageRef.current.focus();
   };
 
-  formatTimestamp = (timestamp) => formatDayTime(timestamp);
-
   selectConversation = (username) => {
     this.setState(
       (previousState) => ({
@@ -282,7 +278,6 @@ class Chat extends Component {
                       <Ref innerRef={this.listRef}>
                         <List>
                           <ChatMessageHistory
-                            formatTimestamp={this.formatTimestamp}
                             messages={messages}
                             selfUsername={user.username}
                           />

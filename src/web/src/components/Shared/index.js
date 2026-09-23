@@ -14,3 +14,4 @@ export { default as ShrinkableDropdownButton } from './ShrinkableDropdownButton'
 export { default as SortHint } from './SortHint';
 export { default as SortRank } from './SortRank';
 export { default as Switch } from './Switch';
+export { default as Timestamp } from './Timestamp';
