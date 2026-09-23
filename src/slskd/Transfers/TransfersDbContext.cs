@@ -75,6 +75,20 @@ namespace slskd.Transfers
 
         private void ConfigureTransfers(ModelBuilder modelBuilder)
         {
+            // SQLite has no date type and keeps no DateTimeKind, so every timestamp comes back Unspecified and is
+            // serialized without a zone -- which a browser reads as *local* time. every instant on a transfer is
+            // written as UTC, so every one of them is read back as UTC; covering some and not others leaves the
+            // API serving a mix, and the difference between two of them is then off by the reader's UTC offset.
+            modelBuilder
+                .Entity<Transfer>()
+                .Property(e => e.RequestedAt)
+                .HasConversion(v => v, v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
+
+            modelBuilder
+                .Entity<Transfer>()
+                .Property(e => e.EnqueuedAt)
+                .HasConversion(v => v, v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : null);
+
             modelBuilder
                 .Entity<Transfer>()
                 .Property(e => e.StartedAt)
@@ -83,6 +97,11 @@ namespace slskd.Transfers
             modelBuilder
                 .Entity<Transfer>()
                 .Property(e => e.EndedAt)
+                .HasConversion(v => v, v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : null);
+
+            modelBuilder
+                .Entity<Transfer>()
+                .Property(e => e.NextAttemptAt)
                 .HasConversion(v => v, v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : null);
 
             modelBuilder
