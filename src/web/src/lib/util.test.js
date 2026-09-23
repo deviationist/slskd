@@ -175,3 +175,48 @@ describe('date and time formatting', () => {
     );
   });
 });
+
+describe('formatDuration', () => {
+  it.each([
+    [0, '0s'],
+    [45, '45s'],
+    [45.9, '45s'],
+    [60, '1m 00s'],
+    [187, '3m 07s'],
+    [3_599, '59m 59s'],
+    [3_600, '1h 00m'],
+    [7_500, '2h 05m'],
+    [86_399, '23h 59m'],
+    [86_400, '1d 00h'],
+    [273_600, '3d 04h'],
+  ])('%s seconds is %s', (seconds, expected) => {
+    expect(utils.formatDuration(seconds)).toBe(expected);
+  });
+
+  it.each([
+    ['negative', -1],
+    ['not a number', Number.NaN],
+    ['missing', undefined],
+    ['null', null],
+  ])('is blank for a duration that is %s', (_, seconds) => {
+    expect(utils.formatDuration(seconds)).toBe('');
+  });
+});
+
+describe('formatWhen', () => {
+  // written without a zone, so they are the runner's local time -- which is
+  // what "today" is measured in
+  it('gives only the time for something that happened today', () => {
+    const now = Date.parse('2026-09-23T18:00:00');
+    const at = new Date('2026-09-23T14:02:33');
+
+    expect(utils.formatWhen(at, now)).toBe(utils.formatTime(at));
+  });
+
+  it('gives the day as well for anything earlier', () => {
+    const now = Date.parse('2026-09-23T00:05:00');
+    const at = new Date('2026-09-22T23:58:00');
+
+    expect(utils.formatWhen(at, now)).toBe(utils.formatDayTime(at));
+  });
+});

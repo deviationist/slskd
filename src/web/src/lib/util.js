@@ -190,6 +190,50 @@ export const formatDayMonth = (date) => {
   return new Date(date).toLocaleDateString(locale(), DAY_MONTH_OPTIONS);
 };
 
+/**
+ * An instant for a table cell, as short as it can be without being ambiguous:
+ * the time alone if it is today, the day and time if it is not.
+ *
+ * "Today" is the reader's local day. The full date belongs in the cell's
+ * tooltip (`formatDate`), since this form drops the year and the seconds.
+ * @param {number|string|Date} date - The instant.
+ * @param {number} now - The present, in ms.
+ * @returns {string} The instant, formatted.
+ */
+export const formatWhen = (date, now = Date.now()) => {
+  const at = new Date(date);
+
+  return at.toDateString() === new Date(now).toDateString()
+    ? formatTime(at)
+    : formatDayTime(at);
+};
+
+const pad = (n) => String(n).padStart(2, '0');
+
+/**
+ * A duration in whole seconds, in its two largest units: 45s, 3m 07s,
+ * 2h 05m, 3d 04h.
+ *
+ * Two units because a column of durations is read for magnitude -- a download
+ * that waited 3 minutes against one that waited 3 hours -- and the smaller
+ * unit is padded so the column reads evenly down the page.
+ * @param {number} seconds - The duration.
+ * @returns {string} The duration, formatted, or '' if it is not one.
+ */
+export const formatDuration = (seconds) => {
+  if (!Number.isFinite(seconds) || seconds < 0) return '';
+
+  const s = Math.floor(seconds);
+
+  if (s < 60) return `${s}s`;
+  if (s < 3_600) return `${Math.floor(s / 60)}m ${pad(s % 60)}s`;
+  if (s < 86_400) {
+    return `${Math.floor(s / 3_600)}h ${pad(Math.floor((s % 3_600) / 60))}m`;
+  }
+
+  return `${Math.floor(s / 86_400)}d ${pad(Math.floor((s % 86_400) / 3_600))}h`;
+};
+
 export const truncate = (text, maxLength) => {
   if (!text) return '';
   if (text.length <= maxLength) return text;
