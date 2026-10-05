@@ -1,3 +1,9 @@
 /*******************************
     User Variable Overrides
 *******************************/
+/* A field's label. Semantic gives it `@textColor`, a fixed rgba(0,0,0,.87),
+   rather than anything the theme patch reaches, so in dark it is black on the
+   dark modal -- "How often" on the watch dialog could not be read at all. The
+   body colour falls back to the same `@textColor` in light, so light is
+   unchanged. */
+@labelColor: @bodyTextColor;

@@ -8,3 +8,11 @@
 @hoveredItemBackground: var(--smui-menu-hovered-item-background, @transparentBlack);
 @hoveredItemColor: var(--smui-menu-hovered-item-color,@selectedTextColor);
 @selectedColor: var(--smui-menu-item-color, @selectedTextColor);
+
+/* A selection dropdown's chosen value. Its background is already
+   `@inputBackground`, which goes dark with the theme, while its text stays on
+   Semantic's fixed `@textColor` and `@hoveredTextColor` -- black text in a
+   black box, closed and open alike. Both follow the body colour instead, which
+   in light falls back to the same `@textColor`. */
+@selectionTextColor: @bodyTextColor;
+@selectionVisibleTextColor: @bodyTextColor;
