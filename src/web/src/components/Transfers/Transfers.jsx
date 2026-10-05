@@ -366,7 +366,11 @@ const Transfers = ({ direction, server }) => {
           onCancelAll={cancelAll}
           onPlaceInQueueRequested={placeInQueue}
           onRemoveAll={askThenRemoveAll}
-          onRemoveRequested={remove}
+          // the table hands over the row itself; `remove` takes it wrapped, as
+          // the card view's removeAll calls it. Passed bare, the destructure
+          // threw before the request was sent, outside the try that would have
+          // reported it -- so the button did nothing, silently
+          onRemoveRequested={(file) => remove({ file })}
           onRetryAll={retryAll}
           onRetryRequested={retry}
           retrievalEnabled={retrievalEnabled}
