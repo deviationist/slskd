@@ -176,6 +176,8 @@
 #         role: readonly # readonly, readwrite, administrator
 #         cidr: 0.0.0.0/0,::/0
 # searches:
+#   default_sort: size:desc # column:direction keys for the results table; blank keeps the peers' order
+#   default_filter: islossless # the filter box's starting contents
 #   watches:
 #     enabled: true
 #     minimum_interval: 60 # minutes; the shortest a watch may recur at

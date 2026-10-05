@@ -1177,6 +1177,28 @@ throttling:
       response_file_limit: 500 # maximum number of files to return in a single search response
 ```
 
+# Search Results
+
+How the web UI presents a search's results when it is opened. Presentation only: neither option changes what is searched for or what the peers send back.
+
+`default_sort` is the order the results **table** opens in, as one or more `column:direction` keys, most significant first. It is the same form the table writes to its own address when a column header is clicked, so a sort read off the address bar can be pasted here. The columns are `attributes`, `ext`, `length`, `name`, `path`, `queue`, `size`, `slot`, `speed` and `user`; a key without a direction is ascending. Blank keeps the order the peers answered in. A sort picked from the headers overrides it for that view, and clicking the sorted column round to *unsorted* reaches the peers' order without changing the setting. The grouped view sorts peers rather than files and is not affected.
+
+`default_filter` is what the filter box holds when a search is opened, in the box's own syntax -- `islossless`, `minbitrate:320`, `-live`. It applies to both views. It is a starting value rather than a rule: clearing or editing the box applies to the search on screen and changes nothing here.
+
+Both reach the UI over the application hub, so a change takes effect without a reload.
+
+| Command-Line              | Environment Variable          | Description                                                        |
+| ------------------------- | ----------------------------- | ------------------------------------------------------------------ |
+| `--search-default-sort`   | `SLSKD_SEARCH_DEFAULT_SORT`   | The order the results table opens in, as `column:direction` keys   |
+| `--search-default-filter` | `SLSKD_SEARCH_DEFAULT_FILTER` | The filter the search results open with                            |
+
+#### **YAML**
+```yaml
+searches:
+  default_sort: size:desc
+  default_filter: islossless
+```
+
 # Search Watches
 
 A **watch** turns a one-off search into a standing one: slskd re-runs it on a schedule and sends mail when a file
