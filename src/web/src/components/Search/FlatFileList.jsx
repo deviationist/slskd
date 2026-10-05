@@ -189,6 +189,23 @@ const storeColumns = (columns) => {
   }
 };
 
+/*
+ * The order a search opens in when the address names none: biggest first,
+ * because file size is the quickest read of lossless against lossy -- a FLAC,
+ * AIFF or WAV of a track is several times the MP3 of it -- and that is the
+ * first thing an operator looks for in a page of results.
+ *
+ * Only when the `sort` parameter is *absent*. Turning the last sorted column
+ * off writes it present and empty, so the unsorted order (as the peers
+ * answered) stays reachable instead of the default springing straight back.
+ */
+const DEFAULT_SORT = [{ column: 'size', direction: 'desc' }];
+
+const sortOf = (search) =>
+  new URLSearchParams(search).has('sort')
+    ? sortFromQuery(search, SORT_COLUMNS)
+    : DEFAULT_SORT;
+
 const FlatFileList = ({
   disabled,
   downloads,
@@ -215,10 +232,7 @@ const FlatFileList = ({
   // memoised on the query string rather than rebuilt per render: it is the
   // dependency the sorted rows are memoised on, and a fresh array every render
   // would sort the whole list every render
-  const sort = useMemo(
-    () => sortFromQuery(location.search, SORT_COLUMNS),
-    [location.search],
-  );
+  const sort = useMemo(() => sortOf(location.search), [location.search]);
 
   const rows = useMemo(
     () => sortRows({ columns: SORT_COLUMNS, rows: unsorted, sort }),
@@ -228,9 +242,13 @@ const FlatFileList = ({
   const sortBy = (key, append) => {
     const next = nextSort({ append, column: key, sort });
 
+    const search = sortToQuery({ search: location.search, sort: next });
+
     history.replace({
       pathname: location.pathname,
-      search: sortToQuery({ search: location.search, sort: next }),
+      // sortToQuery drops an empty sort, which here would read as "use the
+      // default" rather than "unsorted"
+      search: next.length > 0 ? search : `${search ? `${search}&` : '?'}sort=`,
     });
   };
 
