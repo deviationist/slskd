@@ -1543,6 +1543,36 @@ namespace slskd
         public class SearchesOptions
         {
             /// <summary>
+            ///     Gets the order the web UI's table of search results opens in.
+            /// </summary>
+            /// <remarks>
+            ///     Presentation only. One or more <c>column:direction</c> keys, most significant first, in the form
+            ///     the table writes to its own address -- <c>size:desc</c>, or <c>ext:asc,size:desc</c>. Blank keeps
+            ///     the order the peers answered in. A sort picked from the column headers overrides it for that
+            ///     view, since it is written to the address.
+            /// </remarks>
+            [Argument(default, "search-default-sort")]
+            [EnvironmentVariable("SEARCH_DEFAULT_SORT")]
+            [Description("the order the web UI's table of search results opens in, as column:direction keys")]
+            [RegularExpression(
+                @"^((attributes|ext|length|name|path|queue|size|slot|speed|user)(:(asc|desc))?(,(?!$)|$))*$",
+                ErrorMessage = "must be comma-separated column:direction keys, e.g. size:desc")]
+            public string DefaultSort { get; init; } = string.Empty;
+
+            /// <summary>
+            ///     Gets the filter the web UI's search results open with.
+            /// </summary>
+            /// <remarks>
+            ///     The filter box's own syntax (<c>islossless</c>, <c>minbitrate:320</c>, a word to exclude with
+            ///     <c>-</c>), filled in when a search is opened. It is a starting value rather than a rule: clearing
+            ///     or editing the box applies to the search on screen.
+            /// </remarks>
+            [Argument(default, "search-default-filter")]
+            [EnvironmentVariable("SEARCH_DEFAULT_FILTER")]
+            [Description("the filter the web UI's search results open with")]
+            public string DefaultFilter { get; init; } = string.Empty;
+
+            /// <summary>
             ///     Gets search watch options.
             /// </summary>
             [Validate]

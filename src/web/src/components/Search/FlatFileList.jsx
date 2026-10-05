@@ -122,6 +122,7 @@ const RowAction = ({ action, busy, disabled, onDownload, onRetrieve }) => (
  * rebuilt whenever a filter changes, so a flag written onto a row would be
  * lost with it; a key survives, because it names the file rather than the row.
  * @param {object} params
+ * @param {string} [params.defaultSort] - `searches.default_sort`, the order to open in when the address names none.
  * @param {boolean} params.disabled - Whether the search is in a state that forbids downloading.
  * @param {object[]} params.rows - Flattened, already-filtered results.
  * @returns {object} The list.
@@ -190,23 +191,22 @@ const storeColumns = (columns) => {
 };
 
 /*
- * The order a search opens in when the address names none: biggest first,
- * because file size is the quickest read of lossless against lossy -- a FLAC,
- * AIFF or WAV of a track is several times the MP3 of it -- and that is the
- * first thing an operator looks for in a page of results.
+ * The order the table opens in when the address names none, from
+ * `searches.default_sort` -- written in the address's own `column:direction`
+ * form, so it is read the same way and unknown columns are dropped the same
+ * way.
  *
  * Only when the `sort` parameter is *absent*. Turning the last sorted column
  * off writes it present and empty, so the unsorted order (as the peers
  * answered) stays reachable instead of the default springing straight back.
  */
-const DEFAULT_SORT = [{ column: 'size', direction: 'desc' }];
-
-const sortOf = (search) =>
+const sortOf = (search, defaultSort) =>
   new URLSearchParams(search).has('sort')
     ? sortFromQuery(search, SORT_COLUMNS)
-    : DEFAULT_SORT;
+    : sortFromQuery(`?sort=${defaultSort ?? ''}`, SORT_COLUMNS);
 
 const FlatFileList = ({
+  defaultSort,
   disabled,
   downloads,
   filterQuery,
@@ -232,7 +232,10 @@ const FlatFileList = ({
   // memoised on the query string rather than rebuilt per render: it is the
   // dependency the sorted rows are memoised on, and a fresh array every render
   // would sort the whole list every render
-  const sort = useMemo(() => sortOf(location.search), [location.search]);
+  const sort = useMemo(
+    () => sortOf(location.search, defaultSort),
+    [defaultSort, location.search],
+  );
 
   const rows = useMemo(
     () => sortRows({ columns: SORT_COLUMNS, rows: unsorted, sort }),

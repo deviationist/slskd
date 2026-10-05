@@ -283,6 +283,22 @@ const SearchOptions = ({
   </Segment>
 );
 
+/**
+ * The filter box's contents, starting from `searches.default_filter`.
+ *
+ * Undefined until the box is touched, so that until then it follows the
+ * default -- which arrives over the options hub, after the first render. Once
+ * edited, even to empty, the edit is what applies: clearing a default filter
+ * has to stay cleared.
+ * @param {string} [defaultFilter] - The configured starting filter.
+ * @returns {Array} The filter in force, and its setter.
+ */
+const useResultFilters = (defaultFilter) => {
+  const [edited, setEdited] = useState(undefined);
+
+  return [edited ?? defaultFilter ?? '', setEdited];
+};
+
 const SearchDetail = ({
   creating,
   disabled,
@@ -324,7 +340,9 @@ const SearchDetail = ({
   const [foldResults, setFoldResults] = useState(false);
   const [flatResults, setFlatResults] = useState(readStoredFlat);
   const downloads = useDownloads(flatResults);
-  const [resultFilters, setResultFilters] = useState('');
+  const [resultFilters, setResultFilters] = useResultFilters(
+    options?.searches?.defaultFilter,
+  );
   const [displayCount, setDisplayCount] = useState(5);
 
   // when the search transitions from !isComplete -> isComplete,
@@ -507,6 +525,7 @@ const SearchDetail = ({
         )}
         {loaded && flatResults && (
           <FlatFileList
+            defaultSort={options?.searches?.defaultSort}
             disabled={disabled}
             downloads={downloads}
             filterQuery={resultFilters}
