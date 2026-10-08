@@ -18,3 +18,10 @@
 
 @toggleOffLabelColor: var(--slskd-color-subtle, @checkboxColor);
 @toggleOnLabelColor: var(--smui-input-focus-color, @selectedTextColor);
+
+/* An unticked box being pressed or holding focus. Semantic swaps its
+   background for a fixed `@offWhite` / `@white`, so in dark mode the box just
+   clicked became a white square among dark ones until focus moved on. Both
+   keep the box's own background, which in light is that same white. */
+@checkboxPressedBackground: var(--slskd-color-subtle, @offWhite);
+@checkboxFocusBackground: var(--slskd-color-subtle, @white);
