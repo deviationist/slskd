@@ -4,6 +4,15 @@
 
 @checkboxColor: var(--smui-input-focus-color, @textColor);
 @labelColor: var(--smui-label-color, @textColor);
+
+/* A label being hovered, pressed, and one just clicked. Semantic gives these
+   its fixed `@hoveredTextColor` and `@selectedTextColor` -- near-black -- which
+   the theme never redirected, so in dark mode a checkbox's label vanished under
+   the pointer and stayed gone once ticked. They follow the label colour
+   instead, with Semantic's own values as the fallback so light is unchanged. */
+@labelHoverColor: var(--smui-label-color, @hoveredTextColor);
+@labelPressedColor: var(--smui-label-color, @selectedTextColor);
+@labelFocusColor: var(--smui-label-color, @selectedTextColor);
 @checkboxBackground: var(--slskd-color-subtle, @white);
 @checkboxBorder: var(--smui-button-border, 1px solid @solidBorderColor);
 
