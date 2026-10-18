@@ -7,6 +7,7 @@ export { default as ErrorSegment } from './ErrorSegment';
 export { default as FileList } from './FileList';
 export { default as Graph, useDarkMode } from './Graph';
 export { default as LoaderSegment } from './LoaderSegment';
+export { default as MeasuredRow } from './MeasuredRow';
 export { default as Nbsp } from './Nbsp';
 export { default as PlaceholderSegment } from './PlaceholderSegment';
 export { default as ShrinkableButton } from './ShrinkableButton';
