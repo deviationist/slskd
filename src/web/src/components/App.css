@@ -384,10 +384,10 @@ body {
 /* The flat list: one row per file, with the peer as a column. Widths mirror
    the grouped view's file list so the two read the same, plus a user column
    wide enough for a Soulseek username without pushing the filename out. */
-/* One line, truncated. The virtualiser positions rows by arithmetic rather
-   than by measuring them, so a wrapped filename would make its row two lines
-   tall and put every row below it in the wrong place. The full remote path is
-   in the cell's title. Keep in step with ROW_H in FlatFileList.jsx. */
+/* One line, truncated. The virtualiser measures rows but starts from ROW_H,
+   so a wrapped filename would make its row two lines tall and shift the list
+   as it is measured. The full remote path is in the cell's title. Keep in
+   step with ROW_H in FlatFileList.jsx. */
 .flatlist tbody td {
     height: 37px;
     overflow: hidden;

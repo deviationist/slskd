@@ -30,7 +30,13 @@ import {
   offsetWithin,
   scrollParentOf,
 } from '../../lib/util';
-import { ColumnPicker, EmptyTableRow, SortHint, SortRank } from '../Shared';
+import {
+  ColumnPicker,
+  EmptyTableRow,
+  MeasuredRow,
+  SortHint,
+  SortRank,
+} from '../Shared';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -48,12 +54,12 @@ import {
 /**
  * The height of a row, in px, and the reason the filename column is one line.
  *
- * The virtualiser positions rows by arithmetic rather than by measuring them,
- * so they have to agree on a height. A wrapped filename would make its row two
- * lines tall and every row below it land in the wrong place -- so the column
- * truncates instead, with the full remote path in the cell's title where it
- * was already. Measuring each row is the alternative, and it buys wrapping at
- * the cost of the list shifting under the pointer as rows are measured.
+ * Rows are measured, but from this estimate, and a row that measures
+ * differently shifts the list under the pointer as it is measured. A wrapped
+ * filename would do that to every two-line row -- so the column truncates
+ * instead, with the full remote path in the cell's title where it was already.
+ * The one row allowed to differ is the one media-bridge opens an analysis
+ * panel in, and that was asked for.
  *
  * Must match `.flatlist tbody td` in App.css. Changing one without the other
  * is a drift the eye catches only at the bottom of a long list.
@@ -314,9 +320,19 @@ const FlatFileList = ({
     setFooterSlot(document.querySelector('#footer-action-slot'));
   }, []);
 
+  /*
+   * Rows are measured, not assumed. Every row of ours is ROW_H tall, so the
+   * estimate is right and measuring moves nothing -- but media-bridge opens an
+   * analysis panel *inside* a row, making that one row hundreds of pixels
+   * taller. Positioned by arithmetic, the rows below it sat that far from where
+   * the virtualiser thought, and the panel's row left the window early and came
+   * back late. Keyed by the row rather than its index, so a measured height
+   * follows its row through a re-sort instead of staying at the position.
+   */
   const virtualizer = useVirtualizer({
     count: rows.length,
     estimateSize: () => ROW_H,
+    getItemKey: (index) => rows[index].key,
     getScrollElement: () => scroller,
     overscan: 15,
     scrollMargin,
@@ -662,6 +678,7 @@ const FlatFileList = ({
               return (
                 <Table.Row
                   active={mark?.row === 'active'}
+                  as={MeasuredRow}
                   /*
                    * The row's identity, for the scripts media-bridge injects
                    * into this page. They used to read the peer and the folder
@@ -670,8 +687,10 @@ const FlatFileList = ({
                    * attaches to a file it cannot name.
                    */
                   data-filename={row.filename}
+                  data-index={virtual.index}
                   data-username={row.username}
                   key={row.key}
+                  measureRef={virtualizer.measureElement}
                   positive={mark?.row === 'positive'}
                   warning={mark?.row === 'warning'}
                 >

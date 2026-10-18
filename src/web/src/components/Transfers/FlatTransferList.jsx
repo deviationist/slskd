@@ -25,6 +25,7 @@ import {
 import {
   ColumnPicker,
   EmptyTableRow,
+  MeasuredRow,
   SortHint,
   SortRank,
   Timestamp,
@@ -54,9 +55,9 @@ import {
 /**
  * The height of a row, in px.
  *
- * Must match `.flatlist tbody td` in App.css, as on the searches page: the
- * virtualiser positions rows by arithmetic rather than by measuring them, so a
- * row taller than this puts every row below it in the wrong place.
+ * Must match `.flatlist tbody td` in App.css, as on the searches page. Rows are
+ * measured, but this is the estimate every row starts from, and one that is
+ * wrong makes the list shift under the pointer as rows are measured.
  */
 const ROW_H = 37;
 
@@ -434,9 +435,19 @@ const FlatTransferList = ({
     setFooterSlot(document.querySelector('#footer-action-slot'));
   }, []);
 
+  /*
+   * Rows are measured, not assumed. Every row of ours is ROW_H tall, so the
+   * estimate is right and measuring moves nothing -- but media-bridge opens an
+   * analysis panel *inside* a row, making that one row hundreds of pixels
+   * taller. Positioned by arithmetic, the rows below it sat that far from where
+   * the virtualiser thought, and the panel's row left the window early and came
+   * back late. Keyed by the row rather than its index, so a measured height
+   * follows its row through a re-sort instead of staying at the position.
+   */
   const virtualizer = useVirtualizer({
     count: rows.length,
     estimateSize: () => ROW_H,
+    getItemKey: (index) => rows[index].key,
     getScrollElement: () => scroller,
     overscan: 15,
     scrollMargin,
@@ -884,6 +895,7 @@ const FlatTransferList = ({
 
               return (
                 <Table.Row
+                  as={MeasuredRow}
                   /*
                    * The row's identity, for the scripts media-bridge injects
                    * into this page. They used to read the peer and the folder
@@ -892,6 +904,7 @@ const FlatTransferList = ({
                    * attaches to a file it cannot name.
                    */
                   data-filename={row.filename}
+                  data-index={virtual.index}
                   /*
                    * The state too, for the same reason: media-bridge decides
                    * from it whether a row can be sent into the ingress chain,
@@ -901,6 +914,7 @@ const FlatTransferList = ({
                   data-state={row.state}
                   data-username={row.username}
                   key={row.key}
+                  measureRef={virtualizer.measureElement}
                 >
                   <Table.Cell className="flatlist-selector">
                     <Checkbox
