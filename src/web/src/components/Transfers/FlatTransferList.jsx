@@ -151,6 +151,24 @@ const speedText = (row) => {
 
 const TIMING_COLUMNS = new Set(['finished', 'requested', 'took', 'waited']);
 
+/*
+ * The columns whose cell is nothing but a line of text, and what the text is.
+ * Out of the switch in `cell` because each case there was the same eleven
+ * lines with one expression changed, and the switch was at the linter's
+ * complexity ceiling with nothing complicated in it.
+ */
+const TEXT_COLUMNS = {
+  attempts: (row) => row.attempts,
+  ext: (row) => getFileExtension(row.filename),
+
+  // null until the server has read the file, and for one that is not audio --
+  // formatSeconds would draw either as 00:00
+  length: (row) =>
+    Number.isFinite(row.length) ? formatSeconds(row.length) : '',
+  size: (row) => formatBytes(row.size),
+  speed: speedText,
+};
+
 /**
  * The cell for one of the four timing columns.
  * @param {object} params
@@ -573,6 +591,17 @@ const FlatTransferList = ({
       return timingCell({ key, now, row });
     }
 
+    if (Object.hasOwn(TEXT_COLUMNS, key)) {
+      return (
+        <Table.Cell
+          className={`flatlist-${key}`}
+          key={key}
+        >
+          {TEXT_COLUMNS[key](row)}
+        </Table.Cell>
+      );
+    }
+
     switch (key) {
       case 'name': {
         return (
@@ -584,17 +613,6 @@ const FlatTransferList = ({
             <div className="flatlist-cell">
               <span className="flatlist-name">{getFileName(row.filename)}</span>
             </div>
-          </Table.Cell>
-        );
-      }
-
-      case 'ext': {
-        return (
-          <Table.Cell
-            className="flatlist-ext"
-            key={key}
-          >
-            {getFileExtension(row.filename)}
           </Table.Cell>
         );
       }
@@ -693,52 +711,6 @@ const FlatTransferList = ({
                 {row.placeInQueue ? ` (#${row.placeInQueue})` : ''}
               </Button>
             )}
-          </Table.Cell>
-        );
-      }
-
-      case 'size': {
-        return (
-          <Table.Cell
-            className="flatlist-size"
-            key={key}
-          >
-            {formatBytes(row.size)}
-          </Table.Cell>
-        );
-      }
-
-      case 'length': {
-        // null until the server has read the file, and for one that is not
-        // audio -- formatSeconds would draw either as 00:00
-        return (
-          <Table.Cell
-            className="flatlist-length"
-            key={key}
-          >
-            {Number.isFinite(row.length) ? formatSeconds(row.length) : ''}
-          </Table.Cell>
-        );
-      }
-
-      case 'speed': {
-        return (
-          <Table.Cell
-            className="flatlist-speed"
-            key={key}
-          >
-            {speedText(row)}
-          </Table.Cell>
-        );
-      }
-
-      case 'attempts': {
-        return (
-          <Table.Cell
-            className="flatlist-attempts"
-            key={key}
-          >
-            {row.attempts}
           </Table.Cell>
         );
       }
