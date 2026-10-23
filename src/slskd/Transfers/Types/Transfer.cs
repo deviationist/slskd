@@ -193,6 +193,19 @@ public class Transfer
     public bool? LocalFileExists { get; set; }
 
     /// <summary>
+    ///     Gets or sets how long the audio in the file this download produced plays for, in whole seconds, or null
+    ///     where that is not known.
+    /// </summary>
+    /// <remarks>
+    ///     Not persisted: it is read from the file, and only once the file is complete and still there. Null for a
+    ///     file that is not audio, and for one not measured yet -- the measurement runs in the background, so a
+    ///     download that has just finished gains its length a poll or two later. See
+    ///     <see cref="DownloadFileDuration"/>.
+    /// </remarks>
+    [NotMapped]
+    public int? Length { get; set; }
+
+    /// <summary>
     ///     Gets or sets the <see cref="slskd.Search.Search.Id"/> this download was started from, or null where
     ///     it did not come from a search.
     /// </summary>

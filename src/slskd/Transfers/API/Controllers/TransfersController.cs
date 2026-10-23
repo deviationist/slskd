@@ -71,6 +71,7 @@ namespace slskd.Transfers.API
         /// <param name="fileService"></param>
         /// <param name="downloadTicketService"></param>
         /// <param name="downloadFileAvailability"></param>
+        /// <param name="downloadFileDuration"></param>
         /// <param name="searchExistence"></param>
         public TransfersController(
             TransferService transferService,
@@ -78,6 +79,7 @@ namespace slskd.Transfers.API
             FileService fileService,
             DownloadTicketService downloadTicketService,
             DownloadFileAvailability downloadFileAvailability,
+            DownloadFileDuration downloadFileDuration,
             slskd.Search.SearchExistence searchExistence,
             IOptionsSnapshot<Options> optionsSnapshot)
         {
@@ -86,6 +88,7 @@ namespace slskd.Transfers.API
             Files = fileService;
             Tickets = downloadTicketService;
             FileAvailability = downloadFileAvailability;
+            FileDuration = downloadFileDuration;
             SearchExistence = searchExistence;
             OptionsSnapshot = optionsSnapshot;
         }
@@ -112,6 +115,7 @@ namespace slskd.Transfers.API
         private FileService Files { get; }
         private DownloadTicketService Tickets { get; }
         private DownloadFileAvailability FileAvailability { get; }
+        private DownloadFileDuration FileDuration { get; }
         private slskd.Search.SearchExistence SearchExistence { get; }
         private IOptionsSnapshot<Options> OptionsSnapshot { get; }
         private ILogger Log { get; set; } = Serilog.Log.ForContext<TransfersController>();
@@ -1515,9 +1519,9 @@ namespace slskd.Transfers.API
         ///     Fills in the fields a download record cannot answer for itself.
         /// </summary>
         /// <remarks>
-        ///     Both are questions about the world rather than about the record, and both are asked of a cache: see
-        ///     <see cref="DownloadFileAvailability"/> and <see cref="slskd.Search.SearchExistence"/> for why neither
-        ///     is a lookup per row per poll.
+        ///     All are questions about the world rather than about the record, and all are asked of a cache: see
+        ///     <see cref="DownloadFileAvailability"/>, <see cref="DownloadFileDuration"/> and
+        ///     <see cref="slskd.Search.SearchExistence"/> for why none is a lookup per row per poll.
         ///
         ///     Here rather than in the service that lists them, for the same reason `LocalFileExists` was: they are
         ///     not persisted, they are not derivable from anything that is, and nothing but a caller drawing a list
@@ -1534,6 +1538,13 @@ namespace slskd.Transfers.API
                 if (download.State.HasFlag(TransferStates.Completed) && download.State.HasFlag(TransferStates.Succeeded))
                 {
                     download.LocalFileExists = FileAvailability.Exists(download.LocalFilename);
+
+                    // only of a file that is there: a length for a file that has gone is a fact about nothing
+                    // anyone can play, and asking would open a path that can only fail
+                    if (download.LocalFileExists == true)
+                    {
+                        download.Length = FileDuration.Of(download.LocalFilename, download.Size);
+                    }
                 }
 
                 /*

@@ -17,6 +17,7 @@ import { userPath } from '../../lib/users';
 import {
   formatBytes,
   formatDuration,
+  formatSeconds,
   getFileExtension,
   getFileName,
   offsetWithin,
@@ -703,6 +704,19 @@ const FlatTransferList = ({
             key={key}
           >
             {formatBytes(row.size)}
+          </Table.Cell>
+        );
+      }
+
+      case 'length': {
+        // null until the server has read the file, and for one that is not
+        // audio -- formatSeconds would draw either as 00:00
+        return (
+          <Table.Cell
+            className="flatlist-length"
+            key={key}
+          >
+            {Number.isFinite(row.length) ? formatSeconds(row.length) : ''}
           </Table.Cell>
         );
       }
