@@ -1512,6 +1512,17 @@ describe('downloads from the same search', () => {
     ).toBe(transfers.searchGroupOf({ searchId: 'b', searchText: 'Free Love' }));
   });
 
+  it('group a pasted phrase with the typed one', () => {
+    // a left-to-right mark, and a doubled space, from a title copied off a store page
+    expect(
+      transfers.searchGroupOf({
+        searchText: 'Sleepfreaks \u200EChemical  Shift',
+      }),
+    ).toBe(
+      transfers.searchGroupOf({ searchText: 'Sleepfreaks Chemical Shift' }),
+    );
+  });
+
   it('are not a group when they came from no search', () => {
     expect(transfers.searchGroupOf({})).toBeNull();
     expect(transfers.searchGroupOf({ searchText: null })).toBeNull();

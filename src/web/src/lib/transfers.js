@@ -1150,12 +1150,17 @@ export const filterTransfers = ({ users = [], query = '' }) => {
  * one track that phrase names; and once a search is deleted the API drops its
  * id and keeps its text, so the id would split a group the moment it was
  * tidied away. Compared trimmed and without case, since that is how the same
- * phrase gets typed twice.
+ * phrase gets typed twice -- and without invisible formatting characters, since
+ * that is how it gets *pasted* twice: a title copied from a store page carries
+ * a left-to-right mark between its words often enough that two searches here
+ * for 'Sleepfreaks Chemical Shift' differed by nothing anyone could see.
  * @param {object} row - The transfer.
  * @returns {string|null} The group, or null.
  */
 export const searchGroupOf = (row) => {
   const text = String(row?.searchText ?? '')
+    .replaceAll(/\p{Cf}/gu, '')
+    .replaceAll(/\s+/gu, ' ')
     .trim()
     .toLowerCase();
 
