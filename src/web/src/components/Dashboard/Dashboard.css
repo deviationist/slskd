@@ -38,4 +38,14 @@
     .dashboard .ui.table td {
         overflow-wrap: anywhere;
     }
+
+    /* the Users tab's two tables sit in a stackable grid, whose columns bring
+       their own side padding -- a fourth inset on top of the page, the card and
+       the tab pane, which on a phone put the tables visibly further in than
+       everything above them. Stacked, the columns no longer need a gutter
+       between them, so the pane's own padding is the only one kept. */
+    .dashboard .ui.tab.segment > .ui.stackable.grid > .column {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
 }
