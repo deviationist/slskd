@@ -222,14 +222,7 @@ const HistoricalStatistics = ({
       {loading && <LoaderSegment />}
       {!loading && (
         <>
-          <div
-            style={{
-              alignItems: 'center',
-              display: 'flex',
-              justifyContent: 'space-between',
-              marginBottom: '1em',
-            }}
-          >
+          <div className="history-header">
             <Header
               as="h4"
               style={{ margin: 0 }}

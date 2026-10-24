@@ -99,8 +99,20 @@
   }
 }
 
+/* The rest of the row after the icon, rather than 100% of it beside the icon:
+   at 100% the input and its buttons were the icon's width too wide, which on a
+   desktop vanished into the segment's padding and on a phone cut the search
+   button in half. */
 .search-input {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
+}
+
+@media only screen and (max-width: 767px) {
+  /* decoration, and 40px a phone needs for the buttons */
+  .search-segment-icon {
+    display: none;
+  }
 }
 
 .ui.search-input > input {

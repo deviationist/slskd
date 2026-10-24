@@ -1344,3 +1344,18 @@ time {
         min-height: 56px;
     }
 }
+
+/* A tab strip wider than a phone scrolls sideways rather than running off the
+   edge: System's seven tabs reach 719px at 390. Chat and Rooms already do
+   this for their own strips. */
+@media only screen and (max-width: 767px), only screen and (max-height: 500px) and (orientation: landscape) {
+    .ui.tabular.menu {
+        overflow-x: auto;
+        overflow-y: hidden;
+        scrollbar-width: none;
+    }
+
+    .ui.tabular.menu > .item {
+        flex-shrink: 0;
+    }
+}
