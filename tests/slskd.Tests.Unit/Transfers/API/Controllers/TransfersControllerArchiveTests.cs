@@ -374,6 +374,7 @@ using Moq;
                 fileService: FileService,
                 downloadTicketService: tickets ?? Tickets,
                 downloadFileAvailability: new DownloadFileAvailability(),
+                downloadFileDuration: new DownloadFileDuration(),
 
                 // never consulted by anything these tests call: a transfer with no SearchId is never asked about
                 searchExistence: new slskd.Search.SearchExistence(

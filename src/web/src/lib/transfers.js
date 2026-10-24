@@ -1019,6 +1019,15 @@ export const TRANSFER_COLUMNS = [
   },
   { key: 'state', label: 'Progress', className: 'flatlist-progress' },
   { key: 'size', label: 'Size', className: 'flatlist-size' },
+
+  // read from the finished file, so blank for one still arriving, for one
+  // that is not audio, and for a poll or two after a download completes
+  {
+    key: 'length',
+    label: 'Length',
+    className: 'flatlist-length',
+    optional: true,
+  },
   { key: 'speed', label: 'Speed', className: 'flatlist-speed', optional: true },
   {
     key: 'attempts',
@@ -1066,6 +1075,7 @@ export const TRANSFER_COLUMNS = [
 export const TRANSFER_SORT_COLUMNS = {
   attempts: { kind: 'number', of: (row) => row.attempts },
   ext: { kind: 'text', of: (row) => getFileExtension(row.filename ?? '') },
+  length: { kind: 'number', of: (row) => row.length },
   name: { kind: 'text', of: (row) => getFileName(row.filename ?? '') },
   path: { kind: 'text', of: (row) => row.directory },
   search: { kind: 'text', of: (row) => row.searchText },
@@ -1140,3 +1150,61 @@ export const filterTransfers = ({ users = [], query = '' }) => {
     }))
     .filter((user) => user.directories.length > 0);
 };
+
+/**
+ * The search a download came from, as something two downloads can share, or
+ * null where it came from none.
+ *
+ * The search's *text*, not its id. A phrase searched again is a new search
+ * with a new id, and the downloads from both are still the candidates for the
+ * one track that phrase names; and once a search is deleted the API drops its
+ * id and keeps its text, so the id would split a group the moment it was
+ * tidied away. Compared trimmed and without case, since that is how the same
+ * phrase gets typed twice -- and without invisible formatting characters, since
+ * that is how it gets *pasted* twice: a title copied from a store page carries
+ * a left-to-right mark between its words often enough that two searches here
+ * for 'Sleepfreaks Chemical Shift' differed by nothing anyone could see.
+ * @param {object} row - The transfer.
+ * @returns {string|null} The group, or null.
+ */
+export const searchGroupOf = (row) => {
+  const text = String(row?.searchText ?? '')
+    .replaceAll(/\p{Cf}/gu, '')
+    .replaceAll(/\s+/gu, ' ')
+    .trim()
+    .toLowerCase();
+
+  return text === '' ? null : text;
+};
+
+/**
+ * The rows, gathered by the search each came from.
+ *
+ * Built once per list rather than asked per row: every row wants to know how
+ * many others share its search, and the list is redrawn once a second.
+ * @param {object[]} rows - The rows, each carrying its `key`.
+ * @returns {Map<string, string[]>} Each search's group, and the keys of its rows in the order given.
+ */
+export const groupBySearch = (rows = []) => {
+  const groups = new Map();
+
+  for (const row of rows) {
+    const group = searchGroupOf(row);
+
+    if (group !== null) {
+      groups.set(group, [...(groups.get(group) ?? []), row.key]);
+    }
+  }
+
+  return groups;
+};
+
+/**
+ * What the control selecting a search's downloads says it will do.
+ * @param {object} params
+ * @param {number} params.count - How many downloads it would select.
+ * @param {string} params.text - The search, as it was typed.
+ * @returns {string} The tooltip.
+ */
+export const describeSelectSearch = ({ count, text }) =>
+  `Select the ${count} downloads from '${text}', in place of whatever is selected now`;

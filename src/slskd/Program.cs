@@ -802,6 +802,7 @@ namespace slskd
             services.AddSingleton<FileService>();
             services.AddSingleton<DownloadTicketService>();
             services.AddSingleton<DownloadFileAvailability>();
+            services.AddSingleton<DownloadFileDuration>();
             services.AddSingleton<slskd.Search.SearchExistence>();
 
             services.AddSingleton<IRelayService, RelayService>();
@@ -1089,6 +1090,10 @@ namespace slskd
             // this is necessary because SPA routers (like React Router) mess with the browser's current address
             app.UseHTMLRewrite("((\\.)?\\/static)", $"{(urlBase == "/" ? string.Empty : urlBase)}/static");
             app.UseHTMLRewrite("((\\.)?\\/favicon\\.ico)", $"{(urlBase == "/" ? string.Empty : urlBase)}/favicon.ico");
+
+            // the same for the web app manifest and its icons, which live together under ./pwa: the manifest resolves
+            // its own icons and start_url relative to itself, so only the links into the folder need rewriting
+            app.UseHTMLRewrite("((\\.)?\\/pwa\\/)", $"{(urlBase == "/" ? string.Empty : urlBase)}/pwa/");
 
             // inject urlBase and port into any html files we serve as a window-scoped javascript variable
             app.UseHTMLInjection($"<script>window.urlBase=\"{urlBase}\";window.port={OptionsAtStartup.Web.Port}</script>", excludedRoutes: new[] { "/api", "/swagger" });

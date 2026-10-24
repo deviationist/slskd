@@ -17,6 +17,7 @@ import { userPath } from '../../lib/users';
 import {
   formatBytes,
   formatDuration,
+  formatSeconds,
   getFileExtension,
   getFileName,
   offsetWithin,
@@ -149,6 +150,24 @@ const speedText = (row) => {
 };
 
 const TIMING_COLUMNS = new Set(['finished', 'requested', 'took', 'waited']);
+
+/*
+ * The columns whose cell is nothing but a line of text, and what the text is.
+ * Out of the switch in `cell` because each case there was the same eleven
+ * lines with one expression changed, and the switch was at the linter's
+ * complexity ceiling with nothing complicated in it.
+ */
+const TEXT_COLUMNS = {
+  attempts: (row) => row.attempts,
+  ext: (row) => getFileExtension(row.filename),
+
+  // null until the server has read the file, and for one that is not audio --
+  // formatSeconds would draw either as 00:00
+  length: (row) =>
+    Number.isFinite(row.length) ? formatSeconds(row.length) : '',
+  size: (row) => formatBytes(row.size),
+  speed: speedText,
+};
 
 /**
  * The cell for one of the four timing columns.
@@ -470,6 +489,27 @@ const FlatTransferList = ({
   );
   const selection = selectionState({ rows, selected });
 
+  // the rows as shown, so a filter in force narrows a search's group with
+  // everything else rather than reaching past it to rows nobody can see
+  const searchGroups = useMemo(
+    () => transfersLibrary.groupBySearch(rows),
+    [rows],
+  );
+
+  /*
+   * Selects everything that came from a row's search, in place of the
+   * selection there was. The point is the cleanup after auditioning: of the
+   * three candidates a search produced, the keeper goes to ingress and the
+   * rest go -- and they are scattered through the list by any sort that is not
+   * on the Search column, which is most of them. Replacing rather than adding
+   * is what makes the Remove that follows safe: a selection that silently kept
+   * whatever was ticked before would delete that too.
+   */
+  const selectSearch = (keys) => {
+    setAnchor(undefined);
+    setSelected(new Set(keys));
+  };
+
   /*
    * A click ticks one box; a shift-click takes everything between it and the
    * last box clicked without shift, as a file manager does.
@@ -572,6 +612,17 @@ const FlatTransferList = ({
       return timingCell({ key, now, row });
     }
 
+    if (Object.hasOwn(TEXT_COLUMNS, key)) {
+      return (
+        <Table.Cell
+          className={`flatlist-${key}`}
+          key={key}
+        >
+          {TEXT_COLUMNS[key](row)}
+        </Table.Cell>
+      );
+    }
+
     switch (key) {
       case 'name': {
         return (
@@ -583,17 +634,6 @@ const FlatTransferList = ({
             <div className="flatlist-cell">
               <span className="flatlist-name">{getFileName(row.filename)}</span>
             </div>
-          </Table.Cell>
-        );
-      }
-
-      case 'ext': {
-        return (
-          <Table.Cell
-            className="flatlist-ext"
-            key={key}
-          >
-            {getFileExtension(row.filename)}
           </Table.Cell>
         );
       }
@@ -692,39 +732,6 @@ const FlatTransferList = ({
                 {row.placeInQueue ? ` (#${row.placeInQueue})` : ''}
               </Button>
             )}
-          </Table.Cell>
-        );
-      }
-
-      case 'size': {
-        return (
-          <Table.Cell
-            className="flatlist-size"
-            key={key}
-          >
-            {formatBytes(row.size)}
-          </Table.Cell>
-        );
-      }
-
-      case 'speed': {
-        return (
-          <Table.Cell
-            className="flatlist-speed"
-            key={key}
-          >
-            {speedText(row)}
-          </Table.Cell>
-        );
-      }
-
-      case 'attempts': {
-        return (
-          <Table.Cell
-            className="flatlist-attempts"
-            key={key}
-          >
-            {row.attempts}
           </Table.Cell>
         );
       }
@@ -892,6 +899,9 @@ const FlatTransferList = ({
                 deleteFileOnRemoval,
                 file: row,
               });
+              const searchGroup = transfersLibrary.searchGroupOf(row);
+              const fromSameSearch =
+                searchGroup === null ? [] : searchGroups.get(searchGroup);
 
               return (
                 <Table.Row
@@ -928,6 +938,30 @@ const FlatTransferList = ({
                   {shown.map((col) => cell(row, col.key))}
                   <Table.Cell className="flatlist-actions">
                     <div className="flatlist-actions-row">
+                      {/*
+                       * Only where there is more than this row to select: a
+                       * search that produced one download has nothing to
+                       * gather, and the box beside the row already ticks it.
+                       */}
+                      {fromSameSearch.length > 1 && (
+                        <Popup
+                          content={transfersLibrary.describeSelectSearch({
+                            count: fromSameSearch.length,
+                            text: row.searchText,
+                          })}
+                          position="left center"
+                          trigger={
+                            <Icon
+                              className="flatlist-select-search"
+                              color="grey"
+                              link
+                              name="object group outline"
+                              onClick={() => selectSearch(fromSameSearch)}
+                              size="small"
+                            />
+                          }
+                        />
+                      )}
                       {retrievalEnabled && (
                         <>
                           {transfersLibrary.isFinishedDownload(row) &&
