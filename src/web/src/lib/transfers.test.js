@@ -1502,6 +1502,67 @@ describe('the timing columns', () => {
   });
 });
 
+describe('downloads from the same search', () => {
+  it('group on the text, ignoring case and the space around it', () => {
+    expect(transfers.searchGroupOf({ searchText: '  Free Love ' })).toBe(
+      'free love',
+    );
+    expect(
+      transfers.searchGroupOf({ searchId: 'a', searchText: 'free love' }),
+    ).toBe(transfers.searchGroupOf({ searchId: 'b', searchText: 'Free Love' }));
+  });
+
+  it('group a pasted phrase with the typed one', () => {
+    // a left-to-right mark, and a doubled space, from a title copied off a store page
+    expect(
+      transfers.searchGroupOf({
+        searchText: 'Sleepfreaks \u200EChemical  Shift',
+      }),
+    ).toBe(
+      transfers.searchGroupOf({ searchText: 'Sleepfreaks Chemical Shift' }),
+    );
+  });
+
+  it('are not a group when they came from no search', () => {
+    expect(transfers.searchGroupOf({})).toBeNull();
+    expect(transfers.searchGroupOf({ searchText: null })).toBeNull();
+    expect(transfers.searchGroupOf({ searchText: '   ' })).toBeNull();
+    expect(transfers.searchGroupOf(undefined)).toBeNull();
+  });
+
+  it('keep a deleted search with the one still open', () => {
+    // the API drops a deleted search's id and keeps its text
+    const groups = transfers.groupBySearch([
+      { key: 'open', searchId: 'abc', searchText: 'Free Love' },
+      { key: 'gone', searchId: null, searchText: 'Free Love' },
+    ]);
+
+    expect(groups.get('free love')).toEqual(['open', 'gone']);
+  });
+
+  it('gather rows in the order given, leaving out those from no search', () => {
+    const groups = transfers.groupBySearch([
+      { key: 'a1', searchText: 'A' },
+      { key: 'none' },
+      { key: 'b1', searchText: 'B' },
+      { key: 'a2', searchText: 'a' },
+    ]);
+
+    expect([...groups.entries()]).toEqual([
+      ['a', ['a1', 'a2']],
+      ['b', ['b1']],
+    ]);
+  });
+
+  it('say how many the control would select, and that it replaces', () => {
+    expect(
+      transfers.describeSelectSearch({ count: 4, text: 'Free Love' }),
+    ).toBe(
+      "Select the 4 downloads from 'Free Love', in place of whatever is selected now",
+    );
+  });
+});
+
 describe('the length column', () => {
   it('is off until it is asked for', () => {
     expect(transfers.TRANSFER_COLUMNS.find((c) => c.key === 'length')).toEqual(

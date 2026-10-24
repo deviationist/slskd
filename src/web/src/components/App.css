@@ -814,14 +814,15 @@ time {
     text-align: center !important;
 }
 
-/* One column for everything a row can be told to do -- retrieve, remove,
-   details -- rather than a column each. Three single-icon columns cost three
-   lots of cell padding and read as three unrelated things.
+/* One column for everything a row can be told to do -- select its search,
+   retrieve, remove, details -- rather than a column each. Four single-icon
+   columns cost four lots of cell padding and read as four unrelated things.
 
-   Sized to the three icons and the gaps between them, with the gap narrowed to
-   suit: whatever this column does not take, the filename does. */
+   Sized to the four icons and the gaps between them, with the gap narrowed to
+   suit: whatever this column does not take, the filename does. Not every row
+   has all four, but the column is one width for the whole table. */
 .flatlist-actions {
-    width: 82px;
+    width: 104px;
 }
 
 .flatlist-actions-row {
