@@ -9,3 +9,33 @@
 .dashboard .ui.small.statistics .statistic > .value {
     height: 50px;
 }
+/* The History heading and the range buttons beside it. On a phone the seven
+   buttons are wider than the card, so they take a line of their own under the
+   heading and share it out -- a group that wraps looks broken, and one that is
+   clipped hides All, the button for the longest view. */
+.history-header {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75em;
+    justify-content: space-between;
+    margin-bottom: 1em;
+}
+
+@media only screen and (max-width: 767px) {
+    .history-header .ui.buttons {
+        width: 100%;
+    }
+
+    .history-header .ui.buttons .button {
+        flex: 1;
+        padding-left: 0;
+        padding-right: 0;
+    }
+
+    /* a username or a folder is one long word as far as the browser knows,
+       and a table that cannot break it is a table wider than the card */
+    .dashboard .ui.table td {
+        overflow-wrap: anywhere;
+    }
+}
