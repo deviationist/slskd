@@ -1562,3 +1562,33 @@ describe('downloads from the same search', () => {
     );
   });
 });
+
+describe('the length column', () => {
+  it('is off until it is asked for', () => {
+    expect(transfers.TRANSFER_COLUMNS.find((c) => c.key === 'length')).toEqual(
+      expect.objectContaining({ optional: true }),
+    );
+  });
+
+  it('sorts on the seconds, with a file not measured or not audio last', () => {
+    const rows = [
+      { id: 'unmeasured', length: null },
+      { id: 'long', length: 412 },
+      { id: 'missing' },
+      { id: 'short', length: 95 },
+    ];
+
+    const order = (direction) =>
+      tables
+        .sortRows({
+          column: 'length',
+          columns: transfers.TRANSFER_SORT_COLUMNS,
+          direction,
+          rows,
+        })
+        .map((r) => r.id);
+
+    expect(order('asc').slice(0, 2)).toEqual(['short', 'long']);
+    expect(order('desc').slice(0, 2)).toEqual(['long', 'short']);
+  });
+});

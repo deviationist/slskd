@@ -1019,6 +1019,15 @@ export const TRANSFER_COLUMNS = [
   },
   { key: 'state', label: 'Progress', className: 'flatlist-progress' },
   { key: 'size', label: 'Size', className: 'flatlist-size' },
+
+  // read from the finished file, so blank for one still arriving, for one
+  // that is not audio, and for a poll or two after a download completes
+  {
+    key: 'length',
+    label: 'Length',
+    className: 'flatlist-length',
+    optional: true,
+  },
   { key: 'speed', label: 'Speed', className: 'flatlist-speed', optional: true },
   {
     key: 'attempts',
@@ -1066,6 +1075,7 @@ export const TRANSFER_COLUMNS = [
 export const TRANSFER_SORT_COLUMNS = {
   attempts: { kind: 'number', of: (row) => row.attempts },
   ext: { kind: 'text', of: (row) => getFileExtension(row.filename ?? '') },
+  length: { kind: 'number', of: (row) => row.length },
   name: { kind: 'text', of: (row) => getFileName(row.filename ?? '') },
   path: { kind: 'text', of: (row) => row.directory },
   search: { kind: 'text', of: (row) => row.searchText },
