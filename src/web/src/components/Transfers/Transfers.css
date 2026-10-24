@@ -280,3 +280,74 @@
 .transfers-header-filter .ui.input {
   width: 100%;
 }
+
+/* A card's file rows on a phone. Semantic stacks every cell of a table on its
+   own line below 768px, which turned one file into nine: a checkbox, the
+   name, the status, the size and each action icon in turn, under a header
+   that read File / Progress / Size down the page. Laid out as a grid instead,
+   a row is three lines -- name, status, then size with the actions at its
+   right -- with the checkbox beside all of them. The header keeps only its
+   select-all checkbox and File, since the other labels head nothing once the
+   cells are no longer columns. */
+@media only screen and (max-width: 767px) {
+  .transfer-card .ui.table tr {
+    align-items: center;
+    column-gap: 0.75em;
+    display: grid !important;
+    grid-template-areas:
+      'sel name name name name'
+      'sel prog prog prog prog'
+      'sel size retr rem det';
+    grid-template-columns: auto 1fr auto auto auto;
+    padding: 0.6em 0.75em !important;
+    row-gap: 0.4em;
+  }
+
+  .transfer-card .ui.table tr > td,
+  .transfer-card .ui.table tr > th {
+    min-width: 0 !important;
+    padding: 0 !important;
+  }
+
+  .transfer-card .transferlist-selector {
+    align-self: start;
+    grid-area: sel;
+  }
+
+  .transfer-card .transferlist-filename {
+    grid-area: name;
+    overflow-wrap: anywhere;
+  }
+
+  .transfer-card .transferlist-progress {
+    grid-area: prog;
+  }
+
+  .transfer-card .transferlist-size {
+    grid-area: size;
+  }
+
+  .transfer-card .transferlist-retrieve {
+    grid-area: retr;
+  }
+
+  .transfer-card .transferlist-remove {
+    grid-area: rem;
+  }
+
+  .transfer-card .transferlist-detail {
+    grid-area: det;
+  }
+
+  .transfer-card .ui.table thead tr {
+    grid-template-areas: 'sel name';
+    grid-template-columns: auto 1fr;
+  }
+
+  .transfer-card
+    .ui.table
+    thead
+    th:not(.transferlist-selector):not(.transferlist-filename) {
+    display: none !important;
+  }
+}
