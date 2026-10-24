@@ -1090,6 +1090,10 @@ namespace slskd
             app.UseHTMLRewrite("((\\.)?\\/static)", $"{(urlBase == "/" ? string.Empty : urlBase)}/static");
             app.UseHTMLRewrite("((\\.)?\\/favicon\\.ico)", $"{(urlBase == "/" ? string.Empty : urlBase)}/favicon.ico");
 
+            // the same for the web app manifest and its icons, which live together under ./pwa: the manifest resolves
+            // its own icons and start_url relative to itself, so only the links into the folder need rewriting
+            app.UseHTMLRewrite("((\\.)?\\/pwa\\/)", $"{(urlBase == "/" ? string.Empty : urlBase)}/pwa/");
+
             // inject urlBase and port into any html files we serve as a window-scoped javascript variable
             app.UseHTMLInjection($"<script>window.urlBase=\"{urlBase}\";window.port={OptionsAtStartup.Web.Port}</script>", excludedRoutes: new[] { "/api", "/swagger" });
 
