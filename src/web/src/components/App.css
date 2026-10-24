@@ -1126,3 +1126,221 @@ time {
     opacity: 1;
 }
 
+
+/* ------------------------------------------------------------------------ *
+ * The phone layout
+ *
+ * A phone is anything narrower than Semantic's tablet breakpoint, or a
+ * landscape screen too short for the desktop's two bars: at 844x390 the menu
+ * across the top and the footer took 112px of 390 and the menu still did not
+ * fit across. Both get the same answer -- the menu moves behind a bar along
+ * the bottom edge (MobileNav), whose More opens it as a panel.
+ *
+ * The panel is the desktop menu, restyled rather than redrawn. One list of
+ * destinations, and whatever the scripts injected into this page add to it
+ * comes along. The two media queries below must stay identical.
+ * ------------------------------------------------------------------------ */
+
+.mobile-nav,
+.mobile-nav-backdrop {
+    display: none;
+}
+
+@media only screen and (max-width: 767px), only screen and (max-height: 500px) and (orientation: landscape) {
+    :root {
+        --mobile-nav-height: 56px;
+        --mobile-nav-bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom));
+    }
+
+    /* The page scrolls inside .pushable, and Semantic gives it an identity
+       transform for the sidebar animations this layout does not use. A
+       transformed ancestor turns `position: fixed` into "fixed to me", and a
+       box fixed to the thing that scrolls scrolls with it -- the panel would
+       ride up the page with the content behind it. */
+    .pushable.app {
+        transform: none !important;
+    }
+
+    .pushable > .pusher.app-content {
+        min-height: 100%;
+    }
+
+    /* Room at the end of every page for the bar and, when something has
+       filled it, the footer above it: otherwise the last row of a list is
+       under them with nowhere to scroll it out to. The side insets are the
+       notch, in landscape. */
+    .app-content-body {
+        padding-bottom: calc(var(--mobile-nav-bottom) + 41px + 16px);
+        padding-left: env(safe-area-inset-left);
+        padding-right: env(safe-area-inset-right);
+    }
+
+    .mobile-nav {
+        display: flex;
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1003;
+        height: var(--mobile-nav-bottom);
+        padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+        background: #1b1c1d;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .mobile-nav-item {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 3px;
+        min-width: 0;
+        padding: 0;
+        border: 0;
+        background: none;
+        color: rgba(255, 255, 255, 0.65);
+        font-family: inherit;
+        font-size: 11px;
+        line-height: 1;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .mobile-nav-item:hover,
+    .mobile-nav-item:focus {
+        color: rgba(255, 255, 255, 0.9);
+    }
+
+    .mobile-nav-item.active {
+        color: #ffffff;
+    }
+
+    .mobile-nav-item.active .icon {
+        color: #58a6ff;
+    }
+
+    .mobile-nav-item .icon {
+        margin: 0 !important;
+        height: auto;
+        font-size: 1.35em;
+    }
+
+    .mobile-nav-more {
+        position: relative;
+    }
+
+    /* Something under More wants attention -- the dot is all a closed menu
+       can say about it. */
+    .mobile-nav-dot {
+        position: absolute;
+        top: -2px;
+        right: -4px;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        box-shadow: 0 0 0 2px #1b1c1d;
+    }
+
+    .mobile-nav-dot-red {
+        background: #db2828;
+    }
+
+    .mobile-nav-dot-yellow {
+        background: #fbbd08;
+    }
+
+    .mobile-nav-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: 1001;
+        background: rgba(0, 0, 0, 0.45);
+    }
+
+    /* The menu: gone until More, then a panel standing on the bar. A grid
+       rather than the row it is on a desktop, so every item has a place
+       however many there are -- the row was the problem. */
+    .ui.sidebar.navigation {
+        display: none !important;
+    }
+
+    :root.nav-open .ui.sidebar.navigation {
+        display: grid !important;
+        grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+        align-content: start;
+        position: fixed !important;
+        top: auto !important;
+        left: 0 !important;
+        right: 0 !important;
+        bottom: var(--mobile-nav-bottom) !important;
+        z-index: 1002 !important;
+        width: auto !important;
+        height: auto !important;
+        max-height: calc(100% - var(--mobile-nav-bottom) - 24px);
+        overflow-y: auto !important;
+        padding: 8px calc(8px + env(safe-area-inset-right)) 8px calc(8px + env(safe-area-inset-left));
+        border-radius: 12px 12px 0 0 !important;
+        box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.4) !important;
+    }
+
+    /* The right-hand group's items are the panel's items too: `contents`
+       takes the group out of the layout and leaves what is in it. */
+    :root.nav-open .ui.sidebar.navigation > .right.menu {
+        display: contents !important;
+    }
+
+    :root.nav-open .ui.sidebar.navigation .item {
+        width: 100%;
+        min-height: 68px;
+        justify-content: center;
+        border-radius: 8px !important;
+    }
+
+    /* The footer keeps the one thing on it a phone cannot do without -- the
+       slot a page puts its selection's actions in -- and stands on the bar.
+       With nothing in the slot there is nothing to show, so it goes. */
+    .footer.ui.menu {
+        bottom: var(--mobile-nav-bottom) !important;
+        padding: 0 env(safe-area-inset-right) 0 env(safe-area-inset-left);
+    }
+
+    .footer.ui.menu > .item,
+    .footer.ui.menu > .right.menu {
+        display: none !important;
+    }
+
+    .footer.ui.menu:has(> .footer-slot:empty) {
+        display: none !important;
+    }
+
+    .footer-slot {
+        flex: 1;
+        justify-content: flex-end;
+        margin-left: 0;
+        padding: 0 8px;
+        overflow-x: auto;
+    }
+
+    .Toastify__toast-container--bottom-center {
+        bottom: calc(var(--mobile-nav-bottom) + 8px) !important;
+    }
+}
+
+/* A landscape phone: a bar half as tall, its labels beside the icons. Height
+   is what such a screen has least of. */
+@media only screen and (max-height: 500px) and (orientation: landscape) {
+    :root {
+        --mobile-nav-height: 44px;
+    }
+
+    .mobile-nav-item {
+        flex-direction: row;
+        gap: 6px;
+        font-size: 12px;
+    }
+
+    :root.nav-open .ui.sidebar.navigation .item {
+        min-height: 56px;
+    }
+}

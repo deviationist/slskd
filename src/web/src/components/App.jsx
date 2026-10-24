@@ -16,6 +16,7 @@ import Browse from './Browse/Browse';
 import Chat from './Chat/Chat';
 import Dashboard from './Dashboard/Dashboard';
 import LoginForm from './LoginForm';
+import MobileNav from './MobileNav';
 import Rooms from './Rooms/Rooms';
 import Searches from './Search/Searches';
 import ErrorSegment from './Shared/ErrorSegment';
@@ -73,6 +74,40 @@ const preferredTheme = () =>
   (window.matchMedia('(prefers-color-scheme: dark)').matches
     ? 'dark'
     : 'light');
+
+/**
+ * The colour of the dot on the phone layout's More, or null for none.
+ *
+ * Red while the server is unreachable, since the footer that says so is hidden
+ * on a phone; yellow while something under More is asking to be looked at.
+ * @param {object} params - The parts of the application's state that can ask.
+ * @param {boolean} params.isAgent - Whether this is a relay agent, which has no server of its own.
+ * @param {boolean} params.isUpdateAvailable - Whether a newer release is out.
+ * @param {boolean} params.pendingReconnect - Whether a reconnect is waiting to happen.
+ * @param {boolean} params.pendingRestart - Whether a restart is waiting to happen.
+ * @param {boolean} params.pendingShareRescan - Whether the shares want rescanning.
+ * @param {object} params.server - The server's state.
+ * @returns {string|null} 'red', 'yellow' or null.
+ */
+const navAlertOf = ({
+  isAgent,
+  isUpdateAvailable,
+  pendingReconnect,
+  pendingRestart,
+  pendingShareRescan,
+  server,
+}) => {
+  if (!isAgent && !server?.isConnected) {
+    return 'red';
+  }
+
+  return pendingReconnect ||
+    pendingRestart ||
+    pendingShareRescan ||
+    isUpdateAvailable
+    ? 'yellow'
+    : null;
+};
 
 const initialState = {
   applicationOptions: {},
@@ -204,6 +239,7 @@ class App extends Component {
     */
     this.state = {
       ...initialState,
+      navOpen: false,
       theme: preferredTheme(),
       wide: savedWide(),
     };
@@ -329,6 +365,14 @@ class App extends Component {
     });
   };
 
+  // the phone layout's full menu; see MobileNav. Never remembered: a menu
+  // that reopens itself on a reload is in the way of the page it covers
+  handleNavToggle = () =>
+    this.setState((state) => ({ navOpen: !state.navOpen }));
+
+  handleNavClose = () =>
+    this.state.navOpen && this.setState({ navOpen: false });
+
   toggleTheme = () => {
     this.setState((state) => {
       const newTheme = state.theme === 'dark' ? 'light' : 'dark';
@@ -381,6 +425,7 @@ class App extends Component {
       error,
       initialized,
       login,
+      navOpen,
       retriesExhausted,
       theme,
       transferMetrics = {},
@@ -452,6 +497,12 @@ class App extends Component {
     // button -- and they have to widen together or the page goes ragged
     document.documentElement.classList.toggle('wide', Boolean(wide));
 
+    // the same, for the phone layout's menu: the menu and the bar that opens
+    // it are in different parts of the tree, and the menu is restyled by
+    // App.css rather than re-rendered, so a class on the root is the one
+    // thing both can see
+    document.documentElement.classList.toggle('nav-open', navOpen);
+
     return (
       <>
         <Sidebar.Pushable
@@ -466,6 +517,10 @@ class App extends Component {
             horizontal="true"
             icon="labeled"
             inverted
+            // on a phone this is the panel More opens, and a choice made in it
+            // is the end of wanting it open; elsewhere the menu is never open
+            // and this does nothing
+            onClick={this.handleNavClose}
             visible
             width="thin"
           >
@@ -790,6 +845,20 @@ class App extends Component {
             </div>
           </Sidebar.Pusher>
         </Sidebar.Pushable>
+        <MobileNav
+          agent={isAgent}
+          alert={navAlertOf({
+            isAgent,
+            isUpdateAvailable,
+            pendingReconnect,
+            pendingRestart,
+            pendingShareRescan,
+            server,
+          })}
+          onClose={this.handleNavClose}
+          onToggle={this.handleNavToggle}
+          open={navOpen}
+        />
         <AppFooter
           server={server}
           transferMetrics={transferMetrics}
