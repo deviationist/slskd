@@ -44,6 +44,23 @@
        the tab pane, which on a phone put the tables visibly further in than
        everything above them. Stacked, the columns no longer need a gutter
        between them, so the pane's own padding is the only one kept. */
+    /* the four History figures. Semantic wraps them two to a line but sizes
+       each to its content, so a label ran straight into its neighbour's
+       ("158 FILESUPLOADED"). An even 2x2 grid with a gap gives each half the
+       card and lets a long label wrap inside it instead. */
+    .dashboard .ui.four.statistics {
+        display: grid;
+        gap: 1.25em 1em;
+        grid-template-columns: 1fr 1fr;
+        margin: 0 0 1em;
+    }
+
+    .dashboard .ui.four.statistics > .statistic {
+        margin: 0;
+        min-width: 0;
+        width: auto;
+    }
+
     .dashboard .ui.tab.segment > .ui.stackable.grid > .column {
         padding-left: 0 !important;
         padding-right: 0 !important;
