@@ -977,6 +977,21 @@ soulseek:
       password: ~   
 ```
 
+### MTU
+
+If needed, the MTU advertised to the server can be set.
+
+| Command-Line        | Environment Variable    | Description                                                                        |
+| ------------------- | ----------------------- | ---------------------------------------------------------------------------------- |
+| `--slsk-server-mtu` | `SLSKD_SLSK_SERVER_MTU` | The maximum TCP transmission unit size advertised to the server (0 for OS default) |
+
+#### **YAML**
+```yaml
+soulseek:
+  connection:
+    mtu: 1500
+```
+
 ## Diagnostic Level
 
 The diagnostic level option is passed to the Soulseek.NET configuration and determines the level of detail the library produces diagnostic messages. This option should generally be left to `Info` or `Warning` but can be set to `Debug` if more verbose logging is desired.
@@ -1667,7 +1682,7 @@ instance_name: default
 
 ## Logging Options and Configurable Loggers
 
-By default, the application logs to console with colors enabled.  Logging to disk is optional, and if enabled, logs will be written to `/logs` in the application directory.
+By default, the application logs to console with colors enabled, and to files in the `/logs` subdirectory of the application directory with extended timestamps and colors disabled.
 
 Console colors can be disabled via typical application configuration described below, or by setting the environment variable `NO_COLOR` in accordance with https://no-color.org/.
 
@@ -1688,7 +1703,7 @@ The current list of available targets is:
 ```yaml
 logger:
   loki: ~
-  disk: false
+  no_disk: false
   no_color: false
 ```
 
