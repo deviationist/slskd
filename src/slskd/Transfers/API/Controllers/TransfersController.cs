@@ -1146,93 +1146,13 @@ namespace slskd.Transfers.API
             var entryNames = ArchiveNaming.EntryNamesFor(remoteFilenames);
             var archiveName = ArchiveNaming.ArchiveNameFor(username, remoteFilenames, DateTime.UtcNow);
 
-            var contentDisposition = new Microsoft.Net.Http.Headers.ContentDispositionHeaderValue("attachment");
-            contentDisposition.SetHttpFileName(archiveName);
-
-            Response.ContentType = "application/zip";
-            Response.Headers.ContentDisposition = contentDisposition.ToString();
-
-            // no Content-Length. the size of a store-only archive *is* computable in advance, but only with a writer
-            // that controls every byte, and a Content-Length wrong by one is a broken download
-
-            // ask a reverse proxy not to buffer: nginx spools a proxied response to a temporary file by default, which
-            // for a streamed archive means waiting for all of it before the browser is handed any of it
-            Response.Headers["X-Accel-Buffering"] = "no";
-
             Log.Information("Streaming an archive of {Count} file(s) from {Username} as '{Archive}'", downloads.Count, username, archiveName);
 
-            var skipped = new List<string>();
+            var sources = downloads
+                .Select((t, i) => new ArchiveSource(entryNames[i], () => TryOpenDownloadedFile(t.Download, out var stream, out var reason) ? (stream, null) : (null, reason)))
+                .ToList();
 
-            try
-            {
-                // ZipArchive cannot write an archive to this response without synchronous writes, and Kestrel
-                // disallows those on the response body by default. The bookkeeping parts of the format -- each entry's
-                // data descriptor, written when the entry stream is disposed, and the central directory, written when
-                // the archive is -- go out through Stream.Write, and neither DirectToArchiveWriterStream nor the entry
-                // stream returned by OpenAsync implements DisposeAsync, so `await using` falls back to the synchronous
-                // path. Verified against the framework directly on .NET 10.0.12, not inferred.
-                //
-                // The consequence of not doing this is worse than a failed request: the file *contents* stream fine,
-                // so the browser saves every byte of every file and then the request dies before the central directory
-                // is written. What lands on disk is a plausible-looking archive with nothing at the end to say what is
-                // in it, which macOS reports as "Error 79 - Inappropriate file type or format".
-                //
-                // Scoped to this request, and only the format's bookkeeping actually travels this way -- the file
-                // contents are copied with CopyToAsync and stay asynchronous.
-                var bodyControl = HttpContext.Features.Get<IHttpBodyControlFeature>();
-
-                if (bodyControl is not null)
-                {
-                    bodyControl.AllowSynchronousIO = true;
-                }
-
-                await using var archive = await ZipArchive.CreateAsync(Response.Body, ZipArchiveMode.Create, leaveOpen: true, entryNameEncoding: null, HttpContext.RequestAborted);
-
-                for (var i = 0; i < downloads.Count; i++)
-                {
-                    var download = downloads[i].Download;
-
-                    if (!TryOpenDownloadedFile(download, out var source, out var reason))
-                    {
-                        Log.Warning("Skipping '{Entry}' in the archive for {Username}: {Reason}", entryNames[i], username, reason);
-                        skipped.Add($"{entryNames[i]}{Environment.NewLine}    {reason}");
-                        continue;
-                    }
-
-                    await using (source)
-                    {
-                        var entry = archive.CreateEntry(entryNames[i], CompressionLevel.NoCompression);
-
-                        await using var target = await entry.OpenAsync(HttpContext.RequestAborted);
-                        await source.CopyToAsync(target, HttpContext.RequestAborted);
-                    }
-                }
-
-                // last, because entries are written in the order they are created, and this one can only be written
-                // once every other entry has had its turn and either made it or not
-                if (skipped.Count > 0)
-                {
-                    var entry = archive.CreateEntry(ArchiveNaming.MissingEntryName, CompressionLevel.NoCompression);
-
-                    await using var target = await entry.OpenAsync(HttpContext.RequestAborted);
-                    await using var writer = new StreamWriter(target);
-
-                    await writer.WriteLineAsync($"{skipped.Count} of the {downloads.Count} selected file(s) could not be added to this archive.");
-                    await writer.WriteLineAsync();
-
-                    foreach (var line in skipped)
-                    {
-                        await writer.WriteLineAsync(line);
-                        await writer.WriteLineAsync();
-                    }
-                }
-            }
-            catch (Exception ex) when (ex is OperationCanceledException || ex is IOException)
-            {
-                // the browser went away, or the connection did. there is no response left to put an error into, and
-                // nothing here is this application's fault
-                Log.Debug("The archive download for {Username} ended early: {Message}", username, ex.Message);
-            }
+            await ArchiveStreaming.WriteAsync(HttpContext, archiveName, sources);
 
             return new EmptyResult();
         }

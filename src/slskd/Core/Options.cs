@@ -933,6 +933,80 @@ namespace slskd
             public GroupsOptions Groups { get; init; } = new GroupsOptions();
 
             /// <summary>
+            ///     Gets share link options.
+            /// </summary>
+            [Validate]
+            public ShareLinksOptions ShareLinks { get; init; } = new ShareLinksOptions();
+
+            /// <summary>
+            ///     Share link options: links that let someone without an account download copies of finished downloads
+            ///     until they expire.
+            /// </summary>
+            public class ShareLinksOptions
+            {
+                /// <summary>
+                ///     Gets a value indicating whether share links can be created and used.
+                /// </summary>
+                /// <remarks>
+                ///     Off by default, because a link is a page and a download that answer without a login. Turning
+                ///     this off stops existing links working at once; their files stay until they expire.
+                /// </remarks>
+                [Argument(default, "share-links")]
+                [EnvironmentVariable("SHARE_LINKS")]
+                [Description("allow share links: downloads anyone with the link can fetch until it expires")]
+                public bool Enabled { get; init; } = false;
+
+                /// <summary>
+                ///     Gets the path where the copies a share link serves are kept.
+                /// </summary>
+                /// <remarks>
+                ///     Each link has a folder of its own here, named for its id, which is deleted when the link
+                ///     expires. Not the downloads directory, and best not inside it: anything that reads that
+                ///     directory as "what has finished" would count the copies as well.
+                /// </remarks>
+                [Argument(default, "share-links-dir")]
+                [EnvironmentVariable("SHARE_LINKS_DIR")]
+                [Description("path where the files share links serve are kept")]
+                [AbsolutePath(OperatingSystem.Current)]
+                [NonTraversingPath]
+                [RequiresRestart]
+                public string Directory { get; init; } = Program.DefaultShareLinksDirectory;
+
+                /// <summary>
+                ///     Gets the address share links are made from, if not the one the web UI is reached at.
+                /// </summary>
+                /// <remarks>
+                ///     A link is opened by someone outside, so it has to carry an address that works from outside --
+                ///     which is often not the one the operator uses: the UI may be reachable only on a home network,
+                ///     with the link pages published under another name that exposes nothing else. Blank uses the
+                ///     address the request creating the link arrived at.
+                /// </remarks>
+                [Argument(default, "share-links-base-url")]
+                [EnvironmentVariable("SHARE_LINKS_BASE_URL")]
+                [Description("address share links are made from; blank uses the one the UI was reached at")]
+                [Url]
+                public string BaseUrl { get; init; }
+
+                /// <summary>
+                ///     Gets the number of days a new link lasts unless told otherwise.
+                /// </summary>
+                [Argument(default, "share-links-default-days")]
+                [EnvironmentVariable("SHARE_LINKS_DEFAULT_DAYS")]
+                [Description("days a new share link lasts unless told otherwise")]
+                [Range(1, 3650)]
+                public int DefaultDays { get; init; } = 7;
+
+                /// <summary>
+                ///     Gets the most days a link may be given, at creation or when extended.
+                /// </summary>
+                [Argument(default, "share-links-max-days")]
+                [EnvironmentVariable("SHARE_LINKS_MAX_DAYS")]
+                [Description("the most days a share link may last")]
+                [Range(1, 3650)]
+                public int MaxDays { get; init; } = 90;
+            }
+
+            /// <summary>
             ///     Global upload options.
             /// </summary>
             public class GlobalUploadOptions

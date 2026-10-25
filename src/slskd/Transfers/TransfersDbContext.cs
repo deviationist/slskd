@@ -36,6 +36,7 @@ namespace slskd.Transfers
     using System.Text.Json;
     using Microsoft.EntityFrameworkCore;
     using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+    using slskd.Transfers.ShareLinks;
 
     public class TransfersDbContext : DbContext
     {
@@ -46,6 +47,8 @@ namespace slskd.Transfers
 
         public DbSet<Batch> Batches { get; set; }
         public DbSet<Transfer> Transfers { get; set; }
+        public DbSet<ShareLink> ShareLinks { get; set; }
+        public DbSet<ShareLinkFile> ShareLinkFiles { get; set; }
 
         public override int SaveChanges(bool acceptAllChangesOnSuccess)
         {
@@ -71,6 +74,50 @@ namespace slskd.Transfers
         {
             ConfigureTransfers(modelBuilder);
             ConfigureBatches(modelBuilder);
+            ConfigureShareLinks(modelBuilder);
+        }
+
+        private void ConfigureShareLinks(ModelBuilder modelBuilder)
+        {
+            modelBuilder
+                .Entity<ShareLink>()
+                .Property(e => e.CreatedAt)
+                .HasConversion(v => v, v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
+
+            modelBuilder
+                .Entity<ShareLink>()
+                .Property(e => e.ExpiresAt)
+                .HasConversion(v => v, v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
+
+            modelBuilder
+                .Entity<ShareLink>()
+                .Property(e => e.LastDownloadedAt)
+                .HasConversion(v => v, v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : null);
+
+            modelBuilder
+                .Entity<ShareLink>()
+                .HasMany(l => l.Files)
+                .WithOne()
+                .HasForeignKey(f => f.ShareLinkId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // every public request starts with this lookup
+            modelBuilder
+                .Entity<ShareLink>()
+                .HasIndex(l => l.Token)
+                .IsUnique()
+                .HasDatabaseName("IDX_ShareLinks_Token");
+
+            // and the sweep with this one
+            modelBuilder
+                .Entity<ShareLink>()
+                .HasIndex(l => l.ExpiresAt)
+                .HasDatabaseName("IDX_ShareLinks_ExpiresAt");
+
+            modelBuilder
+                .Entity<ShareLinkFile>()
+                .HasIndex(f => f.ShareLinkId)
+                .HasDatabaseName("IDX_ShareLinkFiles_ShareLinkId");
         }
 
         private void ConfigureTransfers(ModelBuilder modelBuilder)

@@ -2,6 +2,7 @@ import './Transfers.css';
 import * as transfersLibrary from '../../lib/transfers';
 import AppContext from '../AppContext';
 import { LoaderSegment, PlaceholderSegment } from '../Shared';
+import ShareDialog from '../ShareLinks/ShareDialog';
 import FlatTransferList from './FlatTransferList';
 import TransferGroup from './TransferGroup';
 import { ConfirmRemovalModal } from './TransferList';
@@ -141,6 +142,16 @@ const Transfers = ({ direction, server }) => {
   // over the hub, and a configuration that is not yet known is not the same as
   // one that deletes nothing -- see `removalDeletesFile`
   const deleteFileOnRemoval = options?.transfers?.download?.deleteFileOnRemoval;
+
+  // share links are made from downloads only, and only where the server has
+  // them turned on. undefined rather than a no-op when they cannot be made, so
+  // that a list can leave the control out instead of offering one that fails
+  const shareSettings = options?.transfers?.shareLinks;
+  const [sharing, setSharing] = useState(null);
+  const onShareRequested =
+    direction === 'download' && shareSettings?.enabled === true
+      ? (files) => setSharing(files)
+      : undefined;
 
   /*
    * Filtered before grouped, so the cards and the table answer the same
@@ -373,6 +384,7 @@ const Transfers = ({ direction, server }) => {
           onRemoveRequested={(file) => remove({ file })}
           onRetryAll={retryAll}
           onRetryRequested={retry}
+          onShareRequested={onShareRequested}
           retrievalEnabled={retrievalEnabled}
           total={total}
           users={sorted}
@@ -385,6 +397,7 @@ const Transfers = ({ direction, server }) => {
             deleteFileOnRemoval={deleteFileOnRemoval}
             direction={direction}
             key={user.username}
+            onShareRequested={onShareRequested}
             remove={remove}
             removeAll={removeAll}
             retrievalEnabled={retrievalEnabled}
@@ -393,6 +406,16 @@ const Transfers = ({ direction, server }) => {
             user={user}
           />
         ))
+      )}
+      {sharing && (
+        <ShareDialog
+          defaults={shareSettings}
+          deleteFileOnRemoval={deleteFileOnRemoval}
+          files={sharing}
+          mailEnabled={options?.integrations?.mail?.enabled === true}
+          onClose={() => setSharing(null)}
+          onRemove={removeAll}
+        />
       )}
       {confirmingRemoval && (
         <ConfirmRemovalModal

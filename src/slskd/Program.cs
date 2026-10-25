@@ -249,6 +249,11 @@ namespace slskd
         public static string DefaultIncompleteDirectory { get; private set; }
 
         /// <summary>
+        ///     Gets the default directory for the files share links serve.
+        /// </summary>
+        public static string DefaultShareLinksDirectory { get; private set; }
+
+        /// <summary>
         ///     Gets the path where application logs are saved.
         /// </summary>
         public static string LogDirectory { get; private set; } = null;
@@ -417,6 +422,7 @@ namespace slskd
             DefaultConfigurationFile = Path.Combine(AppDirectory, $"{AppName}.yml");
             DefaultDownloadsDirectory = Path.Combine(AppDirectory, "downloads");
             DefaultIncompleteDirectory = Path.Combine(AppDirectory, "incomplete");
+            DefaultShareLinksDirectory = Path.Combine(AppDirectory, "share-links");
 
             // the location of the configuration file might have been overridden by command line or envar.
             // if not, set it to the default.
@@ -634,6 +640,9 @@ namespace slskd
                 // resolved here for its side effect: the watch service subscribes to the clock when it is
                 // constructed, and nothing else would construct it until the first request arrived at its API
                 _ = app.Services.GetService<slskd.Search.Watches.WatchService>();
+
+                // the same for share links, whose expiry sweep starts with the service
+                _ = app.Services.GetService<slskd.Transfers.ShareLinks.ShareLinkService>();
                 _ = app.Services.GetService<VPNService>();
                 _ = app.Services.GetService<TelemetryService>();
 
@@ -768,6 +777,7 @@ namespace slskd
             services.AddSingleton<slskd.Integrations.Mail.MailService>();
 
             services.AddSingleton<slskd.Search.Watches.WatchService>();
+            services.AddSingleton<slskd.Transfers.ShareLinks.ShareLinkService>();
 
             services.AddSingleton<EventService>();
             services.AddSingleton<EventBus>();

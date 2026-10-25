@@ -1,4 +1,5 @@
 import { urlBase } from '../../config';
+import * as shareLinks from '../../lib/shareLinks';
 import {
   describeEmpty,
   describeSelection,
@@ -38,6 +39,7 @@ import {
   isQueuedState,
   isRetryableState,
 } from './TransferList';
+import withDividers from './withDividers';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -210,6 +212,7 @@ const timingCell = ({ key, now, row }) => {
  * @param {Function} params.onCancelAll - Cancels the selection.
  * @param {Function} params.onRemoveAll - Removes the selection.
  * @param {Function} params.onRetryAll - Retries the selection.
+ * @param {Function} [params.onShareRequested] - Opens the share dialog; absent where links cannot be made.
  * @param {boolean} params.retrievalEnabled - Whether files can be fetched to the browser.
  * @param {object[]} params.rows - The selected rows.
  * @returns {object} The bar, or nothing when nothing is selected.
@@ -218,6 +221,7 @@ const SelectionActions = ({
   onCancelAll,
   onRemoveAll,
   onRetryAll,
+  onShareRequested,
   retrievalEnabled,
   rows,
 }) => {
@@ -241,6 +245,7 @@ const SelectionActions = ({
     rows.length > 0 &&
     rows.every((f) => transfersLibrary.isStateRemovable(f.state));
   const retrievable = rows.filter((f) => transfersLibrary.isRetrievable(f));
+  const shareable = onShareRequested ? rows.filter(shareLinks.isShareable) : [];
 
   /*
    * One archive per peer. The card's version cannot need this -- a card is one
@@ -281,56 +286,63 @@ const SelectionActions = ({
        * to, with an `.or` before it.
        */}
       <Button.Group size="tiny">
-        {allRetryable && (
-          <Button
-            color="green"
-            content="Retry"
-            icon="redo"
-            onClick={() => onRetryAll(rows)}
-          />
-        )}
-        {allRetryable && anyCancellable && <Button.Or />}
-        {anyCancellable && (
-          <Button
-            color="red"
-            content="Cancel"
-            icon="x"
-            onClick={() => onCancelAll(rows)}
-          />
-        )}
-        {(allRetryable || anyCancellable) && allRemovable && <Button.Or />}
-        {allRemovable && (
-          <Button
-            color="red"
-            content="Remove"
-            icon="trash alternate"
-            onClick={() => onRemoveAll(rows)}
-          />
-        )}
-        {(allRetryable || anyCancellable || allRemovable) &&
-          retrievalEnabled &&
-          retrievable.length > 0 && <Button.Or />}
-        {/*
-         * Blue and busy-aware, as the card view's is. The same action looking
-         * like a different one is what makes two views feel like two
-         * products.
-         */}
-        {retrievalEnabled && retrievable.length > 0 && (
-          <Popup
-            content={transfersLibrary.describeRetrieval(retrievable.length)}
-            position="top right"
-            trigger={
-              <Button
-                color="blue"
-                content="Download"
-                disabled={archiving}
-                icon="download"
-                loading={archiving}
-                onClick={archive}
-              />
-            }
-          />
-        )}
+        {withDividers([
+          allRetryable && (
+            <Button
+              color="green"
+              content="Retry"
+              icon="redo"
+              key="retry"
+              onClick={() => onRetryAll(rows)}
+            />
+          ),
+          anyCancellable && (
+            <Button
+              color="red"
+              content="Cancel"
+              icon="x"
+              key="cancel"
+              onClick={() => onCancelAll(rows)}
+            />
+          ),
+          allRemovable && (
+            <Button
+              color="red"
+              content="Remove"
+              icon="trash alternate"
+              key="remove"
+              onClick={() => onRemoveAll(rows)}
+            />
+          ),
+          // blue and busy-aware, as the card view's is. the same action looking
+          // like a different one is what makes two views feel like two products
+          retrievalEnabled && retrievable.length > 0 && (
+            <Popup
+              content={transfersLibrary.describeRetrieval(retrievable.length)}
+              key="retrieve"
+              position="top right"
+              trigger={
+                <Button
+                  color="blue"
+                  content="Download"
+                  disabled={archiving}
+                  icon="download"
+                  loading={archiving}
+                  onClick={archive}
+                />
+              }
+            />
+          ),
+          shareable.length > 0 && (
+            <Button
+              color="teal"
+              content="Share"
+              icon="share alternate"
+              key="share"
+              onClick={() => onShareRequested(rows)}
+            />
+          ),
+        ])}
       </Button.Group>
     </div>
   );
@@ -358,6 +370,7 @@ const SelectionActions = ({
  * @param {Function} params.onPlaceInQueueRequested - Asks a peer where we are in its queue.
  * @param {Function} params.onRemoveRequested - Removes one transfer.
  * @param {Function} params.onRetryRequested - Retries one transfer.
+ * @param {Function} [params.onShareRequested] - Opens the share dialog for some rows; absent where links cannot be made.
  * @param {boolean} params.retrievalEnabled - Whether a finished file can be fetched to the browser.
  * @param {number} params.total - How many transfers there are before the filter.
  * @param {object[]} params.users - The transfers, grouped as the API returns them.
@@ -373,6 +386,7 @@ const FlatTransferList = ({
   onRemoveRequested,
   onRetryAll,
   onRetryRequested,
+  onShareRequested,
   retrievalEnabled,
   total,
   users,
@@ -806,6 +820,7 @@ const FlatTransferList = ({
             onCancelAll={onCancelAll}
             onRemoveAll={onRemoveAll}
             onRetryAll={onRetryAll}
+            onShareRequested={onShareRequested}
             retrievalEnabled={retrievalEnabled}
             rows={selectedRows}
           />,
@@ -957,6 +972,21 @@ const FlatTransferList = ({
                               link
                               name="object group outline"
                               onClick={() => selectSearch(fromSameSearch)}
+                              size="small"
+                            />
+                          }
+                        />
+                      )}
+                      {onShareRequested && shareLinks.isShareable(row) && (
+                        <Popup
+                          content="Share: a link anyone can download this from, for a while"
+                          position="left center"
+                          trigger={
+                            <Icon
+                              color="grey"
+                              link
+                              name="share alternate"
+                              onClick={() => onShareRequested([row])}
                               size="small"
                             />
                           }

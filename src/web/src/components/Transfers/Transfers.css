@@ -67,6 +67,7 @@
   min-width: 5px;
 }
 
+.transferlist-share,
 .transferlist-retrieve {
   width: 5px;
   min-width: 5px;
@@ -295,10 +296,10 @@
     column-gap: 0.75em;
     display: grid !important;
     grid-template-areas:
-      'sel name name name name'
-      'sel prog prog prog prog'
-      'sel size retr rem det';
-    grid-template-columns: auto 1fr auto auto auto;
+      'sel name name name name name'
+      'sel prog prog prog prog prog'
+      'sel size shr retr rem det';
+    grid-template-columns: auto 1fr auto auto auto auto;
     padding: 0.6em 0.75em !important;
     row-gap: 0.4em;
   }
@@ -325,6 +326,10 @@
 
   .transfer-card .transferlist-size {
     grid-area: size;
+  }
+
+  .transfer-card .transferlist-share {
+    grid-area: shr;
   }
 
   .transfer-card .transferlist-retrieve {

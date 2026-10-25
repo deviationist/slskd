@@ -1,0 +1,51 @@
+.share-link-header.ui.header {
+  margin-bottom: 0.9em;
+}
+
+.share-link-header .content {
+  overflow-wrap: anywhere;
+}
+
+.share-link-recipients {
+  color: var(--slskd-color-subtle, #767676);
+  margin: 0.75em 0 0;
+  overflow-wrap: anywhere;
+}
+
+.ui.list.share-link-files,
+.ui.list.share-dialog-files {
+  margin: 0.75em 0;
+  overflow-wrap: anywhere;
+}
+
+.share-link-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5em;
+}
+
+.share-link-actions .ui.button {
+  margin: 0;
+}
+
+.share-dialog-days {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5em;
+}
+
+.share-dialog-days .ui.button {
+  margin: 0;
+}
+
+.share-dialog-days .field {
+  margin: 0 !important;
+  width: 9em;
+}
+
+.share-dialog-note {
+  color: var(--slskd-color-subtle, #767676);
+  font-size: 0.9em;
+  margin: 0.5em 0 0;
+}

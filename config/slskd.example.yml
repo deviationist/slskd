@@ -83,6 +83,12 @@
 #       exists: rename # 'overwrite' or 'rename'
 #       permissions:
 #         mode: ~ # chmod syntax, e.g. 644, 777. does nothing on Windows. 
+#   share_links:
+#     enabled: false
+#     directory: ~ # defaults to <app directory>/share-links
+#     base_url: ~ # e.g. https://share.example.com; blank uses the UI's address
+#     default_days: 7
+#     max_days: 90
 #   groups:
 #     default:
 #       upload:
