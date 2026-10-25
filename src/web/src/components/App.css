@@ -186,6 +186,24 @@ body {
     color: var(--smui-site-body-text-color);
 }
 
+/* Semantic's list and header text, which keep their light-theme colours in
+   the dark one -- rgba(0,0,0,.87) for an item's header, .7 for its
+   description, .6 for a header's subheader: black on near-black. The Shared
+   page drew a share's size and expiry, and every address in its log with what
+   became of it, this way, unreadable. The body colour for what an item is
+   called, and the subtle one for what is said about it, as everywhere else in
+   the dark theme. */
+:root.dark .ui.list > .item .header,
+:root.dark .ui.list .list > .item .header {
+    color: var(--smui-site-body-text-color);
+}
+
+:root.dark .ui.list > .item .description,
+:root.dark .ui.list .list > .item .description,
+:root.dark .ui.header .sub.header {
+    color: var(--slskd-color-subtle);
+}
+
 /* A sortable header's hover, which Semantic paints `rgba(0,0,0,.05)` in both
    themes. Over the light header's `rgb(249,250,251)` that is a visible step
    down; over the dark one's `rgb(22,27,33)` it darkens something already dark
