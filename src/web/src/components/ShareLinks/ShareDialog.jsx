@@ -10,6 +10,7 @@ import {
   Checkbox,
   Form,
   Icon,
+  Input,
   List,
   Message,
   Modal,
@@ -237,17 +238,21 @@ const ShareDialog = ({
                   </Button>
                 ),
               )}
-              <Form.Input
-                error={!daysValid}
-                id="share-dialog-days"
-                label={{ basic: true, content: 'days' }}
-                labelPosition="right"
-                max={maxDays}
-                min={1}
-                onChange={(_event, { value }) => setDays(value)}
-                type="number"
-                value={days}
-              />
+              {/* a plain Input in the field: on Form.Input, `label` is the
+                  field's own label, which left the unit an empty tag and the
+                  box styled for a label it did not have */}
+              <Form.Field error={!daysValid}>
+                <Input
+                  id="share-dialog-days"
+                  label={{ basic: true, content: 'days' }}
+                  labelPosition="right"
+                  max={maxDays}
+                  min={1}
+                  onChange={(_event, { value }) => setDays(value)}
+                  type="number"
+                  value={days}
+                />
+              </Form.Field>
             </div>
           </Form.Field>
           <Form.Field>
