@@ -1,3 +1,10 @@
+/* the same gap under the menu as every other page leaves: the first share's
+   segment is the page's first child, and Semantic takes the top margin off a
+   first segment */
+.share-links {
+  padding-top: 15px;
+}
+
 .share-link-header.ui.header {
   margin-bottom: 0.9em;
 }
