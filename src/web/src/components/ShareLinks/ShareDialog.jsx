@@ -3,7 +3,10 @@ import * as shareLinks from '../../lib/shareLinks';
 import { formatBytes, formatDate } from '../../lib/util';
 import CopyField from './CopyField';
 import FileNames from './FileNames';
-import RecipientsInput, { RecipientProblems } from './RecipientsInput';
+import RecipientsInput, {
+  isPickEscape,
+  RecipientProblems,
+} from './RecipientsInput';
 import React, { useState } from 'react';
 import {
   Button,
@@ -200,7 +203,13 @@ const ShareDialog = ({
 
   return (
     <Modal
-      onClose={busy ? undefined : onClose}
+      onClose={
+        busy
+          ? undefined
+          : (event) => {
+              if (!isPickEscape(event)) onClose();
+            }
+      }
       open
       size="small"
     >
