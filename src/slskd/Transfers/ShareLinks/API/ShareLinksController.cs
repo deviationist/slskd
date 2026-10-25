@@ -397,7 +397,7 @@ public class ShareLinksController : ControllerBase
     [AllowAnonymous]
     [ApiVersionNeutral] // a page, not an API: its address carries no version, and versioning would refuse it
     [ApiExplorerSettings(IgnoreApi = true)]
-    public IActionResult Page([FromRoute] string token)
+    public async Task<IActionResult> Page([FromRoute] string token)
     {
         if (!Links.Enabled)
         {
@@ -411,13 +411,17 @@ public class ShareLinksController : ControllerBase
             return NotFound();
         }
 
+        // read rather than served as a file, so that the policy is made from the very text that goes out
+        var html = await System.IO.File.ReadAllTextAsync(page);
+
         // the page is the same for every link -- it asks the API about the one in its address -- so a bad token gets
         // the page too, and the page says the link does not work. whether a token is good is told only by the API
         Response.Headers.CacheControl = "no-cache";
+        Response.Headers.ContentSecurityPolicy = ShareLinkPagePolicy.For(html);
         Response.Headers["Referrer-Policy"] = "no-referrer";
         Response.Headers["X-Robots-Tag"] = "noindex, nofollow";
 
-        return PhysicalFile(page, "text/html; charset=utf-8");
+        return Content(html, "text/html; charset=utf-8");
     }
 
     /// <summary>

@@ -459,7 +459,10 @@ public class ShareLinkService
     ///     Opens the copy behind the specified file of a link, if it is still where the link left it.
     /// </summary>
     /// <param name="file">The file.</param>
-    /// <returns>The full path, or null if the copy is gone or is not inside the link's own folder.</returns>
+    /// <returns>
+    ///     The full path, or null if the copy is gone, is not inside the link's own folder, or is reached through a
+    ///     symlink.
+    /// </returns>
     public string PathOf(ShareLinkFile file)
     {
         if (file is null)
@@ -470,8 +473,9 @@ public class ShareLinkService
         // the recorded path is ours, written when the copy was made -- checked anyway, since serving it is the one
         // thing here a stranger can cause, and the share directory may have been reconfigured since
         var path = Path.GetFullPath(file.Path);
+        var folder = FolderFor(file.ShareLinkId);
 
-        return IsInside(path, FolderFor(file.ShareLinkId)) && File.Exists(path) ? path : null;
+        return IsInside(path, folder) && File.Exists(path) && !IsLinkedBelow(path, folder) ? path : null;
     }
 
     /// <summary>
@@ -612,6 +616,40 @@ public class ShareLinkService
     {
         var root = folder.EndsWith(Path.DirectorySeparatorChar) ? folder : folder + Path.DirectorySeparatorChar;
         return path.StartsWith(root, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Returns whether the specified <paramref name="path"/>, or any directory between it and
+    ///     <paramref name="folder"/> (the folder included), is a symlink.
+    /// </summary>
+    /// <remarks>
+    ///     Containment is checked on the path as written, and a symlink keeps that path inside while pointing anywhere
+    ///     at all. Nothing here ever makes one -- every copy is a new file in a new folder -- so one found is something
+    ///     put there by whoever else can write to the share directory, and following it would serve whatever it names.
+    ///     The share directory itself, and what is above it, are the operator's to arrange, so they are not checked.
+    /// </remarks>
+    private static bool IsLinkedBelow(string path, string folder)
+    {
+        FileSystemInfo entry = new FileInfo(path);
+        var stop = Path.TrimEndingDirectorySeparator(folder);
+
+        while (entry is not null)
+        {
+            if (entry.LinkTarget is not null)
+            {
+                return true;
+            }
+
+            if (string.Equals(Path.TrimEndingDirectorySeparator(entry.FullName), stop, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            entry = entry is FileInfo info ? info.Directory : ((DirectoryInfo)entry).Parent;
+        }
+
+        // ran out of parents without reaching the folder, which IsInside rules out; refuse rather than assume
+        return true;
     }
 
     private static ShareLink Ordered(ShareLink link)
