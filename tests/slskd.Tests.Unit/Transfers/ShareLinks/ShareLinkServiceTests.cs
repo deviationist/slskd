@@ -303,6 +303,40 @@ public sealed class ShareLinkServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task A_Copy_Replaced_With_A_Symlink_Is_Not_Served()
+    {
+        var a = Download("@@x\\Album\\a.flac", "a");
+        var link = await Service.CreateAsync([a.Id], days: 1);
+        var path = Service.PathOf(link.Files[0]);
+        var secret = Path.Combine(root, "secret.txt");
+        File.WriteAllText(secret, "secret");
+
+        File.Delete(path);
+        File.CreateSymbolicLink(path, secret);
+
+        Assert.True(File.Exists(path));
+        Assert.Null(Service.PathOf(link.Files[0]));
+    }
+
+    [Fact]
+    public async Task A_Folder_Replaced_With_A_Symlink_Is_Not_Served()
+    {
+        var a = Download("@@x\\Album\\a.flac", "a");
+        var link = await Service.CreateAsync([a.Id], days: 1);
+        var path = Service.PathOf(link.Files[0]);
+        var album = Path.GetDirectoryName(path);
+        var elsewhere = Path.Combine(root, "elsewhere");
+        Directory.CreateDirectory(elsewhere);
+        File.WriteAllText(Path.Combine(elsewhere, Path.GetFileName(path)), "secret");
+
+        Directory.Delete(album, recursive: true);
+        Directory.CreateSymbolicLink(album, elsewhere);
+
+        Assert.True(File.Exists(path));
+        Assert.Null(Service.PathOf(link.Files[0]));
+    }
+
+    [Fact]
     public async Task Downloads_Are_Counted()
     {
         var a = Download("@@x\\Album\\a.flac", "a");
