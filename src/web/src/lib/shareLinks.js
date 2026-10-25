@@ -165,6 +165,34 @@ export const addRecipients = (recipients, text) => {
 };
 
 /**
+ * Where a recipients field stands: who would be mailed, which pills are not
+ * addresses, and whether there are more than one request may mail.
+ *
+ * An address is judged when it becomes a pill, and not before. Every address
+ * is invalid until it is finished -- `a`, `a@`, `a@x` -- so judging what is
+ * still being typed would flag each one red on its way to being right. What
+ * is being typed still counts once it is an address, so that the last one
+ * typed is not left out by clicking Share before ending it; one that is not
+ * becomes a red pill as the field is left, which is before any click lands.
+ * @param {object} addresses
+ * @param {string[]} addresses.recipients - The pills.
+ * @param {string} addresses.draft - What is being typed.
+ * @returns {object} `recipients` to mail, `invalid` pills, and `tooMany`.
+ */
+export const summarizeRecipients = ({ draft, recipients }) => {
+  const typed = draft.trim();
+  const all = isRecipient(typed)
+    ? addRecipients(recipients, typed)
+    : recipients;
+
+  return {
+    invalid: invalidRecipients(recipients),
+    recipients: all,
+    tooMany: all.length > MAXIMUM_RECIPIENTS,
+  };
+};
+
+/**
  * How long a link has left, in words: "in 6 days", "in 5 hours", or
  * "expired" once it has.
  */

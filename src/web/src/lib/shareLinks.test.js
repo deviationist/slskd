@@ -8,6 +8,7 @@ import {
   isRecipient,
   isShareable,
   parseRecipients,
+  summarizeRecipients,
 } from './shareLinks';
 
 describe('parseRecipients', () => {
@@ -75,6 +76,42 @@ describe('addRecipients', () => {
     const recipients = ['a@x.no'];
 
     expect(addRecipients(recipients, ' , ')).toEqual(recipients);
+  });
+});
+
+describe('summarizeRecipients', () => {
+  it('does not judge an address while it is still being typed', () => {
+    expect(summarizeRecipients({ draft: 'a@x', recipients: [] })).toEqual({
+      invalid: [],
+      recipients: [],
+      tooMany: false,
+    });
+  });
+
+  it('counts what is being typed once it is an address', () => {
+    expect(
+      summarizeRecipients({ draft: ' b@x.no ', recipients: ['a@x.no'] })
+        .recipients,
+    ).toEqual(['a@x.no', 'b@x.no']);
+  });
+
+  it('judges the pills', () => {
+    expect(
+      summarizeRecipients({ draft: '', recipients: ['a@x.no', 'nope'] }),
+    ).toEqual({
+      invalid: ['nope'],
+      recipients: ['a@x.no', 'nope'],
+      tooMany: false,
+    });
+  });
+
+  it('counts the typed address towards the limit', () => {
+    const recipients = Array.from({ length: 20 }, (_, n) => `${n}@x.no`);
+
+    expect(summarizeRecipients({ draft: '', recipients }).tooMany).toBe(false);
+    expect(
+      summarizeRecipients({ draft: 'one@more.no', recipients }).tooMany,
+    ).toBe(true);
   });
 });
 
