@@ -1243,13 +1243,6 @@ time {
         color: #ffffff;
     }
 
-    /* Back with nowhere to go: there, so the bar keeps its shape, but plainly
-       not something to press */
-    .mobile-nav-item:disabled {
-        color: rgba(255, 255, 255, 0.25);
-        cursor: default;
-    }
-
     .mobile-nav-item.active .icon {
         color: #58a6ff;
     }
@@ -1376,6 +1369,99 @@ time {
 
     :root.nav-open .ui.sidebar.navigation .item {
         min-height: 56px;
+    }
+}
+
+/* ---------------------------------------------------------------------------
+ * The installed iPhone app's title bar (TopBar): Back on the left, where iOS
+ * keeps it, and the page's name. Only there, since Safari has its own back and
+ * Android its system one -- TopBar is not drawn anywhere else -- and only at
+ * a phone's sizes, where the bottom bar is too: the two media queries must
+ * stay identical to the bottom bar's.
+ *
+ * The status bar is iOS's own ("black", in index.html), so the page starts
+ * below it; the inset is added anyway, for the day that changes.
+ * ------------------------------------------------------------------------ */
+
+.top-bar {
+    display: none;
+}
+
+@media only screen and (max-width: 767px), only screen and (max-height: 500px) and (orientation: landscape) {
+    :root {
+        --top-bar-height: calc(44px + env(safe-area-inset-top));
+    }
+
+    .top-bar {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        z-index: 1003;
+        height: var(--top-bar-height);
+        padding: env(safe-area-inset-top) calc(8px + env(safe-area-inset-right)) 0 calc(8px + env(safe-area-inset-left));
+        background: #1b1c1d;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    /* centred on the bar, not in what Back leaves of it, so the title does not
+       move when Back comes and goes; kept clear of Back on both sides */
+    .top-bar .top-bar-title {
+        margin: 0;
+        max-width: calc(100% - 180px);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: #ffffff;
+        font-family: inherit;
+        font-size: 17px;
+        font-weight: 600;
+        line-height: 1.2;
+    }
+
+    .top-bar-back {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        position: absolute;
+        left: calc(2px + env(safe-area-inset-left));
+        bottom: 0;
+        height: 44px;
+        padding: 0 10px 0 6px;
+        border: 0;
+        background: none;
+        color: #58a6ff;
+        font-family: inherit;
+        font-size: 17px;
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    .top-bar-back .icon {
+        margin: 0 !important;
+        height: auto;
+        font-size: 1em;
+    }
+
+    .top-bar-back:active {
+        opacity: 0.5;
+    }
+
+    .top-bar-back:focus-visible {
+        outline: 2px solid #58a6ff;
+        outline-offset: -2px;
+    }
+
+    /* room for it at the top of every page, and the menu panel kept below it */
+    :root.has-top-bar .app-content-body {
+        padding-top: var(--top-bar-height);
+    }
+
+    :root.has-top-bar.nav-open .ui.sidebar.navigation {
+        max-height: calc(100% - var(--mobile-nav-bottom) - var(--top-bar-height) - 24px);
     }
 }
 

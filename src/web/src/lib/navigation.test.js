@@ -1,4 +1,4 @@
-import { initialStack, nextStack, parentOf } from './navigation';
+import { initialStack, nextStack, parentOf, titleOf } from './navigation';
 
 describe('nextStack', () => {
   const opened = initialStack({ key: undefined });
@@ -65,5 +65,30 @@ describe('parentOf', () => {
       '/slskd/searches',
     );
     expect(parentOf('/searches/0a1b2c', '/')).toBe('/searches');
+  });
+});
+
+describe('titleOf', () => {
+  it('names a page as the menu does', () => {
+    expect(titleOf('/searches')).toBe('Search');
+    expect(titleOf('/searches/0a1b2c')).toBe('Search');
+    expect(titleOf('/downloads')).toBe('Downloads');
+    expect(titleOf('/system/info')).toBe('System');
+  });
+
+  it('names a user or a browse of one for whose it is', () => {
+    expect(titleOf('/users/some%20one')).toBe('some one');
+    expect(titleOf('/browse/someone/')).toBe('someone');
+    expect(titleOf('/users')).toBe('Users');
+  });
+
+  it('shows a name that is not valid percent-encoding as it is', () => {
+    expect(titleOf('/users/100%')).toBe('100%');
+  });
+
+  it('keeps out of the URL base, and has no name for what it does not know', () => {
+    expect(titleOf('/slskd/chat', '/slskd')).toBe('Chat');
+    expect(titleOf('/')).toBe('');
+    expect(titleOf('/nowhere')).toBe('');
   });
 });

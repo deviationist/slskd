@@ -1,7 +1,6 @@
 import { urlBase } from '../config';
-import * as navigation from '../lib/navigation';
-import React, { useEffect, useState } from 'react';
-import { NavLink, useHistory, useLocation } from 'react-router-dom';
+import React from 'react';
+import { NavLink } from 'react-router-dom';
 import { Icon } from 'semantic-ui-react';
 
 /*
@@ -19,62 +18,6 @@ const PRIMARY = [
   { icon: 'upload', label: 'Uploads', path: 'uploads' },
   { icon: 'comment', label: 'Chat', path: 'chat' },
 ];
-
-/**
- * Back, for the installed iPhone app, which has no back of its own: to where
- * the app was before, or -- opened straight onto a search, a user, a browse,
- * with nowhere before it -- up to the list that one belongs to. Greyed when
- * there is neither, rather than gone, so the bar does not shift under a thumb.
- *
- * It keeps its own account of the history from the moment the app starts,
- * since the browser will not say whether there is anything to go back to.
- * @param {object} params
- * @param {Function} params.onClose - Closes the menu, as every item here does.
- */
-const BackItem = ({ onClose }) => {
-  const history = useHistory();
-  const location = useLocation();
-  const [stack, setStack] = useState(() =>
-    navigation.initialStack(history.location),
-  );
-
-  useEffect(
-    () =>
-      history.listen((next, action) =>
-        setStack((current) =>
-          navigation.nextStack(current, { action, key: next.key }),
-        ),
-      ),
-    [history],
-  );
-
-  const canGoBack = stack.length > 1;
-  const parent = navigation.parentOf(location.pathname, urlBase);
-
-  const handleClick = () => {
-    onClose();
-
-    if (canGoBack) {
-      history.goBack();
-    } else if (parent) {
-      // up replaces rather than adds, so that going up and then back does not
-      // return to the page that was just left
-      history.replace(parent);
-    }
-  };
-
-  return (
-    <button
-      className="mobile-nav-item"
-      disabled={!canGoBack && !parent}
-      onClick={handleClick}
-      type="button"
-    >
-      <Icon name="chevron left" />
-      <span>Back</span>
-    </button>
-  );
-};
 
 /**
  * The navigation on a phone: a bar along the bottom edge, where a thumb is,
@@ -112,7 +55,6 @@ const MobileNav = ({ agent, alert, onClose, onToggle, open }) => (
       aria-label="Main"
       className="mobile-nav"
     >
-      {navigation.isStandaloneIos() && <BackItem onClose={onClose} />}
       {!agent &&
         PRIMARY.map(({ icon, label, path }) => (
           <NavLink

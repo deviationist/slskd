@@ -67,6 +67,14 @@ const PARENTS = [
   [/^\/browse\/[^/]+\/?$/u, '/browse'],
 ];
 
+const prefixOf = (base) =>
+  base && base !== '/' ? base.replace(/\/$/u, '') : '';
+
+const withoutBase = (pathname, prefix) =>
+  prefix && pathname.startsWith(prefix)
+    ? pathname.slice(prefix.length)
+    : pathname;
+
 /**
  * Where up is from the specified page, for when there is no back: the app was
  * opened on it, or reopened, and has no history to go back through.
@@ -75,13 +83,53 @@ const PARENTS = [
  * @returns {string|null} The parent's path, or null for a page without one.
  */
 export const parentOf = (pathname, base = '') => {
-  const prefix = base && base !== '/' ? base.replace(/\/$/u, '') : '';
-  const path =
-    prefix && pathname.startsWith(prefix)
-      ? pathname.slice(prefix.length)
-      : pathname;
+  const prefix = prefixOf(base);
+  const path = withoutBase(pathname, prefix);
 
   const parent = PARENTS.find(([pattern]) => pattern.test(path));
 
   return parent ? `${prefix}${parent[1]}` : null;
+};
+
+// what each page is called, by the first part of its path: the names the menu
+// gives them, so that the bar says what was tapped
+const TITLES = {
+  browse: 'Browse',
+  chat: 'Chat',
+  dashboard: 'Dashboard',
+  downloads: 'Downloads',
+  rooms: 'Rooms',
+  searches: 'Search',
+  shared: 'Shared',
+  system: 'System',
+  uploads: 'Uploads',
+  users: 'Users',
+};
+
+const decode = (segment) => {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    // a segment that is not valid percent-encoding is shown as it is
+    return segment;
+  }
+};
+
+/**
+ * What to call the specified page in a title bar: its name in the menu, or,
+ * for a user or a browse of one, whose.
+ * @param {string} pathname - The page's path.
+ * @param {string} base - The URL base the app is served under.
+ * @returns {string} The title, or an empty string for a page with no name.
+ */
+export const titleOf = (pathname, base = '') => {
+  const [page, item] = withoutBase(pathname, prefixOf(base))
+    .split('/')
+    .filter(Boolean);
+
+  if (item && (page === 'users' || page === 'browse')) {
+    return decode(item);
+  }
+
+  return TITLES[page] ?? '';
 };
