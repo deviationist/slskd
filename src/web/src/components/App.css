@@ -1291,11 +1291,10 @@ time {
         color: rgba(255, 255, 255, 0.9);
     }
 
+    /* the label in the icon's blue too, so the item reads as one thing that
+       is selected rather than a blue icon over white text; the icon inherits
+       it. #58a6ff is 6.8:1 against the bar, past the 4.5 an 11px label needs */
     .mobile-nav-item.active {
-        color: #ffffff;
-    }
-
-    .mobile-nav-item.active .icon {
         color: #58a6ff;
     }
 
