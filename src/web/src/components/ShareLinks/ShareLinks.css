@@ -12,8 +12,16 @@
   overflow-wrap: anywhere;
 }
 
+/* the left margin is the room Semantic leaves a bulleted list for its
+   bullets; setting the margin as one shorthand took it away and put the dots
+   on the modal's edge */
 .ui.list.share-link-files,
 .ui.list.share-dialog-files {
+  margin: 0.75em 0 0.75em 1.25rem;
+  overflow-wrap: anywhere;
+}
+
+.share-file-single {
   margin: 0.75em 0;
   overflow-wrap: anywhere;
 }
@@ -193,4 +201,16 @@
 
 .recipients-input-pill button:disabled {
   cursor: default;
+}
+
+/* Backspace in an empty field has picked this pill out; the next removes it */
+.ui.label.recipients-input-pill.picked {
+  background-color: #2185d0;
+  color: #ffffff;
+  outline: 2px solid #58a6ff;
+  outline-offset: 1px;
+}
+
+.ui.red.label.recipients-input-pill.picked {
+  background-color: #a51d1d;
 }

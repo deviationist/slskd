@@ -2,6 +2,7 @@ import './ShareLinks.css';
 import * as shareLinks from '../../lib/shareLinks';
 import { formatBytes, formatDate } from '../../lib/util';
 import CopyField from './CopyField';
+import FileNames from './FileNames';
 import RecipientsInput, { RecipientProblems } from './RecipientsInput';
 import React, { useState } from 'react';
 import {
@@ -52,17 +53,11 @@ const Selection = ({ files, skipped }) => {
         {formatBytes(size)}
         {files.length > 1 && ', downloadable one by one or as a zip'}
       </p>
-      <List
-        bulleted
+      <FileNames
         className="share-dialog-files"
-      >
-        {listed.map((file) => (
-          <List.Item key={file.id}>{getFileName(file.filename)}</List.Item>
-        ))}
-        {files.length > listed.length && (
-          <List.Item>and {files.length - listed.length} more</List.Item>
-        )}
-      </List>
+        names={listed.map((file) => getFileName(file.filename))}
+        total={files.length}
+      />
       {skipped > 0 && (
         <Message
           info
@@ -159,14 +154,9 @@ const ShareDialog = ({
   const [error, setError] = useState(null);
   const [created, setCreated] = useState(null);
 
-  // an address typed and not yet ended with Enter still counts: it is the one
-  // most likely to be there when Share is clicked
-  const recipients = shareLinks.addRecipients(
-    addresses.recipients,
-    addresses.draft,
-  );
-  const invalid = shareLinks.invalidRecipients(recipients);
-  const tooMany = recipients.length > shareLinks.MAXIMUM_RECIPIENTS;
+  // judged as pills, and the address being typed counted once it is one
+  const { invalid, recipients, tooMany } =
+    shareLinks.summarizeRecipients(addresses);
   const dayCount = Number.parseInt(days, 10);
   const daysValid =
     Number.isInteger(dayCount) && dayCount >= 1 && dayCount <= maxDays;
@@ -268,9 +258,7 @@ const ShareDialog = ({
             />
           </Form.Field>
           <Form.Field disabled={!mailEnabled}>
-            <label htmlFor="share-dialog-recipients">
-              Email it to (each address gets a link of its own)
-            </label>
+            <label htmlFor="share-dialog-recipients">Email it to</label>
             <RecipientsInput
               disabled={!mailEnabled}
               draft={addresses.draft}
@@ -283,6 +271,11 @@ const ShareDialog = ({
               }
               recipients={addresses.recipients}
             />
+            {mailEnabled && (
+              <p className="share-dialog-note">
+                Each address gets a link of its own.
+              </p>
+            )}
             <RecipientProblems
               invalid={invalid}
               tooMany={tooMany}

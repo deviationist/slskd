@@ -1,5 +1,5 @@
 import * as shareLinks from '../../lib/shareLinks';
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { Icon, Label } from 'semantic-ui-react';
 
 // what ends an address as it is typed. Tab only when there is something to
@@ -38,6 +38,10 @@ export const RecipientProblems = ({ invalid, tooMany }) => {
  * can be put back into the field to fix, or removed. Pasting several at once
  * makes a pill of each.
  *
+ * Backspace in an empty field works as it does in Mail's To field: the first
+ * press picks out the last pill, the second removes it. One press removing it
+ * outright would cost a whole address to a key held a moment too long.
+ *
  * Controlled from both ends -- the pills and what is still being typed -- so
  * that the owner can count an address typed and not yet ended as one of the
  * recipients. Leaving it out would mail everyone except the address someone
@@ -62,6 +66,9 @@ const RecipientsInput = ({
 }) => {
   const input = useRef(null);
 
+  // whether Backspace has picked out the last pill, for the next one to remove
+  const [picked, setPicked] = useState(false);
+
   const commit = (text = draft) =>
     onChange({
       draft: '',
@@ -69,6 +76,22 @@ const RecipientsInput = ({
     });
 
   const handleKeyDown = (event) => {
+    if (event.key === 'Backspace' && draft === '' && recipients.length > 0) {
+      event.preventDefault();
+
+      if (picked) {
+        setPicked(false);
+        onChange({ draft, recipients: recipients.slice(0, -1) });
+      } else {
+        setPicked(true);
+      }
+
+      return;
+    }
+
+    // anything else is the end of meaning that pill
+    setPicked(false);
+
     if (
       SEPARATORS.has(event.key) ||
       (event.key === 'Tab' && draft.trim() !== '')
@@ -117,12 +140,13 @@ const RecipientsInput = ({
         if (event.target === event.currentTarget) input.current?.focus();
       }}
     >
-      {recipients.map((value) => {
+      {recipients.map((value, index) => {
         const valid = shareLinks.isRecipient(value);
+        const isPicked = picked && index === recipients.length - 1;
 
         return (
           <Label
-            className="recipients-input-pill"
+            className={`recipients-input-pill${isPicked ? ' picked' : ''}`}
             color={valid ? undefined : 'red'}
             key={value}
             title={valid ? value : `Not an email address: ${value}`}
@@ -164,7 +188,10 @@ const RecipientsInput = ({
         // the browser's own validation: it would block the form on a draft
         // that is about to become a pill, and treats spaces unevenly
         inputMode="email"
-        onBlur={() => draft.trim() && commit()}
+        onBlur={() => {
+          setPicked(false);
+          if (draft.trim()) commit();
+        }}
         onChange={(event) =>
           onChange({ draft: event.target.value, recipients })
         }

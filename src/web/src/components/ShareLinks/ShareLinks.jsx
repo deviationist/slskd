@@ -4,6 +4,7 @@ import { formatBytes, formatDate, formatDayMonth } from '../../lib/util';
 import AppContext from '../AppContext';
 import { LoaderSegment, PlaceholderSegment } from '../Shared';
 import CopyField from './CopyField';
+import FileNames from './FileNames';
 import RecipientsInput, { RecipientProblems } from './RecipientsInput';
 import React, { useCallback, useContext, useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
@@ -33,12 +34,9 @@ const MailModal = ({ link, onClose }) => {
   const [addresses, setAddresses] = useState({ draft: '', recipients: [] });
   const [busy, setBusy] = useState(false);
 
-  const recipients = shareLinks.addRecipients(
-    addresses.recipients,
-    addresses.draft,
-  );
-  const invalid = shareLinks.invalidRecipients(recipients);
-  const tooMany = recipients.length > shareLinks.MAXIMUM_RECIPIENTS;
+  // judged as pills, and the address being typed counted once it is one
+  const { invalid, recipients, tooMany } =
+    shareLinks.summarizeRecipients(addresses);
 
   const handleSend = async () => {
     setBusy(true);
@@ -317,15 +315,11 @@ const LinkItem = ({ link, mailEnabled, maxDays, onChanged }) => {
         busy={busy}
         onRevoke={(access) => setConfirming({ access })}
       />
-      <List
-        bulleted
+      <FileNames
         className="share-link-files"
-      >
-        {link.files.slice(0, 5).map((file) => (
-          <List.Item key={file.id}>{file.name}</List.Item>
-        ))}
-        {count > 5 && <List.Item>and {count - 5} more</List.Item>}
-      </List>
+        names={link.files.slice(0, 5).map((file) => file.name)}
+        total={count}
+      />
       <div className="share-link-actions">
         <Dropdown
           button
