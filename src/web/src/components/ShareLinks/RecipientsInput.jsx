@@ -102,9 +102,16 @@ const RecipientsInput = ({
 
   const handlePaste = (event) => {
     const text = event.clipboardData?.getData('text') ?? '';
+    const pasted = shareLinks.parseRecipients(text);
 
-    // a single address pasted is left to be typed onto, like any other text
-    if (/[\s,;]/u.test(text.trim())) {
+    // a paste of several makes a pill of each, along with whatever was typed;
+    // a paste of one address into an empty field is one finished address, and
+    // becomes its pill at once, as in Gmail. Pasted into the middle of
+    // something being typed, or not an address, it is text to carry on with
+    if (
+      pasted.length > 1 ||
+      (draft === '' && pasted.length === 1 && shareLinks.isRecipient(pasted[0]))
+    ) {
       event.preventDefault();
       commit(`${draft} ${text}`);
     }
