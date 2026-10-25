@@ -21,6 +21,14 @@ describe('parseRecipients', () => {
     ]);
   });
 
+  it('takes the address out of a name and an address, as mail clients copy them', () => {
+    expect(
+      parseRecipients(
+        'Ola Nordmann <ola@x.no>, "Kari, K." <kari@x.no>; c@x.no',
+      ),
+    ).toEqual(['ola@x.no', 'kari@x.no', 'c@x.no']);
+  });
+
   it('gives nothing for nothing', () => {
     expect(parseRecipients('')).toEqual([]);
     expect(parseRecipients(undefined)).toEqual([]);

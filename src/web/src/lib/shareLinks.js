@@ -119,23 +119,32 @@ export const isShareable = (file) =>
 /**
  * Splits what was typed into the recipients field into addresses: commas,
  * semicolons and whitespace all separate, and duplicates go.
+ *
+ * An address as a mail client copies it -- `Ola Nordmann <ola@x.no>` -- is
+ * taken for the address alone, as Gmail takes it; the name would otherwise
+ * become two addresses that are not, beside the real one in brackets.
  */
 export const parseRecipients = (text) => {
   const seen = new Set();
 
-  return (text ?? '')
-    .split(/[\s,;]+/u)
-    .map((value) => value.trim())
-    .filter((value) => {
-      const key = value.toLowerCase();
+  return (
+    (text ?? '')
+      // a quoted name first, since it may hold the very commas that separate
+      .replaceAll(/"[^"]*"/gu, ' ')
+      .replaceAll(/[^,;<>\n]*<([^\s<>][^\s<>@]*@[^\s<>]+)>/gu, ' $1 ')
+      .split(/[\s,;]+/u)
+      .map((value) => value.trim())
+      .filter((value) => {
+        const key = value.toLowerCase();
 
-      if (!value || seen.has(key)) {
-        return false;
-      }
+        if (!value || seen.has(key)) {
+          return false;
+        }
 
-      seen.add(key);
-      return true;
-    });
+        seen.add(key);
+        return true;
+      })
+  );
 };
 
 /**
