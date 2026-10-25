@@ -328,6 +328,58 @@ body {
     top: 0 !important;
 }
 
+/* On a desktop only the page below the menu scrolls.
+
+   Semantic scrolls the whole of `.pushable`, menu and all, so its scrollbar ran
+   the full height of the window -- beside the menu too, which then stopped
+   short of the right edge with the scrollbar's track next to it. And the
+   footer, fixed to the window rather than to that box, sat over the bottom of
+   the scrollbar. So the box becomes a column that does not scroll: the menu
+   at the top, full width, and under it the page, which scrolls on its own and
+   ends where the footer begins.
+
+   `.pusher` becoming the scroller is safe for the lists that virtualise: they
+   find their scroller by walking up to the first `auto` (scrollParentOf) and
+   measure against it, rather than assuming which element it is.
+
+   Exactly the screens the phone layout below is not -- at least 768px wide,
+   and not a short landscape one -- since the phone layout has its own answer,
+   the bar along the bottom. */
+@media only screen and (min-width: 768px) and (min-height: 501px), only screen and (min-width: 768px) and (orientation: portrait) {
+    :root {
+        --footer-height: 41px;
+    }
+
+    .pushable.app {
+        display: flex;
+        flex-direction: column;
+        overflow: hidden !important;
+        top: 0;
+        bottom: var(--footer-height);
+        /* it is a .ui.segment, which keeps 1rem below itself: harmless while the
+           box ran under the footer, a strip above it now that it stops there */
+        margin-bottom: 0 !important;
+        height: auto !important;
+    }
+
+    .pushable.app > .navigation {
+        flex: none;
+    }
+
+    .pushable > .pusher.app-content {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-x: hidden !important;
+        overflow-y: auto !important;
+    }
+
+    /* the footer no longer covers the end of the page, so the room that was
+       kept for it is only the usual space after the last thing on it */
+    .app-content-body {
+        padding-bottom: 16px;
+    }
+}
+
 .result-card {
     width: 100% !important;
 }
