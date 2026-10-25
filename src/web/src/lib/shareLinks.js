@@ -19,6 +19,12 @@ import { formatDate, formatDayMonth } from './util';
  */
 export const DURATIONS = [1, 7, 30];
 
+/**
+ * How many addresses one request may mail; the server refuses more
+ * (ShareLinkService.MaximumRecipients).
+ */
+export const MAXIMUM_RECIPIENTS = 20;
+
 export const list = async () => (await api.get('/links')).data;
 
 export const create = async ({
@@ -131,14 +137,32 @@ export const parseRecipients = (text) => {
 };
 
 /**
- * The addresses that are plainly not addresses. Deliberately loose -- the
- * server has the last word -- and only here so a typo is caught before the
- * copies are made rather than after.
+ * Whether a value looks like an address. Deliberately loose -- the server has
+ * the last word -- and only here so a typo is caught before the copies are
+ * made rather than after.
+ */
+export const isRecipient = (value) =>
+  /^[^\s@]+@[^\s@][^\s.@]*\.[^\s@]+$/u.test(value);
+
+/**
+ * The addresses that are plainly not addresses.
  */
 export const invalidRecipients = (recipients) =>
-  recipients.filter(
-    (value) => !/^[^\s@]+@[^\s@][^\s.@]*\.[^\s@]+$/u.test(value),
-  );
+  recipients.filter((value) => !isRecipient(value));
+
+/**
+ * The given addresses with whatever was typed or pasted added to the end:
+ * split as {@link parseRecipients} splits, and without any already there,
+ * compared as the server compares them, ignoring case.
+ */
+export const addRecipients = (recipients, text) => {
+  const taken = new Set(recipients.map((value) => value.toLowerCase()));
+
+  return [
+    ...recipients,
+    ...parseRecipients(text).filter((value) => !taken.has(value.toLowerCase())),
+  ];
+};
 
 /**
  * How long a link has left, in words: "in 6 days", "in 5 hours", or

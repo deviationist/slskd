@@ -2,6 +2,7 @@ import './ShareLinks.css';
 import * as shareLinks from '../../lib/shareLinks';
 import { formatBytes, formatDate } from '../../lib/util';
 import CopyField from './CopyField';
+import RecipientsInput, { RecipientProblems } from './RecipientsInput';
 import React, { useState } from 'react';
 import {
   Button,
@@ -151,15 +152,21 @@ const ShareDialog = ({
 
   const [days, setDays] = useState(String(defaults?.defaultDays ?? 7));
   const [title, setTitle] = useState('');
-  const [recipientsText, setRecipientsText] = useState('');
+  const [addresses, setAddresses] = useState({ draft: '', recipients: [] });
   const [general, setGeneral] = useState(true);
   const [remove, setRemove] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [created, setCreated] = useState(null);
 
-  const recipients = shareLinks.parseRecipients(recipientsText);
+  // an address typed and not yet ended with Enter still counts: it is the one
+  // most likely to be there when Share is clicked
+  const recipients = shareLinks.addRecipients(
+    addresses.recipients,
+    addresses.draft,
+  );
   const invalid = shareLinks.invalidRecipients(recipients);
+  const tooMany = recipients.length > shareLinks.MAXIMUM_RECIPIENTS;
   const dayCount = Number.parseInt(days, 10);
   const daysValid =
     Number.isInteger(dayCount) && dayCount >= 1 && dayCount <= maxDays;
@@ -260,23 +267,27 @@ const ShareDialog = ({
               onChange={(_event, { checked }) => setGeneral(checked)}
             />
           </Form.Field>
-          <Form.TextArea
-            disabled={!mailEnabled}
-            error={
-              invalid.length > 0 && {
-                content: `Not an email address: ${invalid.join(', ')}`,
+          <Form.Field disabled={!mailEnabled}>
+            <label htmlFor="share-dialog-recipients">
+              Email it to (each address gets a link of its own)
+            </label>
+            <RecipientsInput
+              disabled={!mailEnabled}
+              draft={addresses.draft}
+              id="share-dialog-recipients"
+              onChange={setAddresses}
+              placeholder={
+                mailEnabled
+                  ? 'Type an address and press Enter (optional)'
+                  : 'Mail is not set up on this server'
               }
-            }
-            label="Email it to (each address gets a link of its own)"
-            onChange={(_event, { value }) => setRecipientsText(value)}
-            placeholder={
-              mailEnabled
-                ? 'Addresses, separated by commas or spaces (optional)'
-                : 'Mail is not set up on this server'
-            }
-            rows={2}
-            value={recipientsText}
-          />
+              recipients={addresses.recipients}
+            />
+            <RecipientProblems
+              invalid={invalid}
+              tooMany={tooMany}
+            />
+          </Form.Field>
           {!reachable && (
             <p className="share-dialog-note share-dialog-unreachable">
               Make a general link or add an address, or nobody will be able to
@@ -321,6 +332,7 @@ const ShareDialog = ({
             shareable.length === 0 ||
             !daysValid ||
             invalid.length > 0 ||
+            tooMany ||
             !reachable
           }
           form="share-dialog-form"

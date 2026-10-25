@@ -4,6 +4,7 @@ import { formatBytes, formatDate, formatDayMonth } from '../../lib/util';
 import AppContext from '../AppContext';
 import { LoaderSegment, PlaceholderSegment } from '../Shared';
 import CopyField from './CopyField';
+import RecipientsInput, { RecipientProblems } from './RecipientsInput';
 import React, { useCallback, useContext, useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import {
@@ -29,11 +30,15 @@ const errorOf = (error) =>
  * the one it already has.
  */
 const MailModal = ({ link, onClose }) => {
-  const [text, setText] = useState('');
+  const [addresses, setAddresses] = useState({ draft: '', recipients: [] });
   const [busy, setBusy] = useState(false);
 
-  const recipients = shareLinks.parseRecipients(text);
+  const recipients = shareLinks.addRecipients(
+    addresses.recipients,
+    addresses.draft,
+  );
   const invalid = shareLinks.invalidRecipients(recipients);
+  const tooMany = recipients.length > shareLinks.MAXIMUM_RECIPIENTS;
 
   const handleSend = async () => {
     setBusy(true);
@@ -73,19 +78,21 @@ const MailModal = ({ link, onClose }) => {
           id="share-links-mail-form"
           onSubmit={handleSend}
         >
-          <Form.TextArea
-            autoFocus
-            error={
-              invalid.length > 0 && {
-                content: `Not an email address: ${invalid.join(', ')}`,
-              }
-            }
-            label="Addresses"
-            onChange={(_event, { value }) => setText(value)}
-            placeholder="Separated by commas or spaces"
-            rows={2}
-            value={text}
-          />
+          <Form.Field>
+            <label htmlFor="share-links-mail-recipients">Addresses</label>
+            <RecipientsInput
+              autoFocus
+              draft={addresses.draft}
+              id="share-links-mail-recipients"
+              onChange={setAddresses}
+              placeholder="Type an address and press Enter"
+              recipients={addresses.recipients}
+            />
+            <RecipientProblems
+              invalid={invalid}
+              tooMany={tooMany}
+            />
+          </Form.Field>
         </Form>
         <p className="share-dialog-note">
           Each address gets a link of its own, which can be revoked without
@@ -102,7 +109,9 @@ const MailModal = ({ link, onClose }) => {
           Cancel
         </Button>
         <Button
-          disabled={busy || recipients.length === 0 || invalid.length > 0}
+          disabled={
+            busy || recipients.length === 0 || invalid.length > 0 || tooMany
+          }
           form="share-links-mail-form"
           loading={busy}
           primary

@@ -1,9 +1,11 @@
 import {
+  addRecipients,
   describeAccess,
   describeExpiry,
   describeRemoval,
   generalAccessOf,
   invalidRecipients,
+  isRecipient,
   isShareable,
   parseRecipients,
 } from './shareLinks';
@@ -31,6 +33,48 @@ describe('invalidRecipients', () => {
       'nope',
       'b@x',
     ]);
+  });
+});
+
+describe('isRecipient', () => {
+  it('takes an address and refuses what plainly is not one', () => {
+    expect(isRecipient('a@x.no')).toBe(true);
+    expect(isRecipient('first.last+tag@sub.x.no')).toBe(true);
+    expect(isRecipient('nope')).toBe(false);
+    expect(isRecipient('b@x')).toBe(false);
+    expect(isRecipient('a @x.no')).toBe(false);
+    expect(isRecipient('')).toBe(false);
+  });
+});
+
+describe('addRecipients', () => {
+  it('adds what was typed to the end', () => {
+    expect(addRecipients(['a@x.no'], 'b@x.no')).toEqual(['a@x.no', 'b@x.no']);
+  });
+
+  it('adds every address in a paste', () => {
+    expect(addRecipients([], 'a@x.no, b@x.no; c@x.no')).toEqual([
+      'a@x.no',
+      'b@x.no',
+      'c@x.no',
+    ]);
+  });
+
+  it('skips an address already there, whatever its case', () => {
+    expect(addRecipients(['a@x.no'], 'A@X.no b@x.no')).toEqual([
+      'a@x.no',
+      'b@x.no',
+    ]);
+  });
+
+  it('keeps an invalid address, so that it can be shown and fixed', () => {
+    expect(addRecipients([], 'nope')).toEqual(['nope']);
+  });
+
+  it('changes nothing for nothing', () => {
+    const recipients = ['a@x.no'];
+
+    expect(addRecipients(recipients, ' , ')).toEqual(recipients);
   });
 });
 
