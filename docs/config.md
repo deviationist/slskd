@@ -969,6 +969,7 @@ Logging of HTTP requests is disabled by default.
 | `--content-path`           | `SLSKD_CONTENT_PATH`           | The path to static web content                      |
 | `--http-logging`           | `SLSKD_HTTP_LOGGING`           | Determines whether HTTP requests are to be logged   |
 | `--ui-locale`              | `SLSKD_UI_LOCALE`              | The locale the web UI formats dates in              |
+| `--offline-message`        | `SLSKD_OFFLINE_MESSAGE`        | What the installed app says when slskd is unreachable |
 
 The web UI renders every date and time in the locale given by `locale`, a BCP 47
 tag. This sets date order, separators and month names: `en-GB` gives
@@ -985,6 +986,17 @@ by an `en-US` browser.
 The 24-hour clock is applied on top of whichever locale is in force, so setting
 `en-US` gives US date order and still `00`–`23`.
 
+When the web UI is installed as an app, a service worker shows slskd's own
+offline page instead of the browser's error whenever opening it fails. If the
+server can't be reached at all, the page shows `offline_message`. Use it for
+the advice that fits your deployment, such as which network or VPN to join.
+slskd has no way to know that, so the default is generic. The message is plain
+text, and line breaks are kept. If a proxy in front of slskd answers 502, 503
+or 504, the page instead explains that slskd itself isn't responding.
+
+The page is stored on the device, so a changed message reaches it the next
+time the app is opened while slskd is reachable.
+
 #### **YAML**
 ```yaml
 web:
@@ -995,6 +1007,7 @@ web:
   content_path: wwwroot
   logging: false
   locale: en-GB
+  offline_message: ~
 ```
 
 ## HTTPS

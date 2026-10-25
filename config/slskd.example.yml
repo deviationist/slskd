@@ -163,6 +163,7 @@
 #   content_path: wwwroot
 #   logging: false
 #   locale: en-GB
+#   offline_message: ~
 #   authentication:
 #     disabled: false
 #     username: slskd

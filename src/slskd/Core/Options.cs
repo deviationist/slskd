@@ -2242,6 +2242,27 @@ namespace slskd
             public string Locale { get; init; } = "en-GB";
 
             /// <summary>
+            ///     Gets the message the installed web app shows when it cannot reach slskd.
+            /// </summary>
+            /// <remarks>
+            ///     <para>
+            ///         Shown by the service worker's offline page when opening the app fails outright -- no route, no
+            ///         name, no answer. That is a fact about where slskd is deployed rather than about slskd, so the
+            ///         advice worth giving (which network to join, which VPN to connect) is the operator's to write.
+            ///     </para>
+            ///     <para>
+            ///         Plain text; line breaks are kept. Blank gives a generic message. It reaches a device the next
+            ///         time the app is opened online, since the page is held there for exactly the moment the server
+            ///         cannot be asked.
+            ///     </para>
+            /// </remarks>
+            [Argument(default, "offline-message")]
+            [EnvironmentVariable("OFFLINE_MESSAGE")]
+            [Description("message the installed web app shows when slskd cannot be reached; blank is generic")]
+            [StringLength(2000)]
+            public string OfflineMessage { get; init; }
+
+            /// <summary>
             ///     Gets HTTPS options.
             /// </summary>
             [Validate]
