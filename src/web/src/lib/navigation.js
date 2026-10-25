@@ -2,10 +2,15 @@
  * Going back, for where the browser offers no way to.
  *
  * A page added to an iPhone's home screen opens without Safari around it: no
- * back button, and no swipe back either. Every link from one page to another
- * -- a search result to its user, a download to the search it came from -- is
- * then a way in with no way out. So the app keeps its own account of where it
- * has been, and knows where "up" is for the pages that have an up.
+ * back button, and no swipe back either. A search's results, a user, a browse
+ * of someone's files -- each one thing out of a list or a lookup -- then had
+ * no way back to that list short of knowing which tab it lives under.
+ *
+ * Back here is up, not history: it is shown only on a page with a parent, and
+ * it goes to that parent. Between the sections themselves the tabs are the
+ * way to move, as in any iOS app. The app keeps its own account of where it
+ * has been only to go up the way it came when it came from there, so that the
+ * list is as it was left -- scrolled, filtered -- rather than drawn again.
  */
 
 // what a location with no key is called: the browser's history gives the
@@ -22,21 +27,27 @@ const INITIAL = 'initial';
 export const isStandaloneIos = () =>
   typeof window !== 'undefined' && window.navigator?.standalone === true;
 
+const entryOf = (location) => ({
+  key: location?.key ?? INITIAL,
+  pathname: location?.pathname ?? '',
+});
+
 /**
- * The entries of the app's own history, oldest first, after a navigation.
+ * The entries of the app's own history, oldest first, after a navigation:
+ * each a location's key and path.
  *
  * The browser does not say which way a pop went, so it is worked out from the
  * key: the entry before this one means back, any other entry already seen
  * means back that far, and one never seen starts the account again rather than
  * guess. Only the last case is a loss, and only of the way back past it.
- * @param {string[]} stack - The entries so far.
+ * @param {object[]} stack - The entries so far.
  * @param {object} navigation
  * @param {string} navigation.action - PUSH, REPLACE or POP.
- * @param {string} [navigation.key] - The location's key.
- * @returns {string[]} The entries now.
+ * @param {object} navigation.location - The location arrived at.
+ * @returns {object[]} The entries now.
  */
-export const nextStack = (stack, { action, key }) => {
-  const entry = key ?? INITIAL;
+export const nextStack = (stack, { action, location }) => {
+  const entry = entryOf(location);
 
   if (action === 'PUSH') {
     return [...stack, entry];
@@ -46,7 +57,7 @@ export const nextStack = (stack, { action, key }) => {
     return [...stack.slice(0, -1), entry];
   }
 
-  const at = stack.lastIndexOf(entry);
+  const at = stack.map((item) => item.key).lastIndexOf(entry.key);
 
   return at === -1 ? [entry] : stack.slice(0, at + 1);
 };
@@ -54,9 +65,9 @@ export const nextStack = (stack, { action, key }) => {
 /**
  * The account to start from, for the location the app was opened on.
  * @param {object} location - The location.
- * @returns {string[]} The entries.
+ * @returns {object[]} The entries.
  */
-export const initialStack = (location) => [location?.key ?? INITIAL];
+export const initialStack = (location) => [entryOf(location)];
 
 // the pages that show one thing out of a list or a lookup, and the page that
 // is the list or the lookup: up from a search is its list, from a user is
@@ -132,4 +143,31 @@ export const titleOf = (pathname, base = '') => {
   }
 
   return TITLES[page] ?? '';
+};
+
+const samePath = (a, b) => a.replace(/\/+$/u, '') === b.replace(/\/+$/u, '');
+
+/**
+ * What Back does on the specified page: nothing, for a page with no parent --
+ * it is not shown there -- and otherwise goes up to the parent. `back` when the
+ * page was reached from that parent, so stepping back in history returns to
+ * the list as it was left; `up` to the parent's path otherwise, replacing the
+ * page rather than adding to the history, so that Back then up does not loop.
+ * @param {object[]} stack - The app's history, as nextStack keeps it.
+ * @param {string} pathname - The page's path.
+ * @param {string} base - The URL base the app is served under.
+ * @returns {object|null} `{ mode: 'back' }`, `{ mode: 'up', to }`, or null.
+ */
+export const backTarget = (stack, pathname, base = '') => {
+  const parent = parentOf(pathname, base);
+
+  if (!parent) {
+    return null;
+  }
+
+  const previous = stack.length > 1 ? stack[stack.length - 2] : null;
+
+  return previous && samePath(previous.pathname, parent)
+    ? { mode: 'back' }
+    : { mode: 'up', to: parent };
 };

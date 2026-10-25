@@ -8,13 +8,15 @@ import { Icon } from 'semantic-ui-react';
  * A title bar along the top edge, for the installed iPhone app, which has no
  * back of its own: Back on the left, where iOS keeps it, and what the page is.
  *
- * Back goes to where the app was before, or -- opened straight onto a search,
- * a user, a browse, with nowhere before it -- up to the list that one belongs
- * to. With neither it is not shown, as iOS shows none on a first page; the
- * title is centred on the bar rather than beside it, so nothing moves.
+ * Back is up, not history: shown only on a page that is one thing out of a
+ * list or a lookup -- a search's results, a user, a browse -- and going to that
+ * list. Between the sections themselves the tabs are the way to move, as in
+ * any iOS app, so a top-level page has no Back however it was reached. The
+ * title is centred on the bar rather than beside Back, so nothing moves.
  *
- * It keeps its own account of the history from the moment the app starts,
- * since the browser will not say whether there is anything to go back to.
+ * It keeps its own account of the history from the moment the app starts, so
+ * that a page opened from its list goes back to it the way it came, and the
+ * list is as it was left (see navigation.backTarget).
  *
  * Only drawn in the installed app, and only at the widths and heights App.css
  * calls a phone, where it is the page's top edge; App.css makes the room for it.
@@ -39,30 +41,29 @@ const TopBar = ({ onNavigate }) => {
     () =>
       history.listen((next, action) =>
         setStack((current) =>
-          navigation.nextStack(current, { action, key: next.key }),
+          navigation.nextStack(current, { action, location: next }),
         ),
       ),
     [history],
   );
 
-  const canGoBack = stack.length > 1;
-  const parent = navigation.parentOf(location.pathname, urlBase);
+  const target = navigation.backTarget(stack, location.pathname, urlBase);
 
   const handleBack = () => {
     onNavigate();
 
-    if (canGoBack) {
+    if (target.mode === 'back') {
       history.goBack();
     } else {
       // up replaces rather than adds, so that going up and then back does not
       // return to the page that was just left
-      history.replace(parent);
+      history.replace(target.to);
     }
   };
 
   return (
     <header className="top-bar">
-      {(canGoBack || parent) && (
+      {target && (
         <button
           className="top-bar-back"
           onClick={handleBack}
