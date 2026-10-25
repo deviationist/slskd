@@ -49,7 +49,12 @@
 
 .share-dialog-days .field {
   margin: 0 !important;
-  width: 9em;
+}
+
+/* the number box sized, and the field left to fit it and its "days" label: a
+   fixed width on the field cut the label off, leaving a box with no unit */
+.share-dialog-days .ui.labeled.input > input {
+  width: 5em;
 }
 
 .share-dialog-note {

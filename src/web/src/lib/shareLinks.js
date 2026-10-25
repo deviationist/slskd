@@ -15,9 +15,11 @@ import { formatDate, formatDayMonth } from './util';
 
 /**
  * The validities the dialog offers, in days. Any number up to the server's
- * maximum can be typed; these are the ones worth a button.
+ * maximum can be typed; these are the ones worth a button. Two and three
+ * months for a share meant to outlast a holiday or a season; the server's
+ * default maximum is 90, and a preset above whatever it is set to is not shown.
  */
-export const DURATIONS = [1, 7, 30];
+export const DURATIONS = [1, 7, 30, 60, 90];
 
 /**
  * How many addresses one request may mail; the server refuses more
