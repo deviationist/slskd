@@ -1,6 +1,8 @@
 import {
+  describeAccess,
   describeExpiry,
   describeRemoval,
+  generalAccessOf,
   invalidRecipients,
   isShareable,
   parseRecipients,
@@ -80,5 +82,49 @@ describe('describeRemoval', () => {
     expect(describeRemoval({ count: 3, deleteFileOnRemoval: false })).toBe(
       'Remove the 3 downloads from Downloads',
     );
+  });
+});
+
+describe('generalAccessOf', () => {
+  it('finds the general link that still works, not a revoked one or a recipient', () => {
+    const link = {
+      accesses: [
+        { id: 'old', recipient: null, revokedAt: '2026-10-20T00:00:00Z' },
+        { id: 'kim', recipient: 'kim@x.no', revokedAt: null },
+        { id: 'new', recipient: null, revokedAt: null },
+      ],
+    };
+
+    expect(generalAccessOf(link).id).toBe('new');
+    expect(generalAccessOf({ accesses: [link.accesses[0]] })).toBeUndefined();
+  });
+});
+
+describe('describeAccess', () => {
+  it('puts a revocation first', () => {
+    expect(
+      describeAccess({ downloadCount: 3, revokedAt: '2026-10-20T00:00:00Z' }),
+    ).toMatch(/^revoked /u);
+  });
+
+  it('says when a mail never arrived', () => {
+    expect(
+      describeAccess({
+        downloadCount: 0,
+        mailError: 'Mail is not enabled',
+        recipient: 'kim@x.no',
+      }),
+    ).toBe('not delivered: Mail is not enabled');
+  });
+
+  it('counts downloads', () => {
+    expect(describeAccess({ downloadCount: 0 })).toBe('not downloaded yet');
+    expect(describeAccess({ downloadCount: 1 })).toBe('downloaded once');
+    expect(
+      describeAccess({
+        downloadCount: 2,
+        lastDownloadedAt: '2026-10-25T12:00:00Z',
+      }),
+    ).toMatch(/^downloaded 2 times, last /u);
   });
 });

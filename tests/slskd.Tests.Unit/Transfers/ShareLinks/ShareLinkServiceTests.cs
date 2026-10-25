@@ -80,6 +80,10 @@ public sealed class ShareLinkServiceTests : IDisposable
             {
                 ShareLinks = new Options.TransfersOptions.ShareLinksOptions { Enabled = true, Directory = Shared, MaxDays = 30 },
             },
+            Integrations = new Options.IntegrationsOptions
+            {
+                Mail = new Options.IntegrationsOptions.MailOptions { Enabled = true, Adapter = "fake", From = "me@example.com" },
+            },
         };
 
         var monitor = new TestOptionsMonitor<Options>(options);
@@ -96,10 +100,11 @@ public sealed class ShareLinkServiceTests : IDisposable
             factory.Object,
             downloadService.Object,
             new FileService(monitor),
-            new MailService([], monitor),
+            new MailService([Adapter], monitor),
             monitor);
     }
 
+    private FakeMailAdapter Adapter { get; } = new();
     private string Downloads => Path.Combine(root, "downloads");
     private string Shared => Path.Combine(root, "shared");
     private ShareLinkService Service { get; }
@@ -127,7 +132,8 @@ public sealed class ShareLinkServiceTests : IDisposable
         Assert.Equal([0, 1], link.Files.Select(f => f.Position));
         Assert.Equal("one", File.ReadAllText(Service.PathOf(link.Files[0])));
         Assert.InRange(link.ExpiresAt - link.CreatedAt, TimeSpan.FromDays(7), TimeSpan.FromDays(7));
-        Assert.Equal(43, link.Token.Length);
+        Assert.Equal(43, Assert.Single(link.Accesses).Token.Length);
+        Assert.Null(link.Accesses[0].Recipient);
     }
 
     [Fact]
@@ -204,13 +210,15 @@ public sealed class ShareLinkServiceTests : IDisposable
         var a = Download("@@x\\Album\\a.flac", "a");
         var link = await Service.CreateAsync([a.Id], days: 1);
 
-        Assert.Equal(link.Id, (await Service.FindByTokenAsync(link.Token)).Id);
+        var token = link.Accesses[0].Token;
+
+        Assert.Equal(link.Id, (await Service.FindByTokenAsync(token)).Link.Id);
         Assert.Null(await Service.FindByTokenAsync("not-a-token"));
 
         Expire(link.Id);
 
         // not yet swept, and already closed
-        Assert.Null(await Service.FindByTokenAsync(link.Token));
+        Assert.Null(await Service.FindByTokenAsync(token));
     }
 
     [Fact]
@@ -279,7 +287,7 @@ public sealed class ShareLinkServiceTests : IDisposable
         var extended = await Service.ExtendAsync(link.Id, days: 3);
 
         Assert.InRange(extended.ExpiresAt, DateTime.UtcNow.AddDays(3).AddMinutes(-1), DateTime.UtcNow.AddDays(3));
-        Assert.NotNull(await Service.FindByTokenAsync(link.Token));
+        Assert.NotNull(await Service.FindByTokenAsync(link.Accesses[0].Token));
     }
 
     [Fact]
@@ -300,12 +308,130 @@ public sealed class ShareLinkServiceTests : IDisposable
         var a = Download("@@x\\Album\\a.flac", "a");
         var link = await Service.CreateAsync([a.Id], days: 1);
 
-        await Service.RecordDownloadAsync(link.Id);
-        await Service.RecordDownloadAsync(link.Id);
+        await Service.RecordDownloadAsync(link.Accesses[0].Id);
+        await Service.RecordDownloadAsync(link.Accesses[0].Id);
 
-        var stored = await Service.FindAsync(link.Id);
+        var stored = (await Service.FindAsync(link.Id)).Accesses[0];
         Assert.Equal(2, stored.DownloadCount);
         Assert.NotNull(stored.LastDownloadedAt);
+    }
+
+    [Fact]
+    public async Task A_Share_Can_Be_Made_Without_A_General_Link()
+    {
+        var a = Download("@@x\\Album\\a.flac", "a");
+
+        var link = await Service.CreateAsync([a.Id], days: 1, general: false);
+
+        Assert.Empty(link.Accesses);
+    }
+
+    [Fact]
+    public async Task Each_Recipient_Gets_A_Link_Of_Their_Own_And_Keeps_It_When_Mailed_Again()
+    {
+        var a = Download("@@x\\Album\\a.flac", "a");
+        var link = await Service.CreateAsync([a.Id], days: 1);
+
+        var first = await Service.SendAsync(link.Id, Url, ["kim@example.com", "Lee@example.com"]);
+        var again = await Service.SendAsync(link.Id, Url, ["KIM@example.com"]);
+
+        Assert.All(first.Concat(again), r => Assert.True(r.Sent));
+        Assert.Equal(first[0].AccessId, again[0].AccessId);
+
+        var accesses = (await Service.FindAsync(link.Id)).Accesses;
+        Assert.Equal([null, "kim@example.com", "Lee@example.com"], accesses.Select(x => x.Recipient));
+        Assert.Equal(3, accesses.Select(x => x.Token).Distinct().Count());
+        Assert.All(accesses.Skip(1), x => Assert.NotNull(x.SentAt));
+
+        // each mail carries its own recipient's link, never the general one
+        Assert.Equal(3, Adapter.Sent.Count);
+        Assert.Contains(Url(accesses[1].Token), Adapter.Sent[0].Mail.Text);
+        Assert.Contains(Url(accesses[2].Token), Adapter.Sent[1].Mail.Text);
+        Assert.DoesNotContain(Url(accesses[0].Token), string.Concat(Adapter.Sent.Select(m => m.Mail.Text)));
+    }
+
+    [Fact]
+    public async Task Revoking_One_Link_Leaves_The_Others_Working()
+    {
+        var a = Download("@@x\\Album\\a.flac", "a");
+        var link = await Service.CreateAsync([a.Id], days: 1);
+        await Service.SendAsync(link.Id, Url, ["kim@example.com", "lee@example.com"]);
+
+        var accesses = (await Service.FindAsync(link.Id)).Accesses;
+        var after = await Service.RevokeAccessAsync(link.Id, accesses[1].Id);
+
+        Assert.NotNull(after.Accesses[1].RevokedAt);
+        Assert.Null(await Service.FindByTokenAsync(accesses[1].Token));
+        Assert.NotNull(await Service.FindByTokenAsync(accesses[0].Token));
+        Assert.NotNull(await Service.FindByTokenAsync(accesses[2].Token));
+        Assert.NotNull(Service.PathOf(after.Files[0]));
+    }
+
+    [Fact]
+    public async Task Mailing_A_Revoked_Recipient_Again_Gives_Them_A_New_Link()
+    {
+        var a = Download("@@x\\Album\\a.flac", "a");
+        var link = await Service.CreateAsync([a.Id], days: 1, general: false);
+
+        var first = (await Service.SendAsync(link.Id, Url, ["kim@example.com"]))[0];
+        await Service.RevokeAccessAsync(link.Id, first.AccessId);
+        var second = (await Service.SendAsync(link.Id, Url, ["kim@example.com"]))[0];
+
+        Assert.NotEqual(first.AccessId, second.AccessId);
+
+        var accesses = (await Service.FindAsync(link.Id)).Accesses;
+        Assert.Equal(2, accesses.Count);
+        Assert.NotNull(accesses.Single(x => x.Id == first.AccessId).RevokedAt);
+        Assert.NotNull(await Service.FindByTokenAsync(accesses.Single(x => x.Id == second.AccessId).Token));
+    }
+
+    [Fact]
+    public async Task A_Revoked_General_Link_Is_Replaced_With_A_New_Token_Never_Revived()
+    {
+        var a = Download("@@x\\Album\\a.flac", "a");
+        var link = await Service.CreateAsync([a.Id], days: 1);
+        var old = link.Accesses[0];
+
+        await Service.RevokeAccessAsync(link.Id, old.Id);
+        var after = await Service.CreateGeneralAccessAsync(link.Id);
+        var unchanged = await Service.CreateGeneralAccessAsync(link.Id);
+
+        var general = after.Accesses.Where(x => x.Recipient is null).ToList();
+        Assert.Equal(2, general.Count);
+        Assert.Null(await Service.FindByTokenAsync(old.Token));
+        Assert.NotNull(await Service.FindByTokenAsync(general.Single(x => x.RevokedAt is null).Token));
+        Assert.Equal(2, unchanged.Accesses.Count);
+    }
+
+    [Fact]
+    public async Task A_Failed_Send_Is_Recorded_On_The_Recipients_Link()
+    {
+        var a = Download("@@x\\Album\\a.flac", "a");
+        var link = await Service.CreateAsync([a.Id], days: 1, general: false);
+        Adapter.Fail = true;
+
+        var result = Assert.Single(await Service.SendAsync(link.Id, Url, ["kim@example.com"]));
+
+        Assert.False(result.Sent);
+        var access = Assert.Single((await Service.FindAsync(link.Id)).Accesses);
+        Assert.Null(access.SentAt);
+        Assert.Equal("boom", access.MailError);
+    }
+
+    [Fact]
+    public async Task Withdrawing_A_Share_Ends_Every_Link_To_It()
+    {
+        var a = Download("@@x\\Album\\a.flac", "a");
+        var link = await Service.CreateAsync([a.Id], days: 1);
+        await Service.SendAsync(link.Id, Url, ["kim@example.com"]);
+        var tokens = (await Service.FindAsync(link.Id)).Accesses.Select(x => x.Token).ToList();
+
+        await Service.RevokeAsync(link.Id);
+
+        foreach (var token in tokens)
+        {
+            Assert.Null(await Service.FindByTokenAsync(token));
+        }
     }
 
     [Fact]
@@ -326,6 +452,8 @@ public sealed class ShareLinkServiceTests : IDisposable
         Assert.DoesNotContain("<i>a</i>", mail.Html);
         Assert.Contains("Sunday 1 November 2026, 12:00 (Etc/UTC)", mail.Text);
     }
+
+    private static string Url(string token) => $"https://example.com/l/{token}";
 
     private Transfer Download(string remote, string content, TransferStates state = TransferStates.Completed | TransferStates.Succeeded)
     {
@@ -352,5 +480,23 @@ public sealed class ShareLinkServiceTests : IDisposable
         var link = context.ShareLinks.Single(l => l.Id == id);
         link.ExpiresAt = DateTime.UtcNow.AddSeconds(-1);
         context.SaveChanges();
+    }
+
+    private sealed class FakeMailAdapter : IMailAdapter
+    {
+        public string Name => "fake";
+        public bool Fail { get; set; }
+        public List<(Mail Mail, string To)> Sent { get; } = [];
+
+        public Task SendAsync(Mail mail, string from, string to, System.Threading.CancellationToken cancellationToken = default)
+        {
+            if (Fail)
+            {
+                throw new MailException("boom");
+            }
+
+            Sent.Add((mail, to));
+            return Task.CompletedTask;
+        }
     }
 }

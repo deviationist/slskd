@@ -57,7 +57,9 @@ public class Z2026_10_25_ShareLinksMigration : IMigration
     {
         var schema = SchemaInspector.GetDatabaseSchema(ConnectionString);
 
-        return !schema.ContainsKey("ShareLinks") || !schema.ContainsKey("ShareLinkFiles");
+        return !schema.ContainsKey("ShareLinks")
+            || !schema.ContainsKey("ShareLinkFiles")
+            || !schema.ContainsKey("ShareLinkAccesses");
     }
 
     public void Apply()
@@ -86,16 +88,11 @@ public class Z2026_10_25_ShareLinksMigration : IMigration
             Exec(@"
             CREATE TABLE IF NOT EXISTS ShareLinks (
                 Id TEXT NOT NULL CONSTRAINT PK_ShareLinks PRIMARY KEY,
-                Token TEXT NOT NULL,
                 Title TEXT NOT NULL,
                 CreatedAt TEXT NOT NULL,
-                ExpiresAt TEXT NOT NULL,
-                Recipients TEXT,
-                DownloadCount INTEGER NOT NULL,
-                LastDownloadedAt TEXT
+                ExpiresAt TEXT NOT NULL
             );");
 
-            Exec(@"CREATE UNIQUE INDEX IF NOT EXISTS IDX_ShareLinks_Token ON ShareLinks (Token);");
             Exec(@"CREATE INDEX IF NOT EXISTS IDX_ShareLinks_ExpiresAt ON ShareLinks (ExpiresAt);");
 
             Exec(@"
@@ -112,6 +109,24 @@ public class Z2026_10_25_ShareLinksMigration : IMigration
             );");
 
             Exec(@"CREATE INDEX IF NOT EXISTS IDX_ShareLinkFiles_ShareLinkId ON ShareLinkFiles (ShareLinkId);");
+
+            Exec(@"
+            CREATE TABLE IF NOT EXISTS ShareLinkAccesses (
+                Id TEXT NOT NULL CONSTRAINT PK_ShareLinkAccesses PRIMARY KEY,
+                ShareLinkId TEXT NOT NULL,
+                Token TEXT NOT NULL,
+                Recipient TEXT,
+                CreatedAt TEXT NOT NULL,
+                SentAt TEXT,
+                MailError TEXT,
+                RevokedAt TEXT,
+                DownloadCount INTEGER NOT NULL,
+                LastDownloadedAt TEXT,
+                CONSTRAINT FK_ShareLinkAccesses_ShareLinks_ShareLinkId FOREIGN KEY (ShareLinkId) REFERENCES ShareLinks (Id) ON DELETE CASCADE
+            );");
+
+            Exec(@"CREATE UNIQUE INDEX IF NOT EXISTS IDX_ShareLinkAccesses_Token ON ShareLinkAccesses (Token);");
+            Exec(@"CREATE INDEX IF NOT EXISTS IDX_ShareLinkAccesses_ShareLinkId ON ShareLinkAccesses (ShareLinkId);");
 
             transaction.Commit();
             Log.Information("> Done!");

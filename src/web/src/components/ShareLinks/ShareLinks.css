@@ -49,3 +49,61 @@
   font-size: 0.9em;
   margin: 0.5em 0 0;
 }
+
+.share-link-general {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5em;
+}
+
+.share-link-general .ui.input {
+  flex: 1 1 18em;
+  min-width: 0;
+}
+
+.share-link-general-label {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  font-weight: bold;
+  gap: 0.5em;
+}
+
+.share-link-general .ui.button {
+  margin: 0;
+}
+
+.share-link-general-none {
+  color: var(--slskd-color-subtle, #767676);
+}
+
+.share-link-access-status {
+  color: var(--slskd-color-subtle, #767676);
+  font-weight: normal;
+}
+
+.ui.list.share-link-accesses {
+  margin: 1em 0 0;
+}
+
+.ui.list.share-link-accesses .header,
+.ui.list.share-link-accesses .description {
+  overflow-wrap: anywhere;
+}
+
+.share-link-access-revoked {
+  opacity: 0.55;
+}
+
+.share-link-access-revoked .header {
+  text-decoration: line-through;
+}
+
+.share-dialog-mailed {
+  margin: 1em 0 0.25em;
+}
+
+.share-dialog-unreachable {
+  color: #db2828;
+}

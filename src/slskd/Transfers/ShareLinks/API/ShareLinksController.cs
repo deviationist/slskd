@@ -70,9 +70,14 @@ public class ShareLinkRequest
     public string Title { get; set; }
 
     /// <summary>
-    ///     Gets or sets the addresses to mail the link to, if any.
+    ///     Gets or sets the addresses to mail it to, if any. Each gets a link of its own.
     /// </summary>
     public List<string> Recipients { get; set; }
+
+    /// <summary>
+    ///     Gets or sets a value indicating whether to make a general link too, to hand out by other means.
+    /// </summary>
+    public bool General { get; set; } = true;
 }
 
 /// <summary>
@@ -100,25 +105,57 @@ public class ShareLinkMailRequest
 }
 
 /// <summary>
-///     A share link as the operator sees it: everything, including its address.
+///     A share as the operator sees it: everything, including every link to it and its address.
 /// </summary>
 public record ShareLinkResponse
 {
     public Guid Id { get; init; }
     public string Title { get; init; }
-    public string Url { get; init; }
     public DateTime CreatedAt { get; init; }
     public DateTime ExpiresAt { get; init; }
-    public string[] Recipients { get; init; }
-    public int DownloadCount { get; init; }
-    public DateTime? LastDownloadedAt { get; init; }
     public long Size { get; init; }
     public List<ShareLinkFile> Files { get; init; }
+
+    /// <summary>
+    ///     Gets the address of the general link, or null when there is none that works.
+    /// </summary>
+    public string Url { get; init; }
+
+    /// <summary>
+    ///     Gets every link to the share, revoked ones included, the general link first.
+    /// </summary>
+    public List<ShareLinkAccessResponse> Accesses { get; init; }
+
+    /// <summary>
+    ///     Gets the downloads through every link together.
+    /// </summary>
+    public int DownloadCount { get; init; }
 
     /// <summary>
     ///     Gets what became of mailing it, when this answers a request that asked for that.
     /// </summary>
     public List<ShareLinkMailResult> Mail { get; init; }
+}
+
+/// <summary>
+///     One link to a share, as the operator sees it.
+/// </summary>
+public record ShareLinkAccessResponse
+{
+    public Guid Id { get; init; }
+
+    /// <summary>
+    ///     Gets the address the link was made for, or null for the general link.
+    /// </summary>
+    public string Recipient { get; init; }
+
+    public string Url { get; init; }
+    public DateTime CreatedAt { get; init; }
+    public DateTime? SentAt { get; init; }
+    public string MailError { get; init; }
+    public DateTime? RevokedAt { get; init; }
+    public int DownloadCount { get; init; }
+    public DateTime? LastDownloadedAt { get; init; }
 }
 
 /// <summary>
@@ -217,12 +254,18 @@ public class ShareLinksController : ControllerBase
 
         ShareLink link;
 
+        if (!request.General && recipients.Count == 0)
+        {
+            return BadRequest("A share needs a general link, an address to mail it to, or both");
+        }
+
         try
         {
             link = await Links.CreateAsync(
                 request.TransferIds,
                 request.Days ?? OptionsSnapshot.Value.Transfers.ShareLinks.DefaultDays,
                 request.Title,
+                request.General,
                 HttpContext.RequestAborted);
         }
         catch (ShareLinkException ex)
@@ -230,10 +273,9 @@ public class ShareLinksController : ControllerBase
             return BadRequest(ex.Message);
         }
 
-        var url = UrlFor(link);
-        var mail = recipients.Count > 0 ? await Links.SendAsync(link, url, recipients) : null;
+        var mail = recipients.Count > 0 ? await Links.SendAsync(link.Id, UrlFor, recipients) : null;
 
-        return Ok(ToResponse(link, mail));
+        return Ok(ToResponse(mail is null ? link : await Links.FindAsync(link.Id), mail));
     }
 
     /// <summary>
@@ -266,11 +308,11 @@ public class ShareLinksController : ControllerBase
     }
 
     /// <summary>
-    ///     Mails a share link to more addresses.
+    ///     Mails a share to more addresses, each with a link of its own -- or the one it already has.
     /// </summary>
-    /// <param name="id">The link's id.</param>
+    /// <param name="id">The share's id.</param>
     /// <param name="request">The addresses.</param>
-    /// <returns>What became of each.</returns>
+    /// <returns>The share, with what became of each address.</returns>
     /// <response code="200">Mail is reported per address, and failing to send is not an error.</response>
     /// <response code="400">An address is not one.</response>
     /// <response code="404">There is no such link.</response>
@@ -278,7 +320,7 @@ public class ShareLinksController : ControllerBase
     [Authorize(Policy = AuthPolicy.Any)]
     [Consumes("application/json")]
     [Produces("application/json")]
-    [ProducesResponseType(typeof(List<ShareLinkMailResult>), 200)]
+    [ProducesResponseType(typeof(ShareLinkResponse), 200)]
     [ProducesResponseType(typeof(string), 400)]
     [ProducesResponseType(404)]
     public async Task<IActionResult> Mail([FromRoute] Guid id, [FromBody] ShareLinkMailRequest request)
@@ -288,14 +330,46 @@ public class ShareLinksController : ControllerBase
             return BadRequest(problem ?? "No address was given");
         }
 
-        var link = await Links.FindAsync(id);
+        var results = await Links.SendAsync(id, UrlFor, recipients);
 
-        if (link is null)
-        {
-            return NotFound();
-        }
+        return results is null ? NotFound() : Ok(ToResponse(await Links.FindAsync(id), results));
+    }
 
-        return Ok(await Links.SendAsync(link, UrlFor(link), recipients));
+    /// <summary>
+    ///     Makes a general link to a share, unless it has one that works. A revoked one is replaced, never revived.
+    /// </summary>
+    /// <param name="id">The share's id.</param>
+    /// <returns>The share.</returns>
+    /// <response code="200">The request completed successfully.</response>
+    /// <response code="404">There is no such share.</response>
+    [HttpPost("api/v{version:apiVersion}/links/{id}/general")]
+    [Authorize(Policy = AuthPolicy.Any)]
+    [Produces("application/json")]
+    [ProducesResponseType(typeof(ShareLinkResponse), 200)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> CreateGeneral([FromRoute] Guid id)
+    {
+        var link = await Links.CreateGeneralAccessAsync(id);
+        return link is null ? NotFound() : Ok(ToResponse(link));
+    }
+
+    /// <summary>
+    ///     Revokes one link to a share. The share, and every other link to it, carry on.
+    /// </summary>
+    /// <param name="id">The share's id.</param>
+    /// <param name="accessId">The link's id.</param>
+    /// <returns>The share.</returns>
+    /// <response code="200">The request completed successfully.</response>
+    /// <response code="404">There is no such link on that share.</response>
+    [HttpDelete("api/v{version:apiVersion}/links/{id}/accesses/{accessId}")]
+    [Authorize(Policy = AuthPolicy.Any)]
+    [Produces("application/json")]
+    [ProducesResponseType(typeof(ShareLinkResponse), 200)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> RevokeAccess([FromRoute] Guid id, [FromRoute] Guid accessId)
+    {
+        var link = await Links.RevokeAccessAsync(id, accessId);
+        return link is null ? NotFound() : Ok(ToResponse(link));
     }
 
     /// <summary>
@@ -360,7 +434,7 @@ public class ShareLinksController : ControllerBase
     [ProducesResponseType(404)]
     public async Task<IActionResult> Open([FromRoute] string token)
     {
-        var link = await FindOpenAsync(token);
+        var link = (await FindOpenAsync(token))?.Link;
 
         if (link is null)
         {
@@ -394,8 +468,8 @@ public class ShareLinksController : ControllerBase
     [ProducesResponseType(404)]
     public async Task<IActionResult> GetFile([FromRoute] string token, [FromRoute] int position)
     {
-        var link = await FindOpenAsync(token);
-        var file = link?.Files.FirstOrDefault(f => f.Position == position);
+        var grant = await FindOpenAsync(token);
+        var file = grant?.Link.Files.FirstOrDefault(f => f.Position == position);
         var path = Links.PathOf(file);
 
         if (path is null)
@@ -407,7 +481,7 @@ public class ShareLinksController : ControllerBase
         // from the beginning is a download worth counting
         if (IsFromTheStart(Request))
         {
-            await Links.RecordDownloadAsync(link.Id);
+            await Links.RecordDownloadAsync(grant.Access.Id);
         }
 
         if (!ContentTypeProvider.TryGetContentType(path, out var contentType))
@@ -431,14 +505,16 @@ public class ShareLinksController : ControllerBase
     [ProducesResponseType(404)]
     public async Task<IActionResult> GetArchive([FromRoute] string token)
     {
-        var link = await FindOpenAsync(token);
+        var grant = await FindOpenAsync(token);
 
-        if (link is null)
+        if (grant is null)
         {
             return NotFound();
         }
 
-        await Links.RecordDownloadAsync(link.Id);
+        var link = grant.Link;
+
+        await Links.RecordDownloadAsync(grant.Access.Id);
 
         var sources = link.Files
             .Select(f => new ArchiveSource(f.Name, () =>
@@ -496,13 +572,13 @@ public class ShareLinksController : ControllerBase
         return true;
     }
 
-    private async Task<ShareLink> FindOpenAsync(string token)
+    private async Task<ShareLinkGrant> FindOpenAsync(string token)
     {
         // a disabled feature answers exactly as an unknown token does
         return Links.Enabled ? await Links.FindByTokenAsync(token) : null;
     }
 
-    private string UrlFor(ShareLink link)
+    private string UrlFor(string token)
     {
         var configured = OptionsSnapshot.Value.Transfers.ShareLinks.BaseUrl;
 
@@ -510,21 +586,38 @@ public class ShareLinksController : ControllerBase
             ? $"{Request.Scheme}://{Request.Host}{Request.PathBase}"
             : configured;
 
-        return $"{root.TrimEnd('/')}/l/{link.Token}";
+        return $"{root.TrimEnd('/')}/l/{token}";
     }
 
-    private ShareLinkResponse ToResponse(ShareLink link, List<ShareLinkMailResult> mail = null) => new()
+    private ShareLinkResponse ToResponse(ShareLink link, List<ShareLinkMailResult> mail = null)
     {
-        Id = link.Id,
-        Title = link.Title,
-        Url = UrlFor(link),
-        CreatedAt = link.CreatedAt,
-        ExpiresAt = link.ExpiresAt,
-        Recipients = (link.Recipients ?? string.Empty).Split('\n', StringSplitOptions.RemoveEmptyEntries),
-        DownloadCount = link.DownloadCount,
-        LastDownloadedAt = link.LastDownloadedAt,
-        Size = link.Files.Sum(f => f.Size),
-        Files = link.Files,
-        Mail = mail,
-    };
+        var accesses = link.Accesses.Select(a => new ShareLinkAccessResponse
+        {
+            Id = a.Id,
+            Recipient = a.Recipient,
+            Url = UrlFor(a.Token),
+            CreatedAt = a.CreatedAt,
+            SentAt = a.SentAt,
+            MailError = a.MailError,
+            RevokedAt = a.RevokedAt,
+            DownloadCount = a.DownloadCount,
+            LastDownloadedAt = a.LastDownloadedAt,
+        }).ToList();
+
+        var general = link.Accesses.FirstOrDefault(a => a.IsGeneral && a.RevokedAt is null);
+
+        return new ShareLinkResponse
+        {
+            Id = link.Id,
+            Title = link.Title,
+            CreatedAt = link.CreatedAt,
+            ExpiresAt = link.ExpiresAt,
+            Size = link.Files.Sum(f => f.Size),
+            Files = link.Files,
+            Url = general is null ? null : UrlFor(general.Token),
+            Accesses = accesses,
+            DownloadCount = link.Accesses.Sum(a => a.DownloadCount),
+            Mail = mail,
+        };
+    }
 }

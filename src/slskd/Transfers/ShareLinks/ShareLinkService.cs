@@ -60,12 +60,20 @@ public class ShareLinkException : Exception
 }
 
 /// <summary>
-///     What became of mailing a link to one address.
+///     What became of mailing a share to one address.
 /// </summary>
 /// <param name="Recipient">The address.</param>
+/// <param name="AccessId">The link the address was sent, made for it or reused.</param>
 /// <param name="Sent">Whether it was sent.</param>
 /// <param name="Error">Why it was not, if it was not.</param>
-public record ShareLinkMailResult(string Recipient, bool Sent, string Error);
+public record ShareLinkMailResult(string Recipient, Guid AccessId, bool Sent, string Error);
+
+/// <summary>
+///     A share as opened by one of its links.
+/// </summary>
+/// <param name="Link">The share.</param>
+/// <param name="Access">The link it was opened with.</param>
+public record ShareLinkGrant(ShareLink Link, ShareLinkAccess Access);
 
 /// <summary>
 ///     Creates, serves and expires share links.
@@ -136,15 +144,16 @@ public class ShareLinkService
     private string Root => Path.GetFullPath(LinkOptions.Directory);
 
     /// <summary>
-    ///     Creates a link serving copies of the specified downloads.
+    ///     Creates a share serving copies of the specified downloads.
     /// </summary>
     /// <param name="transferIds">The downloads to share. Each must have finished successfully and still have its file.</param>
-    /// <param name="days">How many days the link lasts.</param>
+    /// <param name="days">How many days the share lasts.</param>
     /// <param name="title">What to call it; derived from the files when blank.</param>
+    /// <param name="general">Whether to make a general link to it as well, rather than only the ones mailed later.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
-    /// <returns>The link.</returns>
-    /// <exception cref="ShareLinkException">Thrown when the link cannot be made as asked.</exception>
-    public async Task<ShareLink> CreateAsync(IEnumerable<Guid> transferIds, int days, string title = null, CancellationToken cancellationToken = default)
+    /// <returns>The share.</returns>
+    /// <exception cref="ShareLinkException">Thrown when the share cannot be made as asked.</exception>
+    public async Task<ShareLink> CreateAsync(IEnumerable<Guid> transferIds, int days, string title = null, bool general = true, CancellationToken cancellationToken = default)
     {
         var ids = (transferIds ?? []).Distinct().ToList();
 
@@ -184,9 +193,13 @@ public class ShareLinkService
         var link = new ShareLink
         {
             Id = Guid.NewGuid(),
-            Token = NewToken(),
             CreatedAt = DateTime.UtcNow,
         };
+
+        if (general)
+        {
+            link.Accesses.Add(NewAccess(link.Id, recipient: null));
+        }
 
         link.ExpiresAt = link.CreatedAt.Add(validity);
         link.Title = string.IsNullOrWhiteSpace(title) ? TitleFor(names) : title.Trim();
@@ -249,7 +262,7 @@ public class ShareLinkService
             throw;
         }
 
-        Log.Information("Created share link {Id} '{Title}' for {Count} file(s), expiring {ExpiresAt:u}", link.Id, link.Title, link.Files.Count, link.ExpiresAt);
+        Log.Information("Created share {Id} '{Title}' for {Count} file(s), expiring {ExpiresAt:u}", link.Id, link.Title, link.Files.Count, link.ExpiresAt);
 
         return link;
     }
@@ -265,9 +278,11 @@ public class ShareLinkService
         var links = await context.ShareLinks
             .AsNoTracking()
             .Include(l => l.Files)
+            .Include(l => l.Accesses)
+            .AsSplitQuery()
             .ToListAsync();
 
-        links.ForEach(l => l.Files = [.. l.Files.OrderBy(f => f.Position)]);
+        links.ForEach(l => Ordered(l));
 
         return [.. links.OrderByDescending(l => l.CreatedAt)];
     }
@@ -280,19 +295,25 @@ public class ShareLinkService
     public async Task<ShareLink> FindAsync(Guid id)
     {
         using var context = ContextFactory.CreateDbContext();
-        return Ordered(await context.ShareLinks.AsNoTracking().Include(l => l.Files).FirstOrDefaultAsync(l => l.Id == id));
+        return Ordered(await context.ShareLinks
+            .AsNoTracking()
+            .Include(l => l.Files)
+            .Include(l => l.Accesses)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(l => l.Id == id));
     }
 
     /// <summary>
-    ///     Finds the link the specified token opens, if it is still open.
+    ///     Finds the share the specified token opens, and the link it belongs to, if both are still open.
     /// </summary>
     /// <remarks>
-    ///     An expired link is not found even before the sweep has deleted it: what decides whether a link works is
-    ///     its expiry, not whether the sweep has been round yet.
+    ///     An expired share is not found even before the sweep has deleted it: what decides whether a link works is
+    ///     its expiry, not whether the sweep has been round yet. Nor is one opened by a revoked link, whatever the
+    ///     share's other links are doing.
     /// </remarks>
     /// <param name="token">The token from the link's address.</param>
-    /// <returns>The link, or null.</returns>
-    public async Task<ShareLink> FindByTokenAsync(string token)
+    /// <returns>The share and the link, or null.</returns>
+    public async Task<ShareLinkGrant> FindByTokenAsync(string token)
     {
         if (string.IsNullOrWhiteSpace(token))
         {
@@ -301,9 +322,75 @@ public class ShareLinkService
 
         using var context = ContextFactory.CreateDbContext();
 
-        var link = await context.ShareLinks.AsNoTracking().Include(l => l.Files).FirstOrDefaultAsync(l => l.Token == token);
+        var access = await context.ShareLinkAccesses.AsNoTracking().FirstOrDefaultAsync(a => a.Token == token);
 
-        return link is null || link.ExpiresAt <= DateTime.UtcNow ? null : Ordered(link);
+        if (access is null || access.RevokedAt is not null)
+        {
+            return null;
+        }
+
+        var link = await context.ShareLinks.AsNoTracking().Include(l => l.Files).FirstOrDefaultAsync(l => l.Id == access.ShareLinkId);
+
+        return link is null || link.ExpiresAt <= DateTime.UtcNow ? null : new ShareLinkGrant(Ordered(link), access);
+    }
+
+    /// <summary>
+    ///     Makes a general link to the specified share, unless it already has one that works.
+    /// </summary>
+    /// <remarks>
+    ///     A general link that was revoked stays revoked: this makes a new one, with a new token, so whoever had the
+    ///     old one still has nothing.
+    /// </remarks>
+    /// <param name="id">The share's id.</param>
+    /// <returns>The share, or null if there is no such share.</returns>
+    public async Task<ShareLink> CreateGeneralAccessAsync(Guid id)
+    {
+        using (var context = ContextFactory.CreateDbContext())
+        {
+            if (!await context.ShareLinks.AnyAsync(l => l.Id == id))
+            {
+                return null;
+            }
+
+            if (!await context.ShareLinkAccesses.AnyAsync(a => a.ShareLinkId == id && a.Recipient == null && a.RevokedAt == null))
+            {
+                context.ShareLinkAccesses.Add(NewAccess(id, recipient: null));
+                await context.SaveChangesAsync();
+
+                Log.Information("Made a general link to share {Id}", id);
+            }
+        }
+
+        return await FindAsync(id);
+    }
+
+    /// <summary>
+    ///     Revokes one link to a share, leaving the share and its other links as they are.
+    /// </summary>
+    /// <param name="id">The share's id.</param>
+    /// <param name="accessId">The link's id.</param>
+    /// <returns>The share, or null if there is no such link on it.</returns>
+    public async Task<ShareLink> RevokeAccessAsync(Guid id, Guid accessId)
+    {
+        using (var context = ContextFactory.CreateDbContext())
+        {
+            var access = await context.ShareLinkAccesses.FirstOrDefaultAsync(a => a.Id == accessId && a.ShareLinkId == id);
+
+            if (access is null)
+            {
+                return null;
+            }
+
+            if (access.RevokedAt is null)
+            {
+                access.RevokedAt = DateTime.UtcNow;
+                await context.SaveChangesAsync();
+
+                Log.Information("Revoked the {Kind} link to share {Id}", access.IsGeneral ? "general" : $"{access.Recipient}'s", id);
+            }
+        }
+
+        return await FindAsync(id);
     }
 
     /// <summary>
@@ -353,16 +440,16 @@ public class ShareLinkService
     /// <summary>
     ///     Counts a download through the specified link.
     /// </summary>
-    /// <param name="id">The link's id.</param>
+    /// <param name="accessId">The link's id.</param>
     /// <returns>The operation context.</returns>
-    public async Task RecordDownloadAsync(Guid id)
+    public async Task RecordDownloadAsync(Guid accessId)
     {
         using var context = ContextFactory.CreateDbContext();
 
         var now = DateTime.UtcNow;
 
-        await context.ShareLinks
-            .Where(l => l.Id == id)
+        await context.ShareLinkAccesses
+            .Where(a => a.Id == accessId)
             .ExecuteUpdateAsync(s => s
                 .SetProperty(l => l.DownloadCount, l => l.DownloadCount + 1)
                 .SetProperty(l => l.LastDownloadedAt, now));
@@ -388,51 +475,62 @@ public class ShareLinkService
     }
 
     /// <summary>
-    ///     Mails the specified link's address to each of the specified recipients, separately.
+    ///     Mails the specified share to each of the specified recipients, each with a link of their own.
     /// </summary>
-    /// <param name="link">The link.</param>
-    /// <param name="url">The link's address.</param>
+    /// <remarks>
+    ///     An address that already has a working link is sent that one again rather than a new one, so mailing
+    ///     someone twice does not leave them with two links to revoke. An address whose link was revoked gets a new
+    ///     one: sending is the operator deciding to share with them again.
+    /// </remarks>
+    /// <param name="id">The share's id.</param>
+    /// <param name="urlFor">Makes a link's address from its token.</param>
     /// <param name="recipients">The addresses.</param>
-    /// <returns>What became of each.</returns>
-    public async Task<List<ShareLinkMailResult>> SendAsync(ShareLink link, string url, IEnumerable<string> recipients)
+    /// <returns>What became of each, or null if there is no such share.</returns>
+    public async Task<List<ShareLinkMailResult>> SendAsync(Guid id, Func<string, string> urlFor, IEnumerable<string> recipients)
     {
-        var results = new List<ShareLinkMailResult>();
-        var composed = ShareLinkMail.Compose(link, url, OptionsMonitor.CurrentValue);
+        var link = await FindAsync(id);
 
-        foreach (var recipient in recipients)
+        if (link is null)
         {
-            try
-            {
-                await Mail.SendAsync(composed with { To = recipient });
-                results.Add(new ShareLinkMailResult(recipient, true, null));
-            }
-            catch (Exception ex)
-            {
-                // per address: one that fails does not stop the others, and each is reported on its own
-                Log.Warning("Failed to mail share link {Id} to {Recipient}: {Message}", link.Id, recipient, ex.Message);
-                results.Add(new ShareLinkMailResult(recipient, false, ex.Message));
-            }
+            return null;
         }
 
-        var sent = results.Where(r => r.Sent).Select(r => r.Recipient).ToList();
+        var results = new List<ShareLinkMailResult>();
 
-        if (sent.Count > 0)
+        foreach (var recipient in recipients.Distinct(StringComparer.OrdinalIgnoreCase))
         {
             using var context = ContextFactory.CreateDbContext();
 
-            var stored = await context.ShareLinks.FirstOrDefaultAsync(l => l.Id == link.Id);
+            var access = (await context.ShareLinkAccesses
+                    .Where(a => a.ShareLinkId == id && a.Recipient != null && a.RevokedAt == null)
+                    .ToListAsync())
+                .FirstOrDefault(a => string.Equals(a.Recipient, recipient, StringComparison.OrdinalIgnoreCase));
 
-            if (stored is not null)
+            if (access is null)
             {
-                var all = (stored.Recipients ?? string.Empty)
-                    .Split('\n', StringSplitOptions.RemoveEmptyEntries)
-                    .Concat(sent)
-                    .Distinct(StringComparer.OrdinalIgnoreCase);
-
-                stored.Recipients = string.Join('\n', all);
-                link.Recipients = stored.Recipients;
-                await context.SaveChangesAsync();
+                access = NewAccess(id, recipient);
+                context.ShareLinkAccesses.Add(access);
             }
+
+            try
+            {
+                await Mail.SendAsync(ShareLinkMail.Compose(link, urlFor(access.Token), OptionsMonitor.CurrentValue) with { To = recipient });
+
+                access.SentAt = DateTime.UtcNow;
+                access.MailError = null;
+                results.Add(new ShareLinkMailResult(recipient, access.Id, true, null));
+            }
+            catch (Exception ex)
+            {
+                // per address: one that fails does not stop the others, and each is reported -- and recorded on its
+                // link, so the list says which of them never arrived
+                Log.Warning("Failed to mail share {Id} to {Recipient}: {Message}", id, recipient, ex.Message);
+
+                access.MailError = ex.Message;
+                results.Add(new ShareLinkMailResult(recipient, access.Id, false, ex.Message));
+            }
+
+            await context.SaveChangesAsync();
         }
 
         return results;
@@ -501,7 +599,14 @@ public class ShareLinkService
         return folders.Count == 1 && folders[0].Length > 0 ? folders[0] : $"{names.Count} files";
     }
 
-    private static string NewToken() => Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(32));
+    private static ShareLinkAccess NewAccess(Guid id, string recipient) => new()
+    {
+        Id = Guid.NewGuid(),
+        ShareLinkId = id,
+        Token = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(32)),
+        Recipient = recipient,
+        CreatedAt = DateTime.UtcNow,
+    };
 
     private static bool IsInside(string path, string folder)
     {
@@ -514,6 +619,9 @@ public class ShareLinkService
         if (link is not null)
         {
             link.Files = [.. link.Files.OrderBy(f => f.Position)];
+
+            // the general link first, then everyone it was mailed to in the order they were added
+            link.Accesses = [.. link.Accesses.OrderBy(a => a.IsGeneral ? 0 : 1).ThenBy(a => a.CreatedAt)];
         }
 
         return link;
@@ -542,6 +650,7 @@ public class ShareLinkService
             // both tables by hand rather than trusting the foreign key's cascade, which SQLite applies only with
             // foreign keys switched on for the connection
             await context.ShareLinkFiles.Where(f => f.ShareLinkId == id).ExecuteDeleteAsync();
+            await context.ShareLinkAccesses.Where(a => a.ShareLinkId == id).ExecuteDeleteAsync();
             deleted = await context.ShareLinks.Where(l => l.Id == id).ExecuteDeleteAsync();
         }
 

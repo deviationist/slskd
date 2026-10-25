@@ -38,27 +38,76 @@ using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
 /// <summary>
-///     A link that lets someone without an account download copies of some finished downloads, until it expires.
+///     Copies of some finished downloads that people without an account can download, through links, until it expires.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         The link owns its files. They are copies, made when the link is created, in a folder of the link's own, so
-///         the link and what it serves have one lifetime: removing the download they came from -- or deleting its
-///         file -- does not break the link, and expiring the link removes exactly what it put there and nothing else.
+///         The share owns its files. They are copies, made when the share is created, in a folder of its own, so the
+///         share and what it serves have one lifetime: removing the download they came from -- or deleting its file --
+///         does not break it, and expiring the share removes exactly what it put there and nothing else.
 ///     </para>
 ///     <para>
-///         The token is kept as it is rather than hashed, because the list of links offers each one to be copied
-///         again. A hash would protect it from someone who can read this database, and that person can already read
-///         the files it guards.
+///         Who can download is a matter of <see cref="Accesses"/>, each a link of its own: one general link to hand out
+///         however you like, and one per address it was mailed to. A link cannot be taken back from someone who has
+///         it, so a token per recipient is what makes it possible to cut off one of them without the others -- and to
+///         see which of them has downloaded anything.
 ///     </para>
 /// </remarks>
 public class ShareLink
 {
     /// <summary>
-    ///     Gets or sets the id, which also names the link's folder.
+    ///     Gets or sets the id, which also names the share's folder.
     /// </summary>
     [Key]
     public Guid Id { get; set; }
+
+    /// <summary>
+    ///     Gets or sets what the share is called, on its page, in its mail and in the list.
+    /// </summary>
+    [Required]
+    public string Title { get; set; }
+
+    /// <summary>
+    ///     Gets or sets when the share was created.
+    /// </summary>
+    public DateTime CreatedAt { get; set; }
+
+    /// <summary>
+    ///     Gets or sets when every link to the share stops working and its files are deleted.
+    /// </summary>
+    public DateTime ExpiresAt { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the files the share serves.
+    /// </summary>
+    public List<ShareLinkFile> Files { get; set; } = [];
+
+    /// <summary>
+    ///     Gets or sets the links to the share, revoked ones included: they are the record of who was given it.
+    /// </summary>
+    public List<ShareLinkAccess> Accesses { get; set; } = [];
+}
+
+/// <summary>
+///     One link to a <see cref="ShareLink"/>: a token, and who it was given to.
+/// </summary>
+/// <remarks>
+///     The token is kept as it is rather than hashed, because the list offers each link to be copied again. A hash
+///     would protect it from someone who can read this database, and that person can already read the files it guards.
+/// </remarks>
+public class ShareLinkAccess
+{
+    /// <summary>
+    ///     Gets or sets the id.
+    /// </summary>
+    [Key]
+    public Guid Id { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the share this opens.
+    /// </summary>
+    [JsonIgnore]
+    public Guid ShareLinkId { get; set; }
 
     /// <summary>
     ///     Gets or sets the secret the link's address carries.
@@ -68,44 +117,50 @@ public class ShareLink
     public string Token { get; set; }
 
     /// <summary>
-    ///     Gets or sets what the link is called, on its page and in the list.
+    ///     Gets or sets the address this link was made for, or null for the general link.
     /// </summary>
-    [Required]
-    public string Title { get; set; }
+    public string Recipient { get; set; }
 
     /// <summary>
-    ///     Gets or sets when the link was created.
+    ///     Gets or sets when the link was made.
     /// </summary>
     public DateTime CreatedAt { get; set; }
 
     /// <summary>
-    ///     Gets or sets when the link stops working and its files are deleted.
+    ///     Gets or sets when the link was last mailed to its recipient successfully.
     /// </summary>
-    public DateTime ExpiresAt { get; set; }
+    public DateTime? SentAt { get; set; }
 
     /// <summary>
-    ///     Gets or sets the addresses the link was mailed to, one per line. Recorded for the list, not used again.
+    ///     Gets or sets why the last attempt to mail it failed, if it did.
     /// </summary>
-    public string Recipients { get; set; }
+    public string MailError { get; set; }
 
     /// <summary>
-    ///     Gets or sets how many times something was downloaded through the link -- a file or the archive, each once.
+    ///     Gets or sets when the link was revoked. A revoked link opens nothing, and is kept as the record that it
+    ///     existed.
+    /// </summary>
+    public DateTime? RevokedAt { get; set; }
+
+    /// <summary>
+    ///     Gets or sets how many times something was downloaded through this link -- a file or the archive, each once.
     /// </summary>
     public int DownloadCount { get; set; }
 
     /// <summary>
-    ///     Gets or sets when something was last downloaded through the link.
+    ///     Gets or sets when something was last downloaded through this link.
     /// </summary>
     public DateTime? LastDownloadedAt { get; set; }
 
     /// <summary>
-    ///     Gets or sets the files the link serves.
+    ///     Gets a value indicating whether this is the general link rather than one made for an address.
     /// </summary>
-    public List<ShareLinkFile> Files { get; set; } = [];
+    [JsonIgnore]
+    public bool IsGeneral => Recipient is null;
 }
 
 /// <summary>
-///     One file a <see cref="ShareLink"/> serves: a copy of a finished download, in the link's folder.
+///     One file a <see cref="ShareLink"/> serves: a copy of a finished download, in the share's folder.
 /// </summary>
 public class ShareLinkFile
 {
@@ -116,13 +171,13 @@ public class ShareLinkFile
     public Guid Id { get; set; }
 
     /// <summary>
-    ///     Gets or sets the link this belongs to.
+    ///     Gets or sets the share this belongs to.
     /// </summary>
     [JsonIgnore]
     public Guid ShareLinkId { get; set; }
 
     /// <summary>
-    ///     Gets or sets where in the link's list this file is, from 0. Also how the link's page asks for it.
+    ///     Gets or sets where in the share's list this file is, from 0. Also how the share's page asks for it.
     /// </summary>
     public int Position { get; set; }
 

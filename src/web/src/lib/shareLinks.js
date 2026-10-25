@@ -2,10 +2,14 @@ import api from './api';
 import * as transfers from './transfers';
 
 /**
- * Share links: a link someone without an account can download copies of
- * finished downloads from, until it expires. The server copies the files when
- * the link is made, so the link outlives the downloads it came from, and
- * deletes the copies when it expires.
+ * Shares: copies of finished downloads that people without an account can
+ * download, until the share expires. The server copies the files when the
+ * share is made, so it outlives the downloads it came from, and deletes the
+ * copies when it expires.
+ *
+ * Who can download is a matter of the share's links: a general one to hand
+ * out by any means, and one per address it was mailed to, each revocable on
+ * its own.
  */
 
 /**
@@ -16,8 +20,22 @@ export const DURATIONS = [1, 7, 30];
 
 export const list = async () => (await api.get('/links')).data;
 
-export const create = async ({ days, recipients = [], title, transferIds }) =>
-  (await api.post('/links', { days, recipients, title, transferIds })).data;
+export const create = async ({
+  days,
+  general = true,
+  recipients = [],
+  title,
+  transferIds,
+}) =>
+  (
+    await api.post('/links', {
+      days,
+      general,
+      recipients,
+      title,
+      transferIds,
+    })
+  ).data;
 
 export const extend = async ({ days, id }) =>
   (await api.put(`/links/${encodeURIComponent(id)}`, { days })).data;
@@ -28,6 +46,49 @@ export const mail = async ({ id, recipients }) =>
 
 export const revoke = async ({ id }) =>
   api.delete(`/links/${encodeURIComponent(id)}`);
+
+export const createGeneral = async ({ id }) =>
+  (await api.post(`/links/${encodeURIComponent(id)}/general`)).data;
+
+export const revokeAccess = async ({ accessId, id }) =>
+  (
+    await api.delete(
+      `/links/${encodeURIComponent(id)}/accesses/${encodeURIComponent(accessId)}`,
+    )
+  ).data;
+
+/**
+ * The share's general link that still works, if it has one.
+ */
+export const generalAccessOf = (link) =>
+  link?.accesses?.find((access) => !access.recipient && !access.revokedAt);
+
+/**
+ * What one of a share's links has done, in words: revoked, never delivered,
+ * or how often it has been used.
+ */
+export const describeAccess = (access) => {
+  if (access.revokedAt) {
+    return `revoked ${new Date(access.revokedAt).toLocaleDateString()}`;
+  }
+
+  if (access.recipient && !access.sentAt && access.mailError) {
+    return `not delivered: ${access.mailError}`;
+  }
+
+  if (access.downloadCount === 0) {
+    return 'not downloaded yet';
+  }
+
+  const times =
+    access.downloadCount === 1
+      ? 'downloaded once'
+      : `downloaded ${access.downloadCount} times`;
+
+  return access.lastDownloadedAt
+    ? `${times}, last ${new Date(access.lastDownloadedAt).toLocaleString()}`
+    : times;
+};
 
 /**
  * Whether a download can go into a share link: it has to have finished

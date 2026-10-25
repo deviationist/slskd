@@ -49,6 +49,7 @@ namespace slskd.Transfers
         public DbSet<Transfer> Transfers { get; set; }
         public DbSet<ShareLink> ShareLinks { get; set; }
         public DbSet<ShareLinkFile> ShareLinkFiles { get; set; }
+        public DbSet<ShareLinkAccess> ShareLinkAccesses { get; set; }
 
         public override int SaveChanges(bool acceptAllChangesOnSuccess)
         {
@@ -91,24 +92,19 @@ namespace slskd.Transfers
 
             modelBuilder
                 .Entity<ShareLink>()
-                .Property(e => e.LastDownloadedAt)
-                .HasConversion(v => v, v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : null);
-
-            modelBuilder
-                .Entity<ShareLink>()
                 .HasMany(l => l.Files)
                 .WithOne()
                 .HasForeignKey(f => f.ShareLinkId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            // every public request starts with this lookup
             modelBuilder
                 .Entity<ShareLink>()
-                .HasIndex(l => l.Token)
-                .IsUnique()
-                .HasDatabaseName("IDX_ShareLinks_Token");
+                .HasMany(l => l.Accesses)
+                .WithOne()
+                .HasForeignKey(a => a.ShareLinkId)
+                .OnDelete(DeleteBehavior.Cascade);
 
-            // and the sweep with this one
+            // the sweep starts with this lookup
             modelBuilder
                 .Entity<ShareLink>()
                 .HasIndex(l => l.ExpiresAt)
@@ -118,6 +114,38 @@ namespace slskd.Transfers
                 .Entity<ShareLinkFile>()
                 .HasIndex(f => f.ShareLinkId)
                 .HasDatabaseName("IDX_ShareLinkFiles_ShareLinkId");
+
+            modelBuilder
+                .Entity<ShareLinkAccess>()
+                .Property(e => e.CreatedAt)
+                .HasConversion(v => v, v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
+
+            modelBuilder
+                .Entity<ShareLinkAccess>()
+                .Property(e => e.SentAt)
+                .HasConversion(v => v, v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : null);
+
+            modelBuilder
+                .Entity<ShareLinkAccess>()
+                .Property(e => e.RevokedAt)
+                .HasConversion(v => v, v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : null);
+
+            modelBuilder
+                .Entity<ShareLinkAccess>()
+                .Property(e => e.LastDownloadedAt)
+                .HasConversion(v => v, v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : null);
+
+            // and every public request with this one
+            modelBuilder
+                .Entity<ShareLinkAccess>()
+                .HasIndex(a => a.Token)
+                .IsUnique()
+                .HasDatabaseName("IDX_ShareLinkAccesses_Token");
+
+            modelBuilder
+                .Entity<ShareLinkAccess>()
+                .HasIndex(a => a.ShareLinkId)
+                .HasDatabaseName("IDX_ShareLinkAccesses_ShareLinkId");
         }
 
         private void ConfigureTransfers(ModelBuilder modelBuilder)
