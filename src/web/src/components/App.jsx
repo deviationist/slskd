@@ -112,6 +112,11 @@ const navAlertOf = ({
     : null;
 };
 
+// how long the loader waits for the hub's first state and options before
+// drawing the page without them: long enough for a slow link, short enough
+// that a server that never sends them does not hold the page hostage
+const FIRST_PUSH_TIMEOUT = 3_000;
+
 const initialState = {
   applicationOptions: {},
   applicationState: {},
@@ -300,8 +305,26 @@ class App extends Component {
         if (await session.check()) {
           const appHub = createApplicationHubConnection();
 
+          // The menu is drawn from these, and they come over the hub, pushed
+          // once it is connected -- so a page drawn as soon as it connects is
+          // drawn without them, and redrawn a moment later with whatever they
+          // add: Shared appeared after the rest, pushing everything beside it
+          // along. The loader stays up until both have arrived, which is a
+          // matter of milliseconds, or for FIRST_PUSH_TIMEOUT if they do not.
+          let stateArrived;
+          let optionsArrived;
+          const firstPush = Promise.all([
+            new Promise((resolve) => {
+              stateArrived = resolve;
+            }),
+            new Promise((resolve) => {
+              optionsArrived = resolve;
+            }),
+          ]);
+
           appHub.on('state', (state) => {
             this.setState({ applicationState: state });
+            stateArrived();
           });
 
           appHub.on('options', (options) => {
@@ -309,6 +332,7 @@ class App extends Component {
             // in the configured locale rather than one render behind it
             setLocale(options?.web?.locale);
             this.setState({ applicationOptions: options });
+            optionsArrived();
           });
 
           appHub.onreconnecting(() =>
@@ -324,6 +348,13 @@ class App extends Component {
           await this.hubConnections.appHub?.stop();
           this.hubConnections.appHub = appHub;
           await appHub.start();
+
+          await Promise.race([
+            firstPush,
+            new Promise((resolve) => {
+              setTimeout(resolve, FIRST_PUSH_TIMEOUT);
+            }),
+          ]);
 
           const metricsHub = createMetricsHubConnection();
 
