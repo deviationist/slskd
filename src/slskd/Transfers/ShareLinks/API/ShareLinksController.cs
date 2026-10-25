@@ -321,6 +321,7 @@ public class ShareLinksController : ControllerBase
     /// <returns>The page.</returns>
     [HttpGet("l/{token}")]
     [AllowAnonymous]
+    [ApiVersionNeutral] // a page, not an API: its address carries no version, and versioning would refuse it
     [ApiExplorerSettings(IgnoreApi = true)]
     public IActionResult Page([FromRoute] string token)
     {
