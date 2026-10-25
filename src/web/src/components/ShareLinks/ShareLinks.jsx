@@ -5,7 +5,10 @@ import AppContext from '../AppContext';
 import { LoaderSegment, PlaceholderSegment } from '../Shared';
 import CopyField from './CopyField';
 import FileNames from './FileNames';
-import RecipientsInput, { RecipientProblems } from './RecipientsInput';
+import RecipientsInput, {
+  isPickEscape,
+  RecipientProblems,
+} from './RecipientsInput';
 import React, { useCallback, useContext, useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import {
@@ -66,7 +69,13 @@ const MailModal = ({ link, onClose }) => {
 
   return (
     <Modal
-      onClose={busy ? undefined : () => onClose(false)}
+      onClose={
+        busy
+          ? undefined
+          : (event) => {
+              if (!isPickEscape(event)) onClose(false);
+            }
+      }
       open
       size="tiny"
     >
