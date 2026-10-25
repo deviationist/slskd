@@ -64,7 +64,6 @@ const StopOrDeleteButton = ({
 }) => (
   <Button
     disabled={working}
-    floated={isTinyScreen ? 'right' : undefined}
     icon={isSmallScreen && !isTinyScreen}
     loading={removing || stopping}
     negative
@@ -151,7 +150,7 @@ const SearchDetailHeader = ({
         )}
       </Segment>
       {isTinyScreen && (
-        <Segment>
+        <Segment className="search-detail-header-actions">
           <RefreshButton
             creating={creating}
             disabled={disabled}
