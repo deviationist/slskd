@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<!--
+    The page a share link opens: what the link holds, and a way to download it.
+
+    Served at /l/{token} for every token alike -- the server says nothing about a
+    token to anyone who has not asked the API -- and it asks the API about the one
+    in its own address. It is the whole of what a share link exposes, alongside
+    /api/v0/l/{token}/..., so it links to nothing else: no stylesheet, no script,
+    no icon file. Publishing share links under a public name needs those two
+    prefixes forwarded, and only them.
+-->
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+        <meta name="theme-color" content="#1b1c1d" />
+        <meta name="robots" content="noindex, nofollow" />
+        <meta name="referrer" content="no-referrer" />
+        <title>Shared files</title>
+        <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 490 490'%3E%3Cpath fill='%230072FF' d='M464,58.2c-24.5-14.9-57.5-22.8-95.5-22.8c-58.3,0-122.5,18.4-180.2,50.4l-0.4-0.2c0,0-0.1,0.3-0.1,0.5c-17.5,9.7-34.4,20.5-50.3,32.6C43.8,190,17.6,274.6,39.7,319.8C15.5,361.1,0.6,403.9,0,454.6C46.5,365.9,74.5,294,226.1,173c-43.3,9.3-118.2,53.3-168.6,120.2c-4.8-39.1,26.1-102.2,95-154.6c8.7-6.6,17.8-12.8,27-18.7c-7.2,22.5-4.9,16.9-19.9,48.4c22.2-21,36.8-33.9,58.7-69.9c28.4-14,58-24.4,87.3-30.7c-4.9,16.1-14.1,43.3-26.6,64.9c0,0,31.7-6.8,57.9-5.3c-14.3,15.8-27.2,32.9-40.3,50.4c-17.9,23.9-36.4,48.7-60.1,71.7c-2.9,2.8-5.6,5.3-8.3,7.9c-36.4-3.5-60.5,10.1-83,34.2c17.8-8.3,41.6-15.1,56.6-11c-27.6,22.5-71,52.1-106.7,49.7c-6.8,10.3-7.2,10.6-14.6,23.1c57.9,14.4,130.6-44.4,173.3-86c25.1-24.4,44.2-49.9,62.7-74.6c38-50.9,70.9-94.8,143.8-111.5l29.7-6.8L464,58.2z'/%3E%3C/svg%3E" />
+        <style>
+            html {
+                background: #0d1116;
+                color: #e6e6e6;
+                color-scheme: dark;
+                font-family: Lato, 'Helvetica Neue', Arial, Helvetica, sans-serif;
+            }
+
+            body {
+                box-sizing: border-box;
+                margin: 0 auto;
+                max-width: 44em;
+                min-height: 100vh;
+                padding: max(24px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+                    max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+            }
+
+            header {
+                align-items: center;
+                display: flex;
+                gap: 14px;
+                margin-bottom: 1.5em;
+            }
+
+            header svg {
+                flex: none;
+                height: 44px;
+                width: 44px;
+            }
+
+            h1 {
+                font-size: 1.35em;
+                line-height: 1.25;
+                margin: 0;
+                overflow-wrap: anywhere;
+            }
+
+            .meta {
+                color: #9aa1a9;
+                font-size: 0.9em;
+                margin-top: 0.25em;
+            }
+
+            ul {
+                border: 1px solid #30363d;
+                border-radius: 6px;
+                list-style: none;
+                margin: 0 0 1.25em;
+                padding: 0;
+            }
+
+            li {
+                align-items: center;
+                display: flex;
+                gap: 12px;
+                padding: 0.7em 0.9em;
+            }
+
+            li + li {
+                border-top: 1px solid #21262d;
+            }
+
+            .name {
+                flex: 1;
+                min-width: 0;
+                overflow-wrap: anywhere;
+            }
+
+            .folder {
+                color: #8b949e;
+                display: block;
+                font-size: 0.85em;
+            }
+
+            .size {
+                color: #9aa1a9;
+                flex: none;
+                font-size: 0.9em;
+                font-variant-numeric: tabular-nums;
+            }
+
+            a.button {
+                background: #21262d;
+                border: 1px solid #30363d;
+                border-radius: 4px;
+                color: #e6e6e6;
+                flex: none;
+                font-size: 0.9em;
+                font-weight: bold;
+                padding: 0.45em 0.9em;
+                text-decoration: none;
+            }
+
+            a.button.primary {
+                background: #2185d0;
+                border-color: #2185d0;
+                color: #fff;
+                display: inline-block;
+                font-size: 1em;
+                padding: 0.75em 1.5em;
+            }
+
+            a.button:hover {
+                filter: brightness(1.15);
+            }
+
+            a.button:focus-visible {
+                outline: 2px solid #58a6ff;
+                outline-offset: 2px;
+            }
+
+            .notice {
+                color: #b5b5b5;
+                line-height: 1.5;
+                margin-top: 3em;
+                text-align: center;
+            }
+
+            .notice h1 {
+                margin-bottom: 0.5em;
+            }
+
+            [hidden] {
+                display: none !important;
+            }
+        </style>
+    </head>
+    <body>
+        <main id="link" hidden>
+            <header>
+                <svg viewBox="0 0 490 490" aria-hidden="true">
+                    <linearGradient id="g" gradientUnits="userSpaceOnUse" x1="0" y1="245" x2="490" y2="245">
+                        <stop offset="0" stop-color="#00C6FF" />
+                        <stop offset="1" stop-color="#0072FF" />
+                    </linearGradient>
+                    <path fill="url(#g)" d="M464,58.2c-24.5-14.9-57.5-22.8-95.5-22.8c-58.3,0-122.5,18.4-180.2,50.4l-0.4-0.2c0,0-0.1,0.3-0.1,0.5c-17.5,9.7-34.4,20.5-50.3,32.6C43.8,190,17.6,274.6,39.7,319.8C15.5,361.1,0.6,403.9,0,454.6C46.5,365.9,74.5,294,226.1,173c-43.3,9.3-118.2,53.3-168.6,120.2c-4.8-39.1,26.1-102.2,95-154.6c8.7-6.6,17.8-12.8,27-18.7c-7.2,22.5-4.9,16.9-19.9,48.4c22.2-21,36.8-33.9,58.7-69.9c28.4-14,58-24.4,87.3-30.7c-4.9,16.1-14.1,43.3-26.6,64.9c0,0,31.7-6.8,57.9-5.3c-14.3,15.8-27.2,32.9-40.3,50.4c-17.9,23.9-36.4,48.7-60.1,71.7c-2.9,2.8-5.6,5.3-8.3,7.9c-36.4-3.5-60.5,10.1-83,34.2c17.8-8.3,41.6-15.1,56.6-11c-27.6,22.5-71,52.1-106.7,49.7c-6.8,10.3-7.2,10.6-14.6,23.1c57.9,14.4,130.6-44.4,173.3-86c25.1-24.4,44.2-49.9,62.7-74.6c38-50.9,70.9-94.8,143.8-111.5l29.7-6.8L464,58.2z" />
+                </svg>
+                <div>
+                    <h1 id="title"></h1>
+                    <div class="meta" id="meta"></div>
+                </div>
+            </header>
+            <ul id="files"></ul>
+            <a class="button primary" id="all" hidden>Download all (.zip)</a>
+        </main>
+
+        <main class="notice" id="gone" hidden>
+            <h1>This link doesn't work</h1>
+            <p>It may have expired, or been withdrawn. Files shared this way are only kept for a while.</p>
+        </main>
+
+        <main class="notice" id="failed" hidden>
+            <h1>Something went wrong</h1>
+            <p>The files couldn't be listed just now. Try again in a moment.</p>
+        </main>
+
+        <script>
+            (function () {
+                // everything is relative to where this page is: /l/{token}, under whatever base the server sits at
+                var path = location.pathname.replace(/\/+$/, '');
+                var at = path.lastIndexOf('/l/');
+                var token = path.slice(at + 3);
+                var api = path.slice(0, at) + '/api/v0/l/' + encodeURIComponent(token);
+
+                var show = function (id) {
+                    document.getElementById(id).hidden = false;
+                };
+
+                var size = function (bytes) {
+                    var units = ['bytes', 'KB', 'MB', 'GB', 'TB'];
+                    var i = 0;
+
+                    while (bytes >= 1024 && i < units.length - 1) {
+                        bytes /= 1024;
+                        i++;
+                    }
+
+                    return (i === 0 ? bytes : bytes.toFixed(1)) + ' ' + units[i];
+                };
+
+                var element = function (tag, className, text) {
+                    var node = document.createElement(tag);
+
+                    if (className) {
+                        node.className = className;
+                    }
+
+                    if (text !== undefined) {
+                        node.textContent = text;
+                    }
+
+                    return node;
+                };
+
+                if (at < 0 || !token) {
+                    show('gone');
+                    return;
+                }
+
+                fetch(api, { headers: { Accept: 'application/json' } })
+                    .then(function (response) {
+                        if (response.status === 404) {
+                            show('gone');
+                            return null;
+                        }
+
+                        if (!response.ok) {
+                            throw new Error(response.status);
+                        }
+
+                        return response.json();
+                    })
+                    .then(function (link) {
+                        if (!link) {
+                            return;
+                        }
+
+                        document.title = link.title;
+                        document.getElementById('title').textContent = link.title;
+
+                        var count = link.files.length;
+                        var until = new Date(link.expiresAt).toLocaleString(undefined, {
+                            dateStyle: 'full',
+                            timeStyle: 'short',
+                        });
+
+                        document.getElementById('meta').textContent =
+                            (count === 1 ? '1 file' : count + ' files') + ' · ' + size(link.size) + ' · available until ' + until;
+
+                        var list = document.getElementById('files');
+
+                        link.files.forEach(function (file) {
+                            var item = element('li');
+                            var name = element('span', 'name');
+                            var cut = file.name.lastIndexOf('/');
+
+                            if (cut > 0) {
+                                name.appendChild(element('span', 'folder', file.name.slice(0, cut)));
+                            }
+
+                            name.appendChild(document.createTextNode(file.name.slice(cut + 1)));
+
+                            var download = element('a', 'button', 'Download');
+                            download.href = api + '/files/' + file.position;
+                            download.setAttribute('download', '');
+                            download.setAttribute('aria-label', 'Download ' + file.name.slice(cut + 1));
+
+                            item.appendChild(name);
+                            item.appendChild(element('span', 'size', size(file.size)));
+                            item.appendChild(download);
+                            list.appendChild(item);
+                        });
+
+                        if (count > 1) {
+                            var all = document.getElementById('all');
+                            all.href = api + '/archive';
+                            all.hidden = false;
+                        }
+
+                        show('link');
+                    })
+                    .catch(function () {
+                        show('failed');
+                    });
+            })();
+        </script>
+    </body>
+</html>

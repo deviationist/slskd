@@ -1,3 +1,4 @@
+import * as shareLinks from '../../lib/shareLinks';
 import * as transfers from '../../lib/transfers';
 import { formatBytes, formatBytesAsUnit, getFileName } from '../../lib/util';
 import TransferDetails from './TransferDetails';
@@ -315,6 +316,7 @@ class TransferList extends Component {
       directoryName,
       files,
       onSelectionChange,
+      onShareRequested,
       retrievalEnabled,
     } = this.props;
     const { confirming, isFolded, removing, retrieving, unavailable } =
@@ -363,6 +365,9 @@ class TransferList extends Component {
                     <Table.HeaderCell className="transferlist-size">
                       Size
                     </Table.HeaderCell>
+                    {onShareRequested && (
+                      <Table.HeaderCell className="transferlist-share" />
+                    )}
                     {retrievalEnabled && (
                       <Table.HeaderCell className="transferlist-retrieve" />
                     )}
@@ -450,6 +455,25 @@ class TransferList extends Component {
                             </span>
                           </div>
                         </Table.Cell>
+                        {onShareRequested && (
+                          <Table.Cell className="transferlist-share">
+                            {shareLinks.isShareable(f) && (
+                              <Popup
+                                content="Share: a link anyone can download this from, for a while"
+                                position="left center"
+                                trigger={
+                                  <Icon
+                                    color="grey"
+                                    link
+                                    name="share alternate"
+                                    onClick={() => onShareRequested([f])}
+                                    size="small"
+                                  />
+                                }
+                              />
+                            )}
+                          </Table.Cell>
+                        )}
                         {retrievalEnabled && (
                           <Table.Cell className="transferlist-retrieve">
                             {transfers.isFinishedDownload(f) &&

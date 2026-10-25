@@ -1,6 +1,8 @@
+import * as shareLinks from '../../lib/shareLinks';
 import * as transfers from '../../lib/transfers';
 import { getFileName } from '../../lib/util';
 import TransferList, { ConfirmRemovalModal } from './TransferList';
+import withDividers from './withDividers';
 import React, { Component } from 'react';
 import { toast } from 'react-toastify';
 import {
@@ -345,7 +347,7 @@ class TransferGroup extends Component {
    * function is more branching than is worth reading in one go.
    */
   renderSelectionActions(selected) {
-    const { direction, retrievalEnabled, user } = this.props;
+    const { direction, onShareRequested, retrievalEnabled, user } = this.props;
     const { archiveBusy } = this.state;
 
     const all = selected.length > 1 ? ' Selected' : '';
@@ -371,52 +373,70 @@ class TransferGroup extends Component {
       transfers.isRetrievable(f),
     ).length;
 
+    // like retrieval, offered as soon as something in the selection can go; the
+    // dialog says what it is leaving out
+    const anyShareable =
+      Boolean(onShareRequested) && selected.some(shareLinks.isShareable);
+
     return (
       <Card.Content extra>
         <Button.Group>
-          {allRetryable && (
-            <Button
-              color="green"
-              content={`Retry${all}`}
-              icon="redo"
-              onClick={() => this.retryAll(selected)}
-            />
-          )}
-          {allRetryable && anyCancellable && <Button.Or />}
-          {anyCancellable && (
-            <Button
-              color="red"
-              content={`Cancel${all}`}
-              icon="x"
-              onClick={() => this.cancelAll(direction, user.username, selected)}
-            />
-          )}
-          {(allRetryable || anyCancellable) && allRemovable && <Button.Or />}
-          {allRemovable && (
-            <Button
-              content={`Remove${all}`}
-              icon="trash alternate"
-              onClick={() => this.confirmRemoveAll(selected)}
-            />
-          )}
-          {(allRetryable || anyCancellable || allRemovable) &&
-            anyRetrievable && <Button.Or />}
-          {anyRetrievable && (
-            <Popup
-              content={transfers.describeRetrieval(retrievableCount)}
-              position="top center"
-              trigger={
-                <Button
-                  color="blue"
-                  content={`Download${all}`}
-                  disabled={archiveBusy}
-                  icon="download"
-                  loading={archiveBusy}
-                  onClick={() => this.handleArchive(user.username, selected)}
-                />
-              }
-            />
-          )}
+          {withDividers([
+            allRetryable && (
+              <Button
+                color="green"
+                content={`Retry${all}`}
+                icon="redo"
+                key="retry"
+                onClick={() => this.retryAll(selected)}
+              />
+            ),
+            anyCancellable && (
+              <Button
+                color="red"
+                content={`Cancel${all}`}
+                icon="x"
+                key="cancel"
+                onClick={() =>
+                  this.cancelAll(direction, user.username, selected)
+                }
+              />
+            ),
+            allRemovable && (
+              <Button
+                content={`Remove${all}`}
+                icon="trash alternate"
+                key="remove"
+                onClick={() => this.confirmRemoveAll(selected)}
+              />
+            ),
+            anyRetrievable && (
+              <Popup
+                content={transfers.describeRetrieval(retrievableCount)}
+                key="retrieve"
+                position="top center"
+                trigger={
+                  <Button
+                    color="blue"
+                    content={`Download${all}`}
+                    disabled={archiveBusy}
+                    icon="download"
+                    loading={archiveBusy}
+                    onClick={() => this.handleArchive(user.username, selected)}
+                  />
+                }
+              />
+            ),
+            anyShareable && (
+              <Button
+                color="teal"
+                content={`Share${all}`}
+                icon="share alternate"
+                key="share"
+                onClick={() => onShareRequested(selected)}
+              />
+            ),
+          ])}
         </Button.Group>
       </Card.Content>
     );
@@ -472,6 +492,7 @@ class TransferGroup extends Component {
                 onRemoveRequested={this.handleRemove}
                 onRetryRequested={this.handleRetry}
                 onSelectionChange={this.handleSelectionChange}
+                onShareRequested={this.props.onShareRequested}
                 retrievalEnabled={this.props.retrievalEnabled}
                 username={user.username}
               />

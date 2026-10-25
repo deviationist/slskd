@@ -482,6 +482,53 @@ transfers:
     delete_file_on_removal: false
 ```
 
+## Share Links
+
+A share lets people without an account download copies of finished downloads, until it expires.  It is made from the Downloads page -- the share icon
+on a row, or *Share* on a selection -- and is reached through links:
+
+* a **general link**, to hand out by any means -- a chat, a message.  A share can be made without one, for one meant only for the people it is mailed to.
+* a **link per address** it is mailed to, through the same [mail](#mail) settings search watches use.  Each recipient's mail carries their own link.
+
+A link cannot be taken back from someone who has it, so each link has a token of its own: revoking one stops it and nothing else, which is how one recipient
+is cut off without the others.  Revoking the general link and making another issues a new token rather than reviving the old one, and mailing someone whose
+link was revoked gives them a new one; mailing someone whose link still works sends the same link again.  Each link counts its own downloads and records
+whether its mail arrived, so *Shared* lists, per share, who was given it, who has downloaded, and whose mail failed -- revoked links included, as the record
+of who had one.  A link forwarded to someone else is still counted as the person it was made for.
+
+Everything else is per share: under *Shared* a share can be mailed to more addresses, extended, or withdrawn, which ends every link to it at once.
+
+Making a link copies its files into a folder of the link's own under `directory`, so the link and what it serves have one lifetime: removing the download a
+copy was made from, or deleting its file, does not affect the link, and the dialog can do both as the link is made.  When the link expires, or is withdrawn,
+its folder is deleted.  Expiry is checked every minute and at startup, and is kept in the database, so a link that expired while slskd was stopped is deleted
+when it starts again.  Keep `directory` out of the downloads directory, or whatever reads that as "what has finished" will count the copies too.
+
+A link opens a small page at `/l/{token}` listing the files, each downloadable on its own, and as one zip when there is more than one.  That page and the API
+under `/api/v0/l/{token}` are the only parts of slskd that answer without a login, and they are all a link needs: to publish links under a public name while
+keeping the UI private, forward those two prefixes and nothing else, and set `base_url` to that name so the links slskd makes point there.  Left blank, links
+are made from the address the UI was reached at.
+
+Off by default.  Turning it off stops every link working at once; their files are still deleted when they expire.
+
+| Command-Line                 | Environment Variable             | Description                                                    |
+| ---------------------------- | -------------------------------- | -------------------------------------------------------------- |
+| `--share-links`              | `SLSKD_SHARE_LINKS`              | Allow share links                                              |
+| `--share-links-dir`          | `SLSKD_SHARE_LINKS_DIR`          | Where the files share links serve are kept                     |
+| `--share-links-base-url`     | `SLSKD_SHARE_LINKS_BASE_URL`     | The address links are made from; blank uses the UI's           |
+| `--share-links-default-days` | `SLSKD_SHARE_LINKS_DEFAULT_DAYS` | Days a new link lasts unless told otherwise                    |
+| `--share-links-max-days`     | `SLSKD_SHARE_LINKS_MAX_DAYS`     | The most days a link may last                                  |
+
+#### **YAML**
+```yaml
+transfers:
+  share_links:
+    enabled: false
+    directory: ~
+    base_url: ~
+    default_days: 7
+    max_days: 90
+```
+
 ## Global Upload Limits
 
 Global upload limits define the number of queued, daily, and weekly uploads on a _per user_ basis.  These limits behave as defaults and are applied if limits for a user's group have not been set.

@@ -20,6 +20,7 @@ import MobileNav from './MobileNav';
 import Rooms from './Rooms/Rooms';
 import Searches from './Search/Searches';
 import ErrorSegment from './Shared/ErrorSegment';
+import ShareLinks from './ShareLinks/ShareLinks';
 import System from './System/System';
 import Transfers from './Transfers/Transfers';
 import Users from './Users/Users';
@@ -564,6 +565,14 @@ class App extends Component {
                     Uploads
                   </Menu.Item>
                 </Link>
+                {applicationOptions?.transfers?.shareLinks?.enabled && (
+                  <Link to={`${urlBase}/shared`}>
+                    <Menu.Item>
+                      <Icon name="share alternate" />
+                      Shared
+                    </Menu.Item>
+                  </Link>
+                )}
                 <Link to={`${urlBase}/rooms`}>
                   <Menu.Item>
                     <Icon name="comments" />
@@ -804,6 +813,16 @@ class App extends Component {
                               {...props}
                               direction="upload"
                             />
+                          </div>,
+                        )
+                      }
+                    />
+                    <Route
+                      path={`${urlBase}/shared`}
+                      render={(props) =>
+                        this.withTokenCheck(
+                          <div className="view">
+                            <ShareLinks {...props} />
                           </div>,
                         )
                       }
