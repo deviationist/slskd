@@ -1147,6 +1147,31 @@ time {
     display: none;
 }
 
+/* Navigation says where the pointer or the focus is with colour and an
+   outline, not an underline. The dark theme underlines every link on hover
+   (--smui-site-link-hover-underline), which is right for a link in running
+   text and wrong for a menu item: under an icon and a label it reads as a
+   glitch rather than as hover, and on a phone the tap that opens a page
+   leaves it there, since hover sticks to the last thing touched. */
+.ui.sidebar.navigation a:hover,
+.ui.sidebar.navigation a:focus,
+.mobile-nav-item:hover,
+.mobile-nav-item:focus {
+    text-decoration: none;
+}
+
+/* the outline goes on the item rather than its link: slskd's menu entries are
+   an <a> around a .item, and the .item is the box that is drawn */
+.ui.sidebar.navigation a:focus-visible {
+    outline: none;
+}
+
+.ui.sidebar.navigation a:focus-visible > .item,
+.mobile-nav-item:focus-visible {
+    outline: 2px solid #58a6ff;
+    outline-offset: -2px;
+}
+
 @media only screen and (max-width: 767px), only screen and (max-height: 500px) and (orientation: landscape) {
     :root {
         --mobile-nav-height: 56px;
