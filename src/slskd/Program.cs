@@ -62,6 +62,7 @@ namespace slskd
     using Microsoft.Extensions.DependencyInjection;
     using Microsoft.Extensions.FileProviders;
     using Microsoft.Extensions.FileProviders.Physical;
+    using Microsoft.Extensions.Options;
     using Microsoft.IdentityModel.Tokens;
     using Microsoft.Net.Http.Headers;
     using Microsoft.OpenApi;
@@ -1096,7 +1097,7 @@ namespace slskd
             app.UseHTMLRewrite("((\\.)?\\/pwa\\/)", $"{(urlBase == "/" ? string.Empty : urlBase)}/pwa/");
 
             // inject urlBase and port into any html files we serve as a window-scoped javascript variable
-            app.UseHTMLInjection($"<script>window.urlBase=\"{urlBase}\";window.port={OptionsAtStartup.Web.Port}</script>", excludedRoutes: new[] { "/api", "/swagger" });
+            app.UseHTMLInjection($"<script>window.urlBase=\"{urlBase}\";window.port={OptionsAtStartup.Web.Port}</script>", excludedRoutes: new[] { "/api", "/swagger", OfflinePage.Path });
 
             Log.Information("Using base url {UrlBase}", urlBase);
 
@@ -1155,6 +1156,29 @@ namespace slskd
 
                 endpoints.MapControllers();
                 endpoints.MapHealthChecks("/health");
+
+                // the service worker's offline page, with the configured message rendered in. anonymous because the
+                // worker fetches it without the UI's token, and because there is nothing in it a login protects: it
+                // is the page shown to whoever opens the app when slskd cannot be reached
+                if (!OptionsAtStartup.Headless)
+                {
+                    endpoints.MapGet(OfflinePage.Path, async context =>
+                    {
+                        var template = Path.Combine(contentPath, "pwa", OfflinePage.TemplateFileName);
+
+                        if (!System.IO.File.Exists(template))
+                        {
+                            context.Response.StatusCode = (int)HttpStatusCode.NotFound;
+                            return;
+                        }
+
+                        var message = context.RequestServices.GetRequiredService<IOptionsMonitor<Options>>().CurrentValue.Web.OfflineMessage;
+
+                        context.Response.ContentType = "text/html; charset=utf-8";
+                        context.Response.GetTypedHeaders().CacheControl = new CacheControlHeaderValue { NoCache = true };
+                        await context.Response.WriteAsync(OfflinePage.Render(await System.IO.File.ReadAllTextAsync(template), message));
+                    }).AllowAnonymous();
+                }
 
                 if (OptionsAtStartup.Metrics.Enabled)
                 {
