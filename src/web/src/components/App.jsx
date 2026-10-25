@@ -5,6 +5,7 @@ import {
   createApplicationHubConnection,
   createMetricsHubConnection,
 } from '../lib/hubFactory';
+import { isStandaloneIos } from '../lib/navigation';
 import * as relayAPI from '../lib/relay';
 import { connect, disconnect } from '../lib/server';
 import * as session from '../lib/session';
@@ -22,6 +23,7 @@ import Searches from './Search/Searches';
 import ErrorSegment from './Shared/ErrorSegment';
 import ShareLinks from './ShareLinks/ShareLinks';
 import System from './System/System';
+import TopBar from './TopBar';
 import Transfers from './Transfers/Transfers';
 import Users from './Users/Users';
 import React, { Component } from 'react';
@@ -864,6 +866,7 @@ class App extends Component {
             </div>
           </Sidebar.Pusher>
         </Sidebar.Pushable>
+        {isStandaloneIos() && <TopBar onNavigate={this.handleNavClose} />}
         <MobileNav
           agent={isAgent}
           alert={navAlertOf({
