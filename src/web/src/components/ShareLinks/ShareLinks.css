@@ -107,3 +107,90 @@
 .share-dialog-unreachable {
   color: #db2828;
 }
+
+/* the recipients field: pills and the input they share a box with, drawn to
+   match a Semantic input in either theme */
+.recipients-input {
+  align-items: center;
+  background: var(--smui-input-background, #ffffff);
+  border: 1px solid var(--slskd-tertiary-border-color, rgba(34, 36, 38, 0.15));
+  border-radius: 0.28571429rem;
+  cursor: text;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35em;
+  min-height: 2.71428571em;
+  padding: 0.35em 0.5em;
+}
+
+.recipients-input:focus-within {
+  border-color: #85b7d9;
+}
+
+:root.dark .recipients-input:focus-within {
+  border-color: var(--smui-site-link-color);
+}
+
+.recipients-input.disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+/* beat .ui.form's own input styling, which would draw a second box inside */
+.ui.form .recipients-input input,
+.recipients-input input {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  color: inherit;
+  flex: 1 1 12em;
+  min-width: 8em;
+  outline: none;
+  padding: 0.25em 0.2em;
+}
+
+.ui.form .recipients-input input:focus {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.ui.label.recipients-input-pill {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.15em;
+  margin: 0;
+  max-width: 100%;
+}
+
+.recipients-input-address {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recipients-input-pill button {
+  background: none;
+  border: none;
+  border-radius: 0.2em;
+  color: inherit;
+  cursor: pointer;
+  line-height: 1;
+  margin: 0 0 0 0.15em;
+  opacity: 0.7;
+  padding: 0.2em 0.25em;
+}
+
+.recipients-input-pill button:hover,
+.recipients-input-pill button:focus-visible {
+  opacity: 1;
+}
+
+.recipients-input-pill button:focus-visible {
+  outline: 2px solid #58a6ff;
+  outline-offset: 1px;
+}
+
+.recipients-input-pill button:disabled {
+  cursor: default;
+}
