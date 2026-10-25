@@ -61,7 +61,7 @@ namespace slskd.Tests.Unit.Files.API
         public async Task GetDownloadSubdirectoryContentsAsync_Returns_Forbidden_Given_Unauthorized_Directory()
         {
             FileServiceMock
-                .Setup(f => f.ListContentsAsync(It.IsAny<string>(), It.IsAny<EnumerationOptions>()))
+                .Setup(f => f.ListDirectoryContentsAsync(It.IsAny<string>(), It.IsAny<EnumerationOptions>()))
                 .ThrowsAsync(new UnauthorizedException("Only application-controlled directories can be listed"));
 
             var result = await Controller.GetDownloadSubdirectoryContentsAsync("../../etc".ToBase64());
@@ -73,7 +73,7 @@ namespace slskd.Tests.Unit.Files.API
         public async Task GetDownloadSubdirectoryContentsAsync_Returns_Forbidden_Given_SecurityException()
         {
             FileServiceMock
-                .Setup(f => f.ListContentsAsync(It.IsAny<string>(), It.IsAny<EnumerationOptions>()))
+                .Setup(f => f.ListDirectoryContentsAsync(It.IsAny<string>(), It.IsAny<EnumerationOptions>()))
                 .ThrowsAsync(new SecurityException("nope"));
 
             var result = await Controller.GetDownloadSubdirectoryContentsAsync("foo".ToBase64());
@@ -85,7 +85,7 @@ namespace slskd.Tests.Unit.Files.API
         public async Task GetIncompleteSubdirectoryContentsAsync_Returns_Forbidden_Given_Unauthorized_Directory()
         {
             FileServiceMock
-                .Setup(f => f.ListContentsAsync(It.IsAny<string>(), It.IsAny<EnumerationOptions>()))
+                .Setup(f => f.ListDirectoryContentsAsync(It.IsAny<string>(), It.IsAny<EnumerationOptions>()))
                 .ThrowsAsync(new UnauthorizedException("Only application-controlled directories can be listed"));
 
             var result = await Controller.GetIncompleteSubdirectoryContentsAsync("../../etc".ToBase64());
@@ -163,7 +163,7 @@ namespace slskd.Tests.Unit.Files.API
             AssertBadRequest(result);
 
             FileServiceMock.Verify(
-                f => f.ListContentsAsync(It.IsAny<string>(), It.IsAny<EnumerationOptions>()),
+                f => f.ListDirectoryContentsAsync(It.IsAny<string>(), It.IsAny<EnumerationOptions>()),
                 Times.Never);
         }
 
@@ -245,7 +245,7 @@ namespace slskd.Tests.Unit.Files.API
         public async Task GetDownloadSubdirectoryContentsAsync_Returns_NotFound_Given_Missing_Directory()
         {
             FileServiceMock
-                .Setup(f => f.ListContentsAsync(It.IsAny<string>(), It.IsAny<EnumerationOptions>()))
+                .Setup(f => f.ListDirectoryContentsAsync(It.IsAny<string>(), It.IsAny<EnumerationOptions>()))
                 .ThrowsAsync(new NotFoundException("nope"));
 
             var result = await Controller.GetDownloadSubdirectoryContentsAsync("foo".ToBase64());
@@ -257,7 +257,7 @@ namespace slskd.Tests.Unit.Files.API
         public async Task GetDownloadSubdirectoryContentsAsync_Resolves_The_Decoded_Name_Against_The_Downloads_Directory()
         {
             FileServiceMock
-                .Setup(f => f.ListContentsAsync(It.IsAny<string>(), It.IsAny<EnumerationOptions>()))
+                .Setup(f => f.ListDirectoryContentsAsync(It.IsAny<string>(), It.IsAny<EnumerationOptions>()))
                 .ReturnsAsync(new FilesystemDirectory());
 
             var result = await Controller.GetDownloadSubdirectoryContentsAsync("foo/bar".ToBase64());
@@ -265,7 +265,7 @@ namespace slskd.Tests.Unit.Files.API
             Assert.IsType<OkObjectResult>(result);
 
             FileServiceMock.Verify(
-                f => f.ListContentsAsync(
+                f => f.ListDirectoryContentsAsync(
                     Path.GetFullPath(Path.Combine(Downloads, "foo", "bar")),
                     It.IsAny<EnumerationOptions>()),
                 Times.Once);

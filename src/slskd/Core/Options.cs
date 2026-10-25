@@ -498,6 +498,19 @@ namespace slskd
             public bool Volatile { get; init; } = false;
 
             /// <summary>
+            ///     Gets a value indicating whether real-time memory dumping via API is enabled.
+            /// </summary>
+            /// <remarks>
+            ///     This can expose sensitive information, and should be turned on only to diagnose memory leaks.
+            ///     As such, it is and must remain undocumented.
+            /// </remarks>
+            [Argument(default, "dumpable")]
+            [EnvironmentVariable("DUMPABLE")]
+            [Description("enable run-time memory dumps via api")]
+            [RequiresRestart]
+            public bool Dumpable { get; init; } = false;
+
+            /// <summary>
             ///     Gets a value indicating whether user-defined regular expressions are case sensitive.
             /// </summary>
             [Argument(default, "case-sensitive-regex")]
@@ -1752,8 +1765,8 @@ namespace slskd
             /// <summary>
             ///     Gets the time to retain logs, in days.
             /// </summary>
-            [Range(7, maximum: int.MaxValue)]
-            public int Logs { get; init; } = 30;
+            [Range(2, maximum: int.MaxValue)]
+            public int Logs { get; init; } = 14;
 
             /// <summary>
             ///     Transfer retention options.
@@ -2065,6 +2078,16 @@ namespace slskd
                 /// </summary>
                 [Validate]
                 public ProxyOptions Proxy { get; init; } = new ProxyOptions();
+
+                /// <summary>
+                ///     Gets the MTU to use for the server connection, or null to use the OS default.
+                /// </summary>
+                [Argument(default, "slsk-server-mtu")]
+                [EnvironmentVariable("SLSK_SERVER_MTU")]
+                [Description("MTU to use for the server connection")]
+                [Range(576, 65535)]
+                [RequiresReconnect]
+                public int? Mtu { get; init; } = null;
 
                 /// <summary>
                 ///     Connection buffer options.

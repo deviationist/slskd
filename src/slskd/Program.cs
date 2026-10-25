@@ -52,7 +52,7 @@ namespace slskd
     using Asp.Versioning.ApiExplorer;
     using Microsoft.AspNetCore.Authentication.JwtBearer;
     using Microsoft.AspNetCore.Builder;
-    using Microsoft.AspNetCore.DataProtection;
+    using Microsoft.AspNetCore.DataProtection.KeyManagement;
     using Microsoft.AspNetCore.Diagnostics;
     using Microsoft.AspNetCore.Hosting;
     using Microsoft.AspNetCore.Http;
@@ -388,7 +388,11 @@ namespace slskd
             // only one long-running instance.
             try
             {
-                Mutex = new Mutex(initiallyOwned: true, Compute.Sha256Hash(AppName), out bool created);
+                Mutex = new Mutex(
+                    initiallyOwned: true,
+                    name: Compute.Sha256Hash(AppName),
+                    options: new NamedWaitHandleOptions { CurrentUserOnly = false, CurrentSessionOnly = true },
+                    out bool created);
 
                 if (!created)
                 {
@@ -511,6 +515,11 @@ namespace slskd
 
             Log.Information("Using application directory {AppDirectory}", AppDirectory);
             Log.Information("Using configuration file {ConfigurationFile}", ConfigurationFile);
+
+            if (OptionsAtStartup.Flags.Dumpable)
+            {
+                Log.Warning("Application memory dumps are ENABLED; this can expose sensitive information, including environment variables from the shell.  Disable Flags.Dumpable to disable.");
+            }
 
             if (OptionsAtStartup.Flags.NoConfigWatch)
             {
@@ -862,8 +871,15 @@ namespace slskd
 
             services.ConfigureTelemetry();
 
-            services.AddDataProtection()
-                .PersistKeysToFileSystem(new DirectoryInfo(Path.Combine(DataDirectory, "misc", ".DataProtection-Keys")));
+            /*
+                by default, adding authentication of any kind adds data protection, and the default configuration for
+                data protection drops .DataProtection-Keys on the filesystem. we're not using data protection, but this
+                can't be suppressed.
+
+                instead, we must fake the key manager into using a dummy repository to stop it from using the filesystem
+            */
+            services.AddDataProtection();
+            services.Configure<KeyManagementOptions>(options => options.XmlRepository = new DataProtectionKeyRepository());
 
             var jwtSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(OptionsAtStartup.Web.Authentication.Jwt.Key));
 
@@ -1050,7 +1066,7 @@ namespace slskd
                         },
                         License = new OpenApiLicense
                         {
-                            Name = "AGPL-3.0 license",
+                            Name = "AGPL-3.0-only",
                             Url = new Uri("https://github.com/slskd/slskd/blob/master/LICENSE"),
                         },
                     });
@@ -1304,7 +1320,7 @@ namespace slskd
                         e => !OptionsAtStartup.Logger.NoDisk,
                         config => config.File(
                             Path.Combine(LogDirectory, $"{AppName}-.log"),
-                            outputTemplate: (OptionsAtStartup.Debug ? "[{SourceContext}] " : string.Empty) + "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}",
+                            outputTemplate: (OptionsAtStartup.Debug ? "[{SourceContext}] " : string.Empty) + "[{Timestamp:yyyy-MM-ddTHH:mm:ss.fff} {Level:u3}] {Message:lj}{NewLine}{Exception}",
                             rollingInterval: RollingInterval.Day,
                             retainedFileTimeLimit: TimeSpan.FromDays(OptionsAtStartup.Retention.Logs))))
                 .WriteTo.Conditional(
