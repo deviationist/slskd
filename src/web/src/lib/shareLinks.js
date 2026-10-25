@@ -1,5 +1,6 @@
 import api from './api';
 import * as transfers from './transfers';
+import { formatDate, formatDayMonth } from './util';
 
 /**
  * Shares: copies of finished downloads that people without an account can
@@ -67,27 +68,32 @@ export const generalAccessOf = (link) =>
  * What one of a share's links has done, in words: revoked, never delivered,
  * or how often it has been used.
  */
+export const describeDownloads = (count) => {
+  if (!count) {
+    return 'not downloaded yet';
+  }
+
+  return count === 1 ? 'downloaded once' : `downloaded ${count} times`;
+};
+
 export const describeAccess = (access) => {
+  // a revoked link keeps what it did before it was revoked: that is the part
+  // of the record worth having
   if (access.revokedAt) {
-    return `revoked ${new Date(access.revokedAt).toLocaleDateString()}`;
+    return access.downloadCount
+      ? `revoked ${formatDayMonth(access.revokedAt)} · ${describeDownloads(access.downloadCount)}`
+      : `revoked ${formatDayMonth(access.revokedAt)}`;
   }
 
   if (access.recipient && !access.sentAt && access.mailError) {
     return `not delivered: ${access.mailError}`;
   }
 
-  if (access.downloadCount === 0) {
-    return 'not downloaded yet';
-  }
+  const downloads = describeDownloads(access.downloadCount);
 
-  const times =
-    access.downloadCount === 1
-      ? 'downloaded once'
-      : `downloaded ${access.downloadCount} times`;
-
-  return access.lastDownloadedAt
-    ? `${times}, last ${new Date(access.lastDownloadedAt).toLocaleString()}`
-    : times;
+  return access.downloadCount && access.lastDownloadedAt
+    ? `${downloads}, last ${formatDate(access.lastDownloadedAt)}`
+    : downloads;
 };
 
 /**

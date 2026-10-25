@@ -1,6 +1,6 @@
 import './ShareLinks.css';
 import * as shareLinks from '../../lib/shareLinks';
-import { formatBytes } from '../../lib/util';
+import { formatBytes, formatDate } from '../../lib/util';
 import CopyField from './CopyField';
 import React, { useState } from 'react';
 import {
@@ -107,8 +107,8 @@ const Created = ({ link, onClose }) => (
         </>
       )}
       <p className="share-dialog-note">
-        Works until {new Date(link.expiresAt).toLocaleString()}; the copies are
-        deleted then. Every link can be revoked on its own under Shared.
+        Works until {formatDate(link.expiresAt)}; the copies are deleted then.
+        Every link can be revoked on its own under Shared.
       </p>
     </Modal.Content>
     <Modal.Actions>

@@ -1,6 +1,6 @@
 import './ShareLinks.css';
 import * as shareLinks from '../../lib/shareLinks';
-import { formatBytes } from '../../lib/util';
+import { formatBytes, formatDate, formatDayMonth } from '../../lib/util';
 import AppContext from '../AppContext';
 import { LoaderSegment, PlaceholderSegment } from '../Shared';
 import CopyField from './CopyField';
@@ -213,8 +213,7 @@ const AccessLog = ({ accesses, busy, onRevoke }) =>
             <List.Content>
               <List.Header>{access.recipient ?? 'General link'}</List.Header>
               <List.Description>
-                {access.sentAt &&
-                  `sent ${new Date(access.sentAt).toLocaleDateString()} · `}
+                {access.sentAt && `sent ${formatDayMonth(access.sentAt)} · `}
                 {shareLinks.describeAccess(access)}
               </List.Description>
             </List.Content>
@@ -289,11 +288,10 @@ const LinkItem = ({ link, mailEnabled, maxDays, onChanged }) => {
           <Header.Subheader>
             {count === 1 ? '1 file' : `${count} files`},{' '}
             {formatBytes(link.size)} · expires{' '}
-            <span title={new Date(link.expiresAt).toLocaleString()}>
+            <span title={formatDate(link.expiresAt)}>
               {shareLinks.describeExpiry({ expiresAt: link.expiresAt })}
             </span>{' '}
-            · downloaded{' '}
-            {link.downloadCount === 1 ? 'once' : `${link.downloadCount} times`}
+            · {shareLinks.describeDownloads(link.downloadCount)}
           </Header.Subheader>
         </Header.Content>
       </Header>

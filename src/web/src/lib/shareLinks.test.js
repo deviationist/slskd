@@ -101,10 +101,13 @@ describe('generalAccessOf', () => {
 });
 
 describe('describeAccess', () => {
-  it('puts a revocation first', () => {
+  it('puts a revocation first, keeping what the link did before it', () => {
     expect(
       describeAccess({ downloadCount: 3, revokedAt: '2026-10-20T00:00:00Z' }),
-    ).toMatch(/^revoked /u);
+    ).toBe('revoked 20 Oct · downloaded 3 times');
+    expect(
+      describeAccess({ downloadCount: 0, revokedAt: '2026-10-20T00:00:00Z' }),
+    ).toBe('revoked 20 Oct');
   });
 
   it('says when a mail never arrived', () => {

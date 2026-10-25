@@ -484,9 +484,19 @@ transfers:
 
 ## Share Links
 
-A share link lets someone without an account download copies of finished downloads, until it expires.  It is made from the Downloads page -- the share
-icon on a row, or *Share* on a selection -- and can be mailed from there to one or more addresses, through the same [mail](#mail) settings search watches use.
-The links that exist are listed under *Shared*, where each can be copied again, mailed again, extended or withdrawn.
+A share lets people without an account download copies of finished downloads, until it expires.  It is made from the Downloads page -- the share icon
+on a row, or *Share* on a selection -- and is reached through links:
+
+* a **general link**, to hand out by any means -- a chat, a message.  A share can be made without one, for one meant only for the people it is mailed to.
+* a **link per address** it is mailed to, through the same [mail](#mail) settings search watches use.  Each recipient's mail carries their own link.
+
+A link cannot be taken back from someone who has it, so each link has a token of its own: revoking one stops it and nothing else, which is how one recipient
+is cut off without the others.  Revoking the general link and making another issues a new token rather than reviving the old one, and mailing someone whose
+link was revoked gives them a new one; mailing someone whose link still works sends the same link again.  Each link counts its own downloads and records
+whether its mail arrived, so *Shared* lists, per share, who was given it, who has downloaded, and whose mail failed -- revoked links included, as the record
+of who had one.  A link forwarded to someone else is still counted as the person it was made for.
+
+Everything else is per share: under *Shared* a share can be mailed to more addresses, extended, or withdrawn, which ends every link to it at once.
 
 Making a link copies its files into a folder of the link's own under `directory`, so the link and what it serves have one lifetime: removing the download a
 copy was made from, or deleting its file, does not affect the link, and the dialog can do both as the link is made.  When the link expires, or is withdrawn,
