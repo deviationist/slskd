@@ -176,6 +176,25 @@
   display: inline;
   margin-left: auto;
 }
+
+/* On a phone the actions get a segment of their own, as a wrapping row with
+   the destructive one kept at the far end. Delete used to be floated right
+   for that, and a float takes no room in its box: once Search Again and Watch
+   filled the line, Delete wrapped below them and hung out of the segment over
+   the one beneath. */
+.search-detail-header-actions.ui.segment {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5em;
+}
+
+.search-detail-header-actions.ui.segment > .ui.button {
+  margin: 0;
+}
+
+.search-detail-header-actions.ui.segment > .ui.button.negative {
+  margin-left: auto;
+}
 /* Its own segment rather than the detail header's: that one is a flex container
    with a fixed 78px height, which makes anything inside it a flex item sized to
    its content -- so a panel placed there neither fills the width nor fits two
