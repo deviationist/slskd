@@ -83,14 +83,23 @@ public class ShareLinkPagePolicyTests
 
     private static string PagePath()
     {
-        // walk up to the repository root, where the page sits in the web project
-        var directory = new DirectoryInfo(AppContext.BaseDirectory);
+        // walk up to the repository root. the page is in the web project's public folder in a checkout, but the image
+        // build runs these tests with only the web project's build output, copied into wwwroot -- the same file
+        string[][] candidates = [["src", "web", "public"], ["src", "slskd", "wwwroot"]];
 
-        while (directory is not null && !File.Exists(Path.Combine(directory.FullName, "src", "web", "public", "share-link.html")))
+        for (var directory = new DirectoryInfo(AppContext.BaseDirectory); directory is not null; directory = directory.Parent)
         {
-            directory = directory.Parent;
+            foreach (var candidate in candidates)
+            {
+                var path = Path.Combine([directory.FullName, .. candidate, "share-link.html"]);
+
+                if (File.Exists(path))
+                {
+                    return path;
+                }
+            }
         }
 
-        return Path.Combine(directory!.FullName, "src", "web", "public", "share-link.html");
+        throw new FileNotFoundException("share-link.html is in neither the web project nor wwwroot");
     }
 }
