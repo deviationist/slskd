@@ -1,5 +1,5 @@
 import * as shareLinks from '../../lib/shareLinks';
-import pillKeys from './pillKeys';
+import pillKeys, { selectedIndices } from './pillKeys';
 import React, { useRef, useState } from 'react';
 import { Icon, Label } from 'semantic-ui-react';
 
@@ -33,6 +33,15 @@ export const RecipientProblems = ({ invalid, tooMany }) => {
   return null;
 };
 
+const writeClipboard = async (text) => {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    // refused or unavailable: nothing to fall back on from a key already
+    // handled, and the addresses are still there to copy another way
+  }
+};
+
 /**
  * Whether a dialog's close is an Escape that only meant to let go of a pill.
  *
@@ -57,11 +66,14 @@ export const isPickEscape = (event) =>
  *
  * The keyboard does what Gmail's To field does (see pillKeys): Left from the
  * start of the text picks out the last pill and walks left along them, Right
- * walks back, Backspace or Delete removes the one picked out and Enter puts it
- * back into the text. Backspace in an empty field picks out the last pill
- * first and removes it on the second press. A click picks a pill out too, and
- * a double click edits it. The caret never leaves the text, so typing carries
- * on from wherever the pick was let go.
+ * walks back, and Shift with either stretches the selection; Ctrl/Cmd+A in an
+ * empty field selects every pill. Backspace or Delete removes what is
+ * selected, Ctrl/Cmd+C copies it as addresses separated by commas and
+ * Ctrl/Cmd+X cuts it, and Enter puts a single pill back into the text.
+ * Backspace in an empty field picks out the last pill first and removes it on
+ * the second press. A click picks a pill out too, Shift+click stretches the
+ * selection to it, and a double click edits it. The caret never leaves the
+ * text, so typing carries on from wherever the selection was let go.
  *
  * Controlled from both ends -- the pills and what is still being typed -- so
  * that the owner can count an address typed and not yet ended as one of the
@@ -87,12 +99,16 @@ const RecipientsInput = ({
 }) => {
   const input = useRef(null);
 
-  // the index of the pill the keyboard or a click has picked out, or null
-  const [pickedIndex, setPickedIndex] = useState(null);
-  const picked =
-    pickedIndex !== null && pickedIndex < recipients.length
-      ? pickedIndex
+  // the pills the keyboard or a click has picked out, as an anchor and a
+  // focus as in text, or null; let go of if the pills have since changed
+  // under it
+  const [chosen, setChosen] = useState(null);
+  const selection =
+    chosen && Math.max(chosen.anchor, chosen.focus) < recipients.length
+      ? chosen
       : null;
+  const picked = selectedIndices(selection);
+  const pickedText = () => picked.map((index) => recipients[index]).join(', ');
 
   const commit = (text = draft) =>
     onChange({
@@ -118,7 +134,7 @@ const RecipientsInput = ({
   };
 
   const handleEdit = (value) => {
-    setPickedIndex(null);
+    setChosen(null);
 
     // whatever was being typed is kept, as a pill, rather than overwritten
     onChange({
@@ -131,42 +147,73 @@ const RecipientsInput = ({
     input.current?.focus();
   };
 
-  const handleRemove = (value) => {
-    // back to the text, as after Backspace on a pill in Gmail
-    setPickedIndex(null);
+  // back to the text afterwards, as after Backspace on a pill in Gmail
+  const removeIndices = (indices) => {
+    setChosen(null);
     onChange({
       draft,
-      recipients: recipients.filter((recipient) => recipient !== value),
+      recipients: recipients.filter((_, index) => !indices.includes(index)),
     });
     input.current?.focus();
   };
 
+  const handleRemove = (value) => removeIndices([recipients.indexOf(value)]);
+
+  // the selected pills as text, for the clipboard; cut takes them out as well
+  const handleClipboard = (event, cut) => {
+    if (picked.length === 0) return;
+    event.preventDefault();
+    event.clipboardData.setData('text/plain', pickedText());
+    if (cut) removeIndices(picked);
+  };
+
   const handleKeyDown = (event) => {
+    const mod = event.ctrlKey || event.metaKey;
+    const letter = event.key.toLowerCase();
+
+    // Ctrl/Cmd+C and +X on selected pills. Written straight to the clipboard
+    // where it can be, since not every browser raises a copy event from a
+    // field with no text selected; where it cannot, the key is left to the
+    // browser and the copy event below does it
+    if (
+      mod &&
+      picked.length > 0 &&
+      (letter === 'c' || letter === 'x') &&
+      navigator.clipboard?.writeText
+    ) {
+      event.preventDefault();
+      writeClipboard(pickedText());
+      if (letter === 'x') removeIndices(picked);
+      return;
+    }
+
     const { selectionEnd, selectionStart } = event.target;
     const action = pillKeys({
       atStart: selectionStart === 0 && selectionEnd === 0,
       count: recipients.length,
       empty: draft === '',
       key: event.key,
-      picked,
+      mod,
+      selection,
+      shift: event.shiftKey,
     });
 
     if (action && !action.passThrough) {
       event.preventDefault();
 
       if ('remove' in action) {
-        handleRemove(recipients[action.remove]);
+        removeIndices(action.remove);
       } else if ('edit' in action) {
         handleEdit(recipients[action.edit]);
       } else {
-        setPickedIndex(action.picked);
+        setChosen(action.select);
       }
 
       return;
     }
 
     if (action?.passThrough) {
-      setPickedIndex(null);
+      setChosen(null);
     }
 
     if (
@@ -191,7 +238,7 @@ const RecipientsInput = ({
     >
       {recipients.map((value, index) => {
         const valid = shareLinks.isRecipient(value);
-        const isPicked = index === picked;
+        const isPicked = picked.includes(index);
 
         return (
           <Label
@@ -202,12 +249,21 @@ const RecipientsInput = ({
             onClick={(event) => {
               // a click on the pill itself, not on its edit or remove button
               if (event.target.closest('button')) return;
-              setPickedIndex(index);
+              setChosen(
+                event.shiftKey && selection
+                  ? { anchor: selection.anchor, focus: index }
+                  : { anchor: index, focus: index },
+              );
               input.current?.focus();
             }}
             onDoubleClick={(event) => {
               if (event.target.closest('button')) return;
               handleEdit(value);
+            }}
+            // the text keeps the focus through a press on a pill: its blur
+            // lets go of the selection, which a Shift+click must still find
+            onMouseDown={(event) => {
+              if (!event.target.closest('button')) event.preventDefault();
             }}
             title={valid ? value : `Not an email address: ${value}`}
           >
@@ -243,7 +299,7 @@ const RecipientsInput = ({
         // eslint-disable-next-line jsx-a11y/no-autofocus -- only where the dialog opens for this field alone
         autoFocus={autoFocus}
         // read by isPickEscape, before this field's own handlers run
-        data-pill-picked={picked === null ? undefined : 'true'}
+        data-pill-picked={selection ? 'true' : undefined}
         disabled={disabled}
         id={id}
         // text with the email keyboard rather than type="email", which brings
@@ -251,12 +307,14 @@ const RecipientsInput = ({
         // that is about to become a pill, and treats spaces unevenly
         inputMode="email"
         onBlur={() => {
-          setPickedIndex(null);
+          setChosen(null);
           if (draft.trim()) commit();
         }}
         onChange={(event) =>
           onChange({ draft: event.target.value, recipients })
         }
+        onCopy={(event) => handleClipboard(event, false)}
+        onCut={(event) => handleClipboard(event, true)}
         onKeyDown={handleKeyDown}
         onPaste={handlePaste}
         placeholder={recipients.length === 0 ? placeholder : undefined}
@@ -270,9 +328,10 @@ const RecipientsInput = ({
         aria-live="polite"
         className="recipients-input-status"
       >
-        {picked === null
-          ? ''
-          : `${recipients[picked]} selected. Backspace removes it, Enter edits it.`}
+        {picked.length === 1 &&
+          `${recipients[picked[0]]} selected. Backspace removes it, Enter edits it.`}
+        {picked.length > 1 &&
+          `${picked.length} addresses selected. Backspace removes them.`}
       </span>
     </div>
   );
