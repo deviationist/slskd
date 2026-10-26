@@ -1756,4 +1756,9 @@ time {
     justify-content: flex-end;
     gap: 8px;
     margin-top: 8px;
+
+/* No double-tap zoom: a second tap on a button lands as a second tap on it,
+   not as a zoom. Pinch and the rest are handled in `lib/preventZoom.js`. */
+html {
+    touch-action: manipulation;
 }

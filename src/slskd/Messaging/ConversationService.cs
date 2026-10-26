@@ -262,6 +262,14 @@ namespace slskd.Messaging
                 .Where(m => !m.IsAcknowledged)
                 .ToList();
 
+            // one row per peer: the newest message in either direction
+            var lastMessages = context.PrivateMessages
+                .AsNoTracking()
+                .GroupBy(m => m.Username)
+                .Select(g => g.OrderByDescending(m => m.Timestamp).FirstOrDefault())
+                .ToList()
+                .ToDictionary(m => m.Username);
+
             var conversations = context.Conversations
                 .AsNoTracking()
                 .Where(expression)
@@ -273,6 +281,7 @@ namespace slskd.Messaging
                 Username = c.Username,
                 IsActive = c.IsActive,
                 UnAcknowledgedMessageCount = unAckedMessages.Count(m => m.Username == c.Username),
+                LastMessage = lastMessages.GetValueOrDefault(c.Username),
             });
 
             return Task.FromResult(response);

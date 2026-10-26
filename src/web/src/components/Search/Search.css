@@ -94,7 +94,10 @@
     margin-top: 1rem;
   }
 
-  .search-option-toggles > .checkbox {
+  /* both selectors, or the 990px rule's `+ .checkbox` outranks this one and
+     every toggle after the first stays indented by its 1rem */
+  .search-option-toggles > .checkbox,
+  .search-option-toggles > .checkbox + .checkbox {
     margin-left: 0px;
   }
 }
@@ -257,27 +260,38 @@
   max-width: 100%;
 }
 
-/* Below this the actions take a row under the summary, and the destructive one
-   takes a row under those -- joined to the group at every wider size, which is
-   where it belongs. Wrapping is enabled only here: left on, a merely narrow
-   panel would break the group at some arbitrary button. */
-@media (max-width: 550px) {
-  .watch-panel-actions {
+/* On a phone the actions are a grid of separate buttons rather than one
+   group wrapped across lines. Wrapped, the group still rounded only its own
+   outer corners, so each row had square ends on one side and rounded on the
+   other and the corners matched nothing. Here every button is rounded and
+   spaced: pause, Run now and Edit across the top, Ignored and Emails under
+   them, and Stop watching on its own at the bottom, away from the rest. */
+@media only screen and (max-width: 767px), only screen and (max-height: 500px) and (orientation: landscape) {
+  .watch-panel-actions.ui.buttons {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 6px;
     flex-basis: 100%;
-    flex-wrap: wrap;
   }
 
-  .watch-panel-stop {
-    flex-basis: 100%;
-    margin-top: 0.5em !important;
+  .watch-panel-actions.ui.buttons > .button {
+    grid-column: span 2;
+    margin: 0 !important;
+    padding-left: 0.5em !important;
+    padding-right: 0.5em !important;
+    white-space: nowrap;
     border-radius: 0.28571429rem !important;
+    border-left: var(--smui-button-border, none) !important;
   }
 
-  /* the button before it is now the end of the first row, and a group only
-     rounds the edge of its last child */
-  .watch-panel-actions > .button:nth-last-child(2) {
-    border-top-right-radius: 0.28571429rem !important;
-    border-bottom-right-radius: 0.28571429rem !important;
+  .watch-panel-actions.ui.buttons > .button:nth-child(4),
+  .watch-panel-actions.ui.buttons > .button:nth-child(5) {
+    grid-column: span 3;
+  }
+
+  .watch-panel-actions.ui.buttons > .watch-panel-stop {
+    grid-column: 1 / -1;
+    margin-top: 4px !important;
   }
 }
 
