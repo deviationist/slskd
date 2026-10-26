@@ -1446,16 +1446,15 @@ time {
 
 @media only screen and (max-width: 767px), only screen and (max-height: 500px) and (orientation: landscape) {
     :root {
-        /* The bar runs to the bottom of the glass, and the home indicator's
-           inset is folded into its height rather than padded on under it:
-           padded, the bar's parts stopped above the inset and left a strip
-           of the bar's own background below them, which showed as soon as
-           the parts and the bar were different colours (the open menu), and
-           the items sat half the inset high. The band is the bar where
-           there is no inset; the floor keeps it from being cramped there.
-           -> homelab topics/ios-pwa-screen-edges.md, "A bottom bar that
-           works at any inset". */
-        --mobile-nav-band: 49px;
+        /* The bar runs to the bottom of the glass, so its parts -- and the
+           bent border and the two colours of an open menu -- reach the edge
+           instead of stopping above a strip of the bar's own background.
+           The items keep to the band above the home indicator, though: the
+           inset is padding inside each item (see .mobile-nav-item). Centred
+           across the whole bar, as the homelab note on screen edges
+           recommends, the labels sat on top of the indicator and the bar
+           read as too low. The floor is the bar where there is no inset. */
+        --mobile-nav-band: 56px;
         --mobile-nav-floor: 56px;
         --mobile-nav-bottom: max(var(--mobile-nav-floor), calc(var(--mobile-nav-band) + env(safe-area-inset-bottom, 0px)));
         /* the open menu's panel, and More while it is the panel's tab: one
@@ -1597,7 +1596,7 @@ time {
         justify-content: center;
         gap: 3px;
         min-width: 0;
-        padding: 0;
+        padding: 0 0 env(safe-area-inset-bottom, 0px);
         border: 0;
         background: none;
         color: rgba(255, 255, 255, 0.65);
@@ -1608,8 +1607,16 @@ time {
         -webkit-tap-highlight-color: transparent;
     }
 
-    .mobile-nav-item:hover,
-    .mobile-nav-item:focus {
+    /* Brighter under a mouse or the keyboard only. On a touch screen hover
+       and focus both stay on the last item tapped, so the page just left
+       stayed lit in the bar beside the one now open. */
+    @media (hover: hover) {
+        .mobile-nav-item:hover {
+            color: rgba(255, 255, 255, 0.9);
+        }
+    }
+
+    .mobile-nav-item:focus-visible {
         color: rgba(255, 255, 255, 0.9);
     }
 
@@ -1732,7 +1739,7 @@ time {
    is what such a screen has least of. */
 @media only screen and (max-height: 500px) and (orientation: landscape) {
     :root {
-        --mobile-nav-band: 32px;
+        --mobile-nav-band: 44px;
         --mobile-nav-floor: 44px;
     }
 
