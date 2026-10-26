@@ -40,27 +40,63 @@
 }
 
 .conversation-menu {
-  overflow-x: auto;
-  box-shadow: unset !important;
-  height: 47px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
-  margin-top: unset !important;
+  min-width: 0;
 }
 
-.conversation-menu > .menu-item {
-  font-size: 14pt;
+.conversation-picker {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
-.conversation-menu > .menu-active {
-  font-weight: bold !important;
+/* Taller than Semantic's 28em: the whole point is to see a lot of names at
+   once. Bounded by the window, so on a phone it never runs under the bars. */
+.conversation-picker.ui.dropdown .menu {
+  max-height: min(60vh, 32em) !important;
 }
 
-.conversation-menu > .menu > .add-button {
-  margin: 0px;
-  border-top-left-radius: 0%;
-  border-bottom-left-radius: 0%;
-  border-radius: 0%;
-} 
+.conversation-option-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.conversation-option-name {
+  font-weight: bold;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversation-option-ago {
+  margin-left: auto;
+  flex: 0 0 auto;
+  font-size: 0.85em;
+  opacity: 0.6;
+}
+
+/* One line of it: enough to recognise the conversation by, not to read it. */
+.conversation-option-preview {
+  margin-top: 2px;
+  font-size: 0.9em;
+  opacity: 0.7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversation-unread {
+  flex: 0 0 auto;
+}
+
+.conversation-menu .add-button {
+  flex: 0 0 auto;
+  margin: 0 !important;
+}
 
 .chat-history {
   padding: .5em .5em 0 .5em !important;
@@ -130,6 +166,12 @@
     height: auto;
   }
 
+  /* the bottom bar and the title already say this is Chat; the picker wants
+     the width more */
+  .chat-segment-icon {
+    display: none;
+  }
+
   .chat-history {
     height: calc(100dvh - var(--mobile-nav-bottom) - 220px);
     min-height: 160px;
@@ -138,4 +180,11 @@
   :root.has-top-bar .chat-history {
     height: calc(100dvh - var(--mobile-nav-bottom) - var(--top-bar-height) - 220px);
   }
+}
+
+/* What is typed into the picker. Semantic colours a search dropdown's input
+   `inherit`, and in the dark theme what it inherits from is the selection's
+   own dark text -- the letters were black on the black field. */
+:root.dark .conversation-picker.ui.search.dropdown > input.search {
+  color: var(--smui-site-body-text-color);
 }

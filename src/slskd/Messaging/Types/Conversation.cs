@@ -41,5 +41,11 @@ namespace slskd.Messaging
         public int UnAcknowledgedMessageCount { get; set; }
         public bool HasUnAcknowledgedMessages => UnAcknowledgedMessageCount > 0;
         public IEnumerable<PrivateMessage> Messages { get; set; }
+
+        /// <summary>
+        ///     The newest message either way, so a list of conversations can be ordered by recency and say what was said last
+        ///     without fetching every history. Filled in when listing; not stored.
+        /// </summary>
+        public PrivateMessage LastMessage { get; set; }
     }
 }
