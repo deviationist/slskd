@@ -47,50 +47,248 @@
   min-width: 0;
 }
 
-.conversation-picker {
+/* The active conversation, shaped like the input it replaced so the header
+   keeps its look, but a button: it opens the sheet below and has nothing to
+   type into. */
+.conversation-trigger {
   flex: 1 1 auto;
   min-width: 0;
-}
-
-/* Taller than Semantic's 28em: the whole point is to see a lot of names at
-   once. Bounded by the window, so on a phone it never runs under the bars. */
-.conversation-picker.ui.dropdown .menu {
-  max-height: min(60vh, 32em) !important;
-}
-
-.conversation-option-head {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  min-height: 2.71428571em;
+  padding: 0 0.9em 0 1em;
+  font: inherit;
+  font-weight: bold;
+  text-align: left;
+  color: var(--smui-site-body-text-color, rgba(0, 0, 0, 0.87));
+  background: var(--smui-input-background, #fff);
+  border: 1px solid var(--slskd-tertiary-border-color, rgba(34, 36, 38, 0.15));
+  border-radius: 0.28571429rem;
+  cursor: pointer;
 }
 
-.conversation-option-name {
-  font-weight: bold;
+.conversation-trigger:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.conversation-trigger-name {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.conversation-option-ago {
-  margin-left: auto;
+.conversation-trigger > .ui.label {
+  margin: 0;
+}
+
+.conversation-trigger > .icon {
+  margin: 0;
+  opacity: 0.6;
+}
+
+/* The sheet: on a phone it is the whole window, so the list has every pixel
+   the keyboard leaves it; on a wider screen a panel in the middle of it. */
+.conversation-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+}
+
+.conversation-sheet {
+  display: flex;
+  flex-direction: column;
+  width: min(480px, calc(100vw - 32px));
+  height: min(640px, calc(100dvh - 64px));
+  overflow: hidden;
+  color: var(--smui-site-body-text-color, rgba(0, 0, 0, 0.87));
+  background: var(--slskd-overlay-background, #fff);
+  border: 1px solid var(--slskd-tertiary-border-color, rgba(34, 36, 38, 0.15));
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+}
+
+.conversation-sheet-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border-bottom: 1px solid var(--slskd-tertiary-border-color, rgba(34, 36, 38, 0.15));
+}
+
+.conversation-sheet-filter {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  background: var(--slskd-subtle-background, rgba(0, 0, 0, 0.05));
+  border-radius: 8px;
+}
+
+.conversation-sheet-filter > .icon {
+  margin: 0;
+  opacity: 0.5;
+}
+
+/* 16px: anything smaller and iOS zooms the page in to type */
+.conversation-sheet-filter > input {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 36px;
+  padding: 0;
+  font: inherit;
+  font-size: 16px;
+  color: inherit;
+  background: none;
+  border: none;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.conversation-sheet-close {
+  flex: 0 0 auto;
+  padding: 8px 4px;
+  font: inherit;
+  font-weight: bold;
+  color: var(--smui-site-link-color, #4183c4);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.conversation-sheet-list {
+  flex: 1 1 auto;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.conversation-sheet-empty {
+  padding: 32px 16px;
+  text-align: center;
+  opacity: 0.6;
+}
+
+.conversation-row {
+  display: block;
+  width: 100%;
+  padding: 10px 16px;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  background: none;
+  border: none;
+  border-left: 3px solid transparent;
+  cursor: pointer;
+}
+
+/* Only where there is a pointer to hover with: on a touch screen the row
+   last tapped keeps :hover, and read as a second selection. */
+@media (hover: hover) {
+  .conversation-row:hover {
+    background: var(--slskd-hover-background, rgba(0, 0, 0, 0.05));
+  }
+}
+
+.conversation-row.active {
+  background: var(--slskd-subtle-background, rgba(0, 0, 0, 0.05));
+  border-left-color: var(--smui-site-link-color, #4183c4);
+}
+
+.conversation-row-head,
+.conversation-row-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.conversation-row-foot {
+  margin-top: 2px;
+}
+
+.conversation-row-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.conversation-row.unread .conversation-row-name {
+  font-weight: bold;
+}
+
+.conversation-row-ago {
   flex: 0 0 auto;
   font-size: 0.85em;
   opacity: 0.6;
 }
 
+.conversation-row.unread .conversation-row-ago {
+  color: #db2828;
+  opacity: 1;
+}
+
 /* One line of it: enough to recognise the conversation by, not to read it. */
-.conversation-option-preview {
-  margin-top: 2px;
+.conversation-row-preview {
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: 0.9em;
-  opacity: 0.7;
+  opacity: 0.65;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.conversation-unread {
+.conversation-row-count {
   flex: 0 0 auto;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  font-size: 0.75em;
+  font-weight: bold;
+  line-height: 20px;
+  text-align: center;
+  color: #fff;
+  background: #db2828;
+  border-radius: 10px;
+}
+
+@media only screen and (max-width: 767px), only screen and (max-height: 500px) and (orientation: landscape) {
+  .conversation-sheet-backdrop {
+    align-items: stretch;
+  }
+
+  .conversation-sheet {
+    width: 100%;
+    height: 100%;
+    border: none;
+    border-radius: 0;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+  }
+
+  .conversation-sheet-list {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .conversation-row {
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
 }
 
 .conversation-menu .add-button {
@@ -180,11 +378,4 @@
   :root.has-top-bar .chat-history {
     height: calc(100dvh - var(--mobile-nav-bottom) - var(--top-bar-height) - 220px);
   }
-}
-
-/* What is typed into the picker. Semantic colours a search dropdown's input
-   `inherit`, and in the dark theme what it inherits from is the selection's
-   own dark text -- the letters were black on the black field. */
-:root.dark .conversation-picker.ui.search.dropdown > input.search {
-  color: var(--smui-site-body-text-color);
 }
