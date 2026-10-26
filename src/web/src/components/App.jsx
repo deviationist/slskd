@@ -689,6 +689,7 @@ class App extends Component {
                 Theme
               </Menu.Item>
               <Menu.Item
+                className="wide-toggle"
                 onClick={() => this.toggleWide()}
                 title={
                   wide

@@ -1271,6 +1271,17 @@ time {
   max-width: 2400px !important;
 }
 
+/* The toggle only lifts a 1200px cap, so in a window no wider than that --
+   every phone, and tablets short of a 12.9" iPad in landscape -- it changes
+   nothing and is only a menu entry that seems broken. 1220 leaves room for a
+   scrollbar beside a full 1200. The setting itself is kept, so a window that
+   grows past the cap is wide again if it was. */
+@media only screen and (max-width: 1220px) {
+  .wide-toggle {
+    display: none !important;
+  }
+}
+
 .view:last-child {
   margin-bottom: 16px;
 }
