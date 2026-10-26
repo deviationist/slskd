@@ -1,5 +1,6 @@
 import 'semantic-ui-less/semantic.less';
 import App from './components/App';
+import { preventZoom } from './lib/preventZoom';
 import { registerServiceWorker } from './lib/serviceWorker';
 import React from 'react';
 import ReactDOM from 'react-dom';
@@ -12,4 +13,5 @@ ReactDOM.render(
   document.querySelector('#root'),
 );
 
+preventZoom();
 registerServiceWorker();
