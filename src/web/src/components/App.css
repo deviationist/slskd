@@ -1448,6 +1448,9 @@ time {
     :root {
         --mobile-nav-height: 56px;
         --mobile-nav-bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom));
+        /* the open menu's panel, and More while it is the panel's tab: one
+           value, so the two cannot come apart */
+        --mobile-nav-panel-background: var(--slskd-secondary-background, #1b1c1d);
     }
 
     /* The page scrolls inside .pushable, and Semantic gives it an identity
@@ -1483,7 +1486,97 @@ time {
         height: var(--mobile-nav-bottom);
         padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
         background: #1b1c1d;
+        transition: background-color 0.2s ease;
+    }
+
+    /* The bar's top edge is drawn by its parts rather than by the bar, so
+       that while the menu is open it can go around More instead of over it:
+       along the top of the four, then down their right-hand side with a
+       rounded bend, and More, without an edge of its own and in the panel's
+       colour, reads as the bottom of the panel -- the tab it closes. The bar
+       behind takes the panel's colour too, which is what shows in the corner
+       the bend leaves. */
+    .mobile-nav-primary {
+        flex: 4 1 0;
+        display: flex;
+        min-width: 0;
+        background: #1b1c1d;
         border-top: 1px solid rgba(255, 255, 255, 0.08);
+        border-right: 1px solid transparent;
+        border-top-right-radius: 0;
+        transition: border-color 0.2s ease, border-radius 0.2s ease;
+    }
+
+    .mobile-nav-toggle {
+        border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+        transition: border-color 0.2s ease;
+    }
+
+    :root.nav-open .mobile-nav {
+        background: var(--mobile-nav-panel-background);
+    }
+
+    :root.nav-open .mobile-nav-primary {
+        border-right-color: rgba(255, 255, 255, 0.08);
+        border-top-right-radius: 12px;
+    }
+
+    :root.nav-open .mobile-nav-toggle {
+        border-top-color: transparent !important;
+    }
+
+    .mobile-nav-burger {
+        position: relative;
+        display: block;
+        width: 18px;
+        height: 14px;
+        margin: 2px 0 1px;
+    }
+
+    .mobile-nav-burger > span {
+        position: absolute;
+        left: 0;
+        width: 100%;
+        height: 2px;
+        border-radius: 1px;
+        background: currentColor;
+        transition: transform 0.25s ease, opacity 0.2s ease, top 0.25s ease;
+    }
+
+    .mobile-nav-burger > span:nth-child(1) {
+        top: 0;
+    }
+
+    .mobile-nav-burger > span:nth-child(2) {
+        top: 6px;
+    }
+
+    .mobile-nav-burger > span:nth-child(3) {
+        top: 12px;
+    }
+
+    .mobile-nav-toggle.active .mobile-nav-burger > span:nth-child(1) {
+        top: 6px;
+        transform: rotate(45deg);
+    }
+
+    .mobile-nav-toggle.active .mobile-nav-burger > span:nth-child(2) {
+        opacity: 0;
+        transform: scaleX(0);
+    }
+
+    .mobile-nav-toggle.active .mobile-nav-burger > span:nth-child(3) {
+        top: 6px;
+        transform: rotate(-45deg);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .mobile-nav,
+        .mobile-nav-primary,
+        .mobile-nav-toggle,
+        .mobile-nav-burger > span {
+            transition: none;
+        }
     }
 
     .mobile-nav-item {
@@ -1578,6 +1671,7 @@ time {
         overflow-y: auto !important;
         padding: 8px calc(8px + env(safe-area-inset-right)) 8px calc(8px + env(safe-area-inset-left));
         border-radius: 12px 12px 0 0 !important;
+        background: var(--mobile-nav-panel-background) !important;
         box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.4) !important;
     }
 

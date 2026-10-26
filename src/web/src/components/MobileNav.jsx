@@ -55,27 +55,41 @@ const MobileNav = ({ agent, alert, onClose, onToggle, open }) => (
       aria-label="Main"
       className="mobile-nav"
     >
-      {!agent &&
-        PRIMARY.map(({ icon, label, path }) => (
-          <NavLink
-            activeClassName="active"
-            className="mobile-nav-item"
-            key={path}
-            onClick={onClose}
-            to={`${urlBase}/${path}`}
-          >
-            <Icon name={icon} />
-            <span>{label}</span>
-          </NavLink>
-        ))}
+      {/* the four in a box of their own, which draws the bar's top edge: while
+          the menu is open it stops short of More and turns down beside it */}
+      {!agent && (
+        <div className="mobile-nav-primary">
+          {PRIMARY.map(({ icon, label, path }) => (
+            <NavLink
+              activeClassName="active"
+              className="mobile-nav-item"
+              key={path}
+              onClick={onClose}
+              to={`${urlBase}/${path}`}
+            >
+              <Icon name={icon} />
+              <span>{label}</span>
+            </NavLink>
+          ))}
+        </div>
+      )}
       <button
         aria-expanded={open}
-        className={`mobile-nav-item${open ? ' active' : ''}`}
+        className={`mobile-nav-item mobile-nav-toggle${open ? ' active' : ''}`}
         onClick={onToggle}
         type="button"
       >
         <span className="mobile-nav-more">
-          <Icon name={open ? 'close' : 'bars'} />
+          {/* three bars that fold into a cross, rather than one icon swapped
+              for another: the change is the point, so it is shown happening */}
+          <span
+            aria-hidden="true"
+            className="mobile-nav-burger"
+          >
+            <span />
+            <span />
+            <span />
+          </span>
           {alert && !open && (
             <span
               className={`mobile-nav-dot mobile-nav-dot-${alert}`}
@@ -83,7 +97,7 @@ const MobileNav = ({ agent, alert, onClose, onToggle, open }) => (
             />
           )}
         </span>
-        <span>More</span>
+        <span>{open ? 'Close' : 'More'}</span>
       </button>
     </nav>
   </>
