@@ -1596,7 +1596,10 @@ time {
         justify-content: center;
         gap: 3px;
         min-width: 0;
-        padding: 0 0 env(safe-area-inset-bottom, 0px);
+        /* the inset less 12px: the items' centre comes 6px down into the
+           indicator's band, which looks seated on the bar rather than
+           floating above it; where there is no inset this is 0 */
+        padding: 0 0 max(0px, calc(env(safe-area-inset-bottom, 0px) - 12px));
         border: 0;
         background: none;
         color: rgba(255, 255, 255, 0.65);
