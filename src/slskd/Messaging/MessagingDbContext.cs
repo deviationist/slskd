@@ -50,6 +50,7 @@ namespace slskd.Messaging
         {
             modelBuilder.Entity<Conversation>().HasKey(e => e.Username);
             modelBuilder.Entity<Conversation>().Ignore(e => e.Messages);
+            modelBuilder.Entity<Conversation>().Ignore(e => e.LastMessage);
             modelBuilder.Entity<Conversation>().Ignore(e => e.UnAcknowledgedMessageCount);
             modelBuilder.Entity<Conversation>().Ignore(e => e.HasUnAcknowledgedMessages);
 
