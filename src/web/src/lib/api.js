@@ -26,7 +26,9 @@ api.interceptors.response.use(
   },
   (error) => {
     if (
-      error.response.status === 401 &&
+      // a request that was aborted, or never reached the server, has no
+      // response to look at
+      error.response?.status === 401 &&
       !['/session', '/server', '/application'].includes(
         error.response.config.url,
       )
