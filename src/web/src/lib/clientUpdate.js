@@ -63,7 +63,14 @@ export const watchForUpdate = (onUpdate) => {
   const controller = new AbortController();
   const stop = () => controller.abort();
 
+  // visibilitychange, focus and pageshow tend to arrive together when the app
+  // comes back, and one look is enough for all three
+  let lastCheck = 0;
+
   const check = async () => {
+    if (Date.now() - lastCheck < 2_000) return;
+    lastCheck = Date.now();
+
     const served = await servedBundle();
 
     if (!controller.signal.aborted && served !== null && served !== running) {
@@ -72,11 +79,22 @@ export const watchForUpdate = (onUpdate) => {
     }
   };
 
+  // Whenever the app is opened or comes back. Opening usually loads the newest
+  // page anyway, but an installed app on iOS is as often resumed from memory as
+  // loaded, and that is a page that may be any age: so a look at start, and
+  // again on each of the ways a page can return -- shown again (iOS switching
+  // back to it), focused again (a desktop window), or restored from the
+  // back-forward cache.
+  const { signal } = controller;
   document.addEventListener(
     'visibilitychange',
     () => document.visibilityState === 'visible' && check(),
-    { signal: controller.signal },
+    { signal },
   );
+  window.addEventListener('focus', check, { signal });
+  window.addEventListener('pageshow', check, { signal });
+  check();
+
   const timer = window.setInterval(check, CHECK_INTERVAL);
   controller.signal.addEventListener('abort', () =>
     window.clearInterval(timer),
