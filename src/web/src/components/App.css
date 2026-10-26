@@ -726,6 +726,144 @@ body {
     width: 70px;
 }
 
+/* The table views on a phone: a row is a small block, not a line of columns.
+
+   As columns, a 390px screen gave File about 100px, and on a finished track
+   media-bridge's play button, copy icon and badge took all of it -- the row
+   showed a chip cut down to "Cl" and no filename at all -- while User ran off
+   the right-hand edge. Here the name has a line to itself and may wrap; the
+   peer and the folder share the line under it, and whatever else the column
+   picker has switched on follows as small print, with the state and the row's
+   actions last. The checkbox stays at the left of all of it.
+
+   Rows can change height because the virtualiser measures them
+   (`measureElement`) -- ROW_H is only its first guess. `tr[data-index]` is a
+   drawn row; the spacer rows above and below carry no index and stay table
+   rows, since their height is the scroll position.
+
+   The header keeps its sort: the cells become a strip of chips that scrolls
+   sideways, so every column the picker shows can still be sorted by. */
+@media only screen and (max-width: 767px), only screen and (max-height: 500px) and (orientation: landscape) {
+    .flatlist-scroll {
+        overflow-x: visible;
+    }
+
+    .ui.table.flatlist,
+    .ui.table.flatlist > thead,
+    .ui.table.flatlist > tbody {
+        display: block;
+        width: 100%;
+    }
+
+    .ui.table.flatlist > thead > tr {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        overflow-x: auto;
+        scrollbar-width: none;
+        padding: 6px 8px;
+        background: var(--smui-table-header-background, #f9fafb);
+    }
+
+    .ui.table.flatlist > thead > tr > th {
+        flex: 0 0 auto;
+        width: auto !important;
+        min-width: 0 !important;
+        max-width: none;
+        padding: 4px 10px !important;
+        border: 1px solid rgba(127, 127, 127, 0.35) !important;
+        border-radius: 999px !important;
+        font-size: 0.9em;
+    }
+
+    .ui.table.flatlist > thead > tr > th.flatlist-selector {
+        border-color: transparent !important;
+        padding: 4px 6px !important;
+    }
+
+    .ui.table.flatlist > thead > tr > th.flatlist-actions,
+    .ui.table.flatlist > thead > tr > th.flatlist-download {
+        display: none;
+    }
+
+    .ui.table.flatlist > tbody > tr[data-index] {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 2px 10px;
+        position: relative;
+        padding: 8px 10px 8px 42px;
+        border-top: 1px solid rgba(127, 127, 127, 0.2);
+    }
+
+    .ui.table.flatlist > tbody > tr[data-index] > td {
+        display: block;
+        width: auto !important;
+        min-width: 0 !important;
+        max-width: none !important;
+        height: auto;
+        padding: 0 !important;
+        border: none !important;
+        flex: 0 0 auto;
+        order: 3;
+        font-size: 0.85em;
+        opacity: 0.8;
+    }
+
+    .ui.table.flatlist > tbody > tr[data-index] > td.flatlist-selector {
+        position: absolute;
+        left: 12px;
+        top: 10px;
+        opacity: 1;
+        font-size: 1em;
+    }
+
+    .ui.table.flatlist > tbody > tr[data-index] > td.flatlist-filename {
+        flex: 1 1 100%;
+        order: 1;
+        opacity: 1;
+        font-size: 1em;
+        white-space: normal;
+    }
+
+    /* The name wraps inside its own box, so the play button stays at its
+       left and the copy icon and badge at its right however long it is. */
+    .ui.table.flatlist > tbody > tr[data-index] .flatlist-name {
+        flex: 1 1 0;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+
+    .ui.table.flatlist > tbody > tr[data-index] > td.flatlist-user {
+        order: 2;
+        opacity: 1;
+    }
+
+    /* A line of its own: beside the peer it was left a few characters. */
+    .ui.table.flatlist > tbody > tr[data-index] > td.flatlist-path {
+        flex: 1 1 100%;
+        order: 4;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .ui.table.flatlist > tbody > tr[data-index] > td.flatlist-progress {
+        flex: 1 1 0;
+        min-width: 120px !important;
+        order: 5;
+        opacity: 1;
+        margin-top: 4px;
+    }
+
+    .ui.table.flatlist > tbody > tr[data-index] > td.flatlist-actions,
+    .ui.table.flatlist > tbody > tr[data-index] > td.flatlist-download {
+        order: 6;
+        margin-left: auto;
+        opacity: 1;
+        font-size: 1em;
+    }
+}
+
 /* A timestamp never breaks across lines. "17/09, 00:02" wrapped at its space
    reads as two values, and the columns that hold one -- Events, Ended -- are
    shrink-to-fit, which is exactly where the wrap would happen. Every date in

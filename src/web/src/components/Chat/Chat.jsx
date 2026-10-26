@@ -36,7 +36,7 @@ const ChatMessageHistory = React.memo(({ messages, selfUsername }) => {
             <Timestamp at={message.timestamp} />
           </span>
           <span className="chat-message-name">
-            {message.direction === 'Out' ? selfUsername : message.username}:
+            {message.direction === 'Out' ? selfUsername : message.username}:{' '}
           </span>
           <span className="chat-message-message">{message.message}</span>
         </List.Content>
@@ -187,7 +187,11 @@ class Chat extends Component {
           },
           () => {
             try {
-              this.listRef.current.lastChild.scrollIntoView();
+              // the history box only: scrollIntoView scrolls every ancestor too,
+              // which on a phone carried the page down and put the conversation's
+              // header under the installed app's title bar
+              const history = this.listRef.current.parentElement;
+              history.scrollTop = history.scrollHeight;
             } catch {
               // no-op
             }

@@ -158,7 +158,11 @@ class Rooms extends Component {
         await this.fetchActiveRoom();
         this.setState({ loading: false }, () => {
           try {
-            this.listRef.current.lastChild.scrollIntoView();
+            // the history box only: scrollIntoView scrolls every ancestor too,
+            // which on a phone carried the page down and put the room's
+            // header under the installed app's title bar
+            const history = this.listRef.current.parentElement;
+            history.scrollTop = history.scrollHeight;
           } catch {
             // no-op
           }

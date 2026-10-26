@@ -144,3 +144,24 @@
 .unknown-user-flag {
   opacity: .1 !important;
 }
+/* On a phone the box is sized to what is left between the two bars, so the
+   field to type in sits just above the bottom bar. The desktop heights above
+   assume the desktop's menu and footer: on a phone they left a band of empty
+   page under the conversation, and in the installed app, with its title bar,
+   pushed the field below the fold. 220px is everything of this page above the
+   history and below it -- header, card title, input, padding -- measured at
+   390x664. */
+@media only screen and (max-width: 767px), only screen and (max-height: 500px) and (orientation: landscape) {
+  .room {
+    height: auto;
+  }
+
+  .room-history {
+    height: calc(100dvh - var(--mobile-nav-bottom) - 220px);
+    min-height: 160px;
+  }
+
+  :root.has-top-bar .room-history {
+    height: calc(100dvh - var(--mobile-nav-bottom) - var(--top-bar-height) - 220px);
+  }
+}
