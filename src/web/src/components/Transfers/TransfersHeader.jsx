@@ -163,7 +163,14 @@ const TransfersHeader = ({
               onClick: () => onFilterChange(''),
             }
           }
-          label={{ content: 'Filter', icon: 'filter' }}
+          label={{
+            // the word goes on a phone, where the field needs the room more
+            // than the funnel needs a caption
+            content: (
+              <span className="transfers-header-filter-word">Filter</span>
+            ),
+            icon: 'filter',
+          }}
           onChange={(_, data) => onFilterChange(data.value)}
           placeholder="flac -bob errored"
           value={filter}
@@ -198,7 +205,14 @@ const TransfersHeader = ({
         <Checkbox
           checked={flat}
           className="transfers-header-flat"
-          label="Table View"
+          // "Table" alone on a phone, where it shares a line with the filter
+          label={{
+            children: (
+              <>
+                Table<span className="transfers-header-flat-more"> View</span>
+              </>
+            ),
+          }}
           onChange={() => onFlatChange(!flat)}
           toggle
         />

@@ -356,3 +356,71 @@
     display: none !important;
   }
 }
+
+/* The header on a phone: two lines rather than four.
+
+   As it was, the direction icon had a line to itself, the filter another, the
+   Table View toggle a third and the actions a fourth -- 240px of a 660px
+   screen before the first transfer. The icon goes: the title bar and the
+   bottom bar both already say which page this is. The filter shares its line
+   with the toggle, which is what decides how the list under it is drawn, and
+   the actions share theirs with the sort, which is only there in card view.
+   `order` rather than a different DOM, so the wide layout is untouched. */
+@media only screen and (max-width: 767px), only screen and (max-height: 500px) and (orientation: landscape) {
+  .transfers-segment-icon,
+  .transfers-header-filter-word,
+  .transfers-header-flat-more {
+    display: none;
+  }
+
+  .transfers-header-segment {
+    column-gap: 10px;
+  }
+
+  .transfers-header-filter {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: none;
+    margin-right: 0;
+    order: 1;
+  }
+
+  .transfers-header-filter .ui.label > .icon {
+    margin: 0;
+  }
+
+  .transfers-header-view {
+    margin-left: 0;
+    order: 2;
+  }
+
+  .transfers-header-flat {
+    margin-right: 0;
+  }
+
+  .transfers-header-break {
+    display: block;
+    flex-basis: 100%;
+    height: 0;
+    margin: 0;
+    order: 3;
+  }
+
+  .transfers-header-sort {
+    order: 4;
+  }
+
+  .transfers-header-buttons {
+    margin-left: auto;
+    order: 5;
+  }
+}
+
+/* A labelled input keeps its field at Semantic's natural width, so the field
+   ran under the toggle rather than giving way to it. */
+@media only screen and (max-width: 767px), only screen and (max-height: 500px) and (orientation: landscape) {
+  .transfers-header-filter .ui.input > input {
+    min-width: 0;
+    width: 0;
+  }
+}
