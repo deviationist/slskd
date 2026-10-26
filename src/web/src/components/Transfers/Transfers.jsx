@@ -72,31 +72,58 @@ const Transfers = ({ direction, server }) => {
   const [removing, setRemoving] = useState(false);
   const [confirmingRemoval, setConfirmingRemoval] = useState(null);
 
-  const fetch = async () => {
-    try {
-      const response = await transfersLibrary.getAll({ direction });
-      setTransfers(response);
-    } catch (error) {
-      console.error(error);
-      toast.error(error?.response?.data ?? error?.message ?? error);
-    }
-  };
-
+  // Polled, but never more than one request at a time, and never one that
+  // outlives the page that asked for it. The uploads list runs to a megabyte
+  // and more, which over a phone's connection can take longer than the
+  // second between polls: on a fixed interval the requests then piled up
+  // behind one another, and a tap on another page had to wait for all of
+  // them to arrive -- and be parsed and drawn -- before anything moved.
+  // So the next poll is due a second after the last one finished (or as
+  // long again as it took, if that was longer), nothing is fetched while the
+  // app is out of sight, and leaving the page, or switching direction,
+  // aborts what is in flight; an aborted reply is dropped, so one meant for
+  // the other direction can never land in this one.
   useEffect(() => {
+    const controller = new AbortController();
+    let timer;
+    let first = true;
+
     setConnecting(true);
 
-    const init = async () => {
-      await fetch();
-      setConnecting(false);
+    const poll = async () => {
+      const started = Date.now();
+
+      if (!document.hidden || first) {
+        try {
+          const response = await transfersLibrary.getAll({
+            direction,
+            signal: controller.signal,
+          });
+
+          if (controller.signal.aborted) return;
+          setTransfers(response);
+        } catch (error) {
+          if (controller.signal.aborted) return;
+          console.error(error);
+          toast.error(error?.response?.data ?? error?.message ?? error);
+        }
+
+        if (first) {
+          first = false;
+          setConnecting(false);
+        }
+      }
+
+      timer = window.setTimeout(poll, Math.max(1_000, Date.now() - started));
     };
 
-    init();
-    const interval = window.setInterval(fetch, 1_000);
+    poll();
 
     return () => {
-      clearInterval(interval);
+      controller.abort();
+      window.clearTimeout(timer);
     };
-  }, [direction]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [direction]);
 
   useMemo(() => {
     // this is used to prevent weird update issues if switching

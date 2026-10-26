@@ -7,9 +7,9 @@ import {
   parseInstant,
 } from './util';
 
-export const getAll = async ({ direction }) => {
+export const getAll = async ({ direction, signal }) => {
   const response = (
-    await api.get(`/transfers/${encodeURIComponent(direction)}s`)
+    await api.get(`/transfers/${encodeURIComponent(direction)}s`, { signal })
   ).data;
 
   if (!Array.isArray(response)) {
