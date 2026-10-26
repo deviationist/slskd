@@ -57,6 +57,15 @@ const readStoredSort = (direction) => {
   }
 };
 
+/*
+ * How many cards the card view draws at a time. Uploads can hold hundreds of
+ * peers, tens of thousands of elements between them, and drawn in one go that
+ * was seconds in which a tap on the bar went nowhere. Drawn a batch at a time,
+ * with a pause between batches, the page appears at once and stays answerable
+ * while the rest arrives below the fold.
+ */
+const CARD_BATCH = 40;
+
 const Transfers = ({ direction, server }) => {
   // options arrive over the application hub, so this is {} until it connects
   // and changes again whenever the configuration is edited
@@ -66,6 +75,7 @@ const Transfers = ({ direction, server }) => {
   const [storedSort, setStoredSort] = useState(() => readStoredSort(direction));
   const [flat, setFlat] = useState(() => readStoredFlat(direction));
   const [filter, setFilter] = useState('');
+  const [shownCards, setShownCards] = useState(CARD_BATCH);
 
   const [retrying, setRetrying] = useState(false);
   const [cancelling, setCancelling] = useState(false);
@@ -137,6 +147,10 @@ const Transfers = ({ direction, server }) => {
     // the preference is per direction, and this component is reused across
     // both -- see above -- so it has to be re-read rather than initialised once
     setStoredSort(readStoredSort(direction));
+    // and the view, for the same reason: read once, Uploads opened from
+    // Downloads came up in whichever view Downloads was in
+    setFlat(readStoredFlat(direction));
+    setShownCards(CARD_BATCH);
   }, [direction]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const changeSort = (value) => {
@@ -194,6 +208,17 @@ const Transfers = ({ direction, server }) => {
     () => transfersLibrary.sortTransfers(matching, sort),
     [matching, sort],
   );
+
+  useEffect(() => {
+    if (flat || shownCards >= sorted.length) return undefined;
+
+    const timer = window.setTimeout(
+      () => setShownCards((shown) => shown + CARD_BATCH),
+      50,
+    );
+
+    return () => window.clearTimeout(timer);
+  }, [flat, shownCards, sorted.length]);
 
   // every file this direction has, before the filter: what an emptied table
   // says it was choosing between
@@ -417,7 +442,7 @@ const Transfers = ({ direction, server }) => {
           users={sorted}
         />
       ) : (
-        sorted.map((user) => (
+        sorted.slice(0, shownCards).map((user) => (
           <TransferGroup
             cancel={cancel}
             cancelAll={cancelAll}

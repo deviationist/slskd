@@ -45,6 +45,18 @@
   margin-right: auto !important;
 }
 
+/* Off screen, a card is skipped when the page is laid out and painted. Uploads
+   can run to hundreds of cards, and every batch the card view adds, and every
+   poll that changes one, otherwise laid all of them out again, cost growing
+   with the page while the bar waited for it. The guessed height is only for
+   the scrollbar until the card is first drawn; `auto` remembers the real one
+   after that. Not while something in the card has focus: the containment this
+   implies clips whatever overflows the card, and an open dropdown does. */
+.transfer-card:not(:focus-within) {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 220px;
+}
+
 .transfer-segment {
   margin-top: 16px;
   padding-left: 15px;

@@ -1,6 +1,6 @@
 import { urlBase } from '../config';
-import React from 'react';
-import { NavLink } from 'react-router-dom';
+import React, { useRef } from 'react';
+import { NavLink, useHistory } from 'react-router-dom';
 import { Icon } from 'semantic-ui-react';
 
 /*
@@ -18,6 +18,113 @@ const PRIMARY = [
   { icon: 'upload', label: 'Uploads', path: 'uploads' },
   { icon: 'comment', label: 'Chat', path: 'chat' },
 ];
+
+/*
+ * Acting on the finger lifting rather than on the click that follows it.
+ *
+ * iOS decides for itself whether a tap becomes a click, and while the page
+ * is still drawing it can decide that it does not: it takes the tap for a
+ * hover, and the click only comes on a second one -- or, under a page busy
+ * drawing, after a wait. Pointer events are not subject to that, so the bar
+ * moves on `pointerup` from a finger that has not travelled, and the click
+ * that may or may not arrive afterwards is swallowed so the tap does not count
+ * twice. A mouse, a pen and the keyboard still go through the click.
+ */
+const SLOP = 10;
+const SWALLOW_MS = 800;
+
+const useTap = (action) => {
+  const down = useRef(null);
+  const tapped = useRef(0);
+
+  return {
+    onClick: (event) => {
+      if (Date.now() - tapped.current < SWALLOW_MS) {
+        event.preventDefault();
+        return;
+      }
+
+      action(event);
+    },
+    onPointerDown: (event) => {
+      down.current =
+        event.pointerType === 'touch'
+          ? { x: event.clientX, y: event.clientY }
+          : null;
+    },
+    onPointerUp: (event) => {
+      const start = down.current;
+      down.current = null;
+
+      if (
+        !start ||
+        event.pointerType !== 'touch' ||
+        Math.abs(event.clientX - start.x) > SLOP ||
+        Math.abs(event.clientY - start.y) > SLOP
+      ) {
+        return;
+      }
+
+      tapped.current = Date.now();
+      action(event);
+    },
+  };
+};
+
+const NavItem = ({ icon, label, onClose, to }) => {
+  const history = useHistory();
+  const tap = useTap((event) => {
+    onClose();
+
+    // a click is the link's own to follow; a tap has to be followed by hand
+    if (event.type === 'pointerup') history.push(to);
+  });
+
+  return (
+    <NavLink
+      activeClassName="active"
+      className="mobile-nav-item"
+      to={to}
+      {...tap}
+    >
+      <Icon name={icon} />
+      <span>{label}</span>
+    </NavLink>
+  );
+};
+
+const MoreButton = ({ alert, onToggle, open }) => {
+  const tap = useTap(() => onToggle());
+
+  return (
+    <button
+      aria-expanded={open}
+      className={`mobile-nav-item mobile-nav-toggle${open ? ' active' : ''}`}
+      type="button"
+      {...tap}
+    >
+      <span className="mobile-nav-more">
+        {/* three bars that fold into a cross, rather than one icon swapped
+            for another: the change is the point, so it is shown happening */}
+        <span
+          aria-hidden="true"
+          className="mobile-nav-burger"
+        >
+          <span />
+          <span />
+          <span />
+        </span>
+        {alert && !open && (
+          <span
+            className={`mobile-nav-dot mobile-nav-dot-${alert}`}
+            title="Something under More wants attention"
+          />
+        )}
+      </span>
+      <span>{open ? 'Close' : 'More'}</span>
+    </button>
+  );
+};
 
 /**
  * The navigation on a phone: a bar along the bottom edge, where a thumb is,
@@ -60,45 +167,21 @@ const MobileNav = ({ agent, alert, onClose, onToggle, open }) => (
       {!agent && (
         <div className="mobile-nav-primary">
           {PRIMARY.map(({ icon, label, path }) => (
-            <NavLink
-              activeClassName="active"
-              className="mobile-nav-item"
+            <NavItem
+              icon={icon}
               key={path}
-              onClick={onClose}
+              label={label}
+              onClose={onClose}
               to={`${urlBase}/${path}`}
-            >
-              <Icon name={icon} />
-              <span>{label}</span>
-            </NavLink>
+            />
           ))}
         </div>
       )}
-      <button
-        aria-expanded={open}
-        className={`mobile-nav-item mobile-nav-toggle${open ? ' active' : ''}`}
-        onClick={onToggle}
-        type="button"
-      >
-        <span className="mobile-nav-more">
-          {/* three bars that fold into a cross, rather than one icon swapped
-              for another: the change is the point, so it is shown happening */}
-          <span
-            aria-hidden="true"
-            className="mobile-nav-burger"
-          >
-            <span />
-            <span />
-            <span />
-          </span>
-          {alert && !open && (
-            <span
-              className={`mobile-nav-dot mobile-nav-dot-${alert}`}
-              title="Something under More wants attention"
-            />
-          )}
-        </span>
-        <span>{open ? 'Close' : 'More'}</span>
-      </button>
+      <MoreButton
+        alert={alert}
+        onToggle={onToggle}
+        open={open}
+      />
     </nav>
   </>
 );

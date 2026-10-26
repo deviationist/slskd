@@ -92,6 +92,47 @@ class TransferGroup extends Component {
     };
   }
 
+  /*
+   * Skips a render when nothing this card shows has changed.
+   *
+   * The page polls, and every poll hands each card a freshly built `user` --
+   * sorting copies the objects -- so on Uploads, with hundreds of peers whose
+   * transfers finished long ago, every card redrew every second, and a phone
+   * spent most of its time doing it: taps on the bar waited behind the work.
+   * What changes between polls is a handful of rows, so the card compares
+   * what it was given, serialised, with what it drew last.
+   *
+   * The callbacks are left out on purpose. The page rebuilds them on every
+   * render, but they close over nothing but `direction` and its own state
+   * setters, both compared or stable, so a new one does the same as the old.
+   * `onShareRequested` is the exception that is sometimes absent, so whether
+   * there is one is compared.
+   */
+  shouldComponentUpdate(nextProps, nextState) {
+    if (nextState !== this.state) return true;
+
+    const { props } = this;
+
+    if (
+      nextProps.direction !== props.direction ||
+      nextProps.deleteFileOnRemoval !== props.deleteFileOnRemoval ||
+      nextProps.retrievalEnabled !== props.retrievalEnabled ||
+      Boolean(nextProps.onShareRequested) !== Boolean(props.onShareRequested)
+    ) {
+      return true;
+    }
+
+    if (nextProps.user === props.user) return false;
+
+    const next = JSON.stringify(nextProps.user);
+    this.drawn ??= JSON.stringify(props.user);
+
+    if (next === this.drawn) return false;
+
+    this.drawn = next;
+    return true;
+  }
+
   /**
    * Archives the selected files, asking first if any of them have gone.
    *
