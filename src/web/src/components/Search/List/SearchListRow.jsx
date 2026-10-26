@@ -28,7 +28,7 @@ const SearchListRow = ({ onRemove, onStop, search, watch = undefined }) => {
       disabled={working}
       style={{ cursor: working ? 'wait' : undefined }}
     >
-      <Table.Cell>
+      <Table.Cell className="search-list-status-cell">
         <SearchStatusIcon state={search.state} />
       </Table.Cell>
       <Table.Cell className="search-list-phrase-cell">
@@ -49,8 +49,10 @@ const SearchListRow = ({ onRemove, onStop, search, watch = undefined }) => {
           />
         )}
       </Table.Cell>
-      <Table.Cell>{search.fileCount}</Table.Cell>
-      <Table.Cell>
+      <Table.Cell className="search-list-files-cell">
+        {search.fileCount}
+      </Table.Cell>
+      <Table.Cell className="search-list-locked-cell">
         <Icon
           color="yellow"
           name="lock"
@@ -58,14 +60,18 @@ const SearchListRow = ({ onRemove, onStop, search, watch = undefined }) => {
         />
         {search.lockedFileCount}
       </Table.Cell>
-      <Table.Cell>{search.responseCount}</Table.Cell>
-      <Table.Cell>
+      <Table.Cell className="search-list-responses-cell">
+        {search.responseCount}
+      </Table.Cell>
+      <Table.Cell
+        className={`search-list-ended-cell${search.endedAt ? '' : ' search-list-ended-none'}`}
+      >
         <Timestamp
           at={search.endedAt}
           placeholder="-"
         />
       </Table.Cell>
-      <Table.Cell>
+      <Table.Cell className="search-list-action-cell">
         <SearchActionIcon
           loading={working}
           onRemove={() => invoke(() => onRemove(search))}

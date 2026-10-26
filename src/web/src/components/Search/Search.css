@@ -331,3 +331,86 @@
   justify-content: flex-end;
   padding-bottom: 8px;
 }
+
+/* The list of searches on a phone: each search is a small block rather than
+   a line of seven columns. As columns, Responses, Ended and the stop/remove
+   button sat past the card's right edge with no way to scroll to them. Here
+   the status icon stays at the left and the action at the right, the phrase
+   (and its watch badge) has the first line, and the counts follow on the line
+   under it as small print, labelled since the column headers are gone. */
+@media only screen and (max-width: 767px), only screen and (max-height: 500px) and (orientation: landscape) {
+  .search-list-wrapper .ui.table,
+  .search-list-wrapper .ui.table > tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .search-list-wrapper .ui.table > thead {
+    display: none;
+  }
+
+  .search-list-wrapper .ui.table > tbody > tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 12px;
+    position: relative;
+    padding: 10px 44px 10px 40px;
+    border-top: 1px solid rgba(127, 127, 127, 0.2);
+  }
+
+  .search-list-wrapper .ui.table > tbody > tr:first-child {
+    border-top: none;
+  }
+
+  .search-list-wrapper .ui.table > tbody > tr > td {
+    display: block;
+    width: auto !important;
+    padding: 0 !important;
+    border: none !important;
+    font-size: 0.85em;
+    opacity: 0.8;
+  }
+
+  .search-list-wrapper .ui.table > tbody > tr > td.search-list-status-cell,
+  .search-list-wrapper .ui.table > tbody > tr > td.search-list-action-cell {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 1em;
+    opacity: 1;
+  }
+
+  .search-list-wrapper .ui.table > tbody > tr > td.search-list-status-cell {
+    left: 10px;
+  }
+
+  .search-list-wrapper .ui.table > tbody > tr > td.search-list-action-cell {
+    right: 10px;
+  }
+
+  .search-list-wrapper .ui.table > tbody > tr > td.search-list-phrase-cell {
+    flex: 1 1 100%;
+    flex-wrap: wrap;
+    font-size: 1em;
+    opacity: 1;
+    overflow-wrap: anywhere;
+  }
+
+  .search-list-files-cell::after {
+    content: ' files';
+  }
+
+  .search-list-responses-cell::after {
+    content: ' responses';
+  }
+
+  .search-list-ended-cell::before {
+    content: 'ended ';
+  }
+
+  /* Still running: "ended -" says nothing the status icon does not. */
+  .search-list-ended-cell.search-list-ended-none {
+    display: none !important;
+  }
+}
