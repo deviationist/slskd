@@ -1446,8 +1446,18 @@ time {
 
 @media only screen and (max-width: 767px), only screen and (max-height: 500px) and (orientation: landscape) {
     :root {
-        --mobile-nav-height: 56px;
-        --mobile-nav-bottom: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom));
+        /* The bar runs to the bottom of the glass, and the home indicator's
+           inset is folded into its height rather than padded on under it:
+           padded, the bar's parts stopped above the inset and left a strip
+           of the bar's own background below them, which showed as soon as
+           the parts and the bar were different colours (the open menu), and
+           the items sat half the inset high. The band is the bar where
+           there is no inset; the floor keeps it from being cramped there.
+           -> homelab topics/ios-pwa-screen-edges.md, "A bottom bar that
+           works at any inset". */
+        --mobile-nav-band: 49px;
+        --mobile-nav-floor: 56px;
+        --mobile-nav-bottom: max(var(--mobile-nav-floor), calc(var(--mobile-nav-band) + env(safe-area-inset-bottom, 0px)));
         /* the open menu's panel, and More while it is the panel's tab: one
            value, so the two cannot come apart */
         --mobile-nav-panel-background: var(--slskd-secondary-background, #1b1c1d);
@@ -1484,7 +1494,7 @@ time {
         bottom: 0;
         z-index: 1003;
         height: var(--mobile-nav-bottom);
-        padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+        padding: 0 env(safe-area-inset-right) 0 env(safe-area-inset-left);
         background: #1b1c1d;
         transition: background-color 0.2s ease;
     }
@@ -1722,7 +1732,8 @@ time {
    is what such a screen has least of. */
 @media only screen and (max-height: 500px) and (orientation: landscape) {
     :root {
-        --mobile-nav-height: 44px;
+        --mobile-nav-band: 32px;
+        --mobile-nav-floor: 44px;
     }
 
     .mobile-nav-item {
