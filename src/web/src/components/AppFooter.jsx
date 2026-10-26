@@ -82,7 +82,13 @@ const VersionModal = ({ onClose, version }) => (
           {(version.isCanary || version.isDevelopment) && (
             <Table.Row>
               <Table.Cell>Build</Table.Cell>
+              {/* the flask the footer shows, beside the word it stands for --
+                  the one place that says what the mark in the corner means */}
               <Table.Cell>
+                <Icon
+                  color="yellow"
+                  name="flask"
+                />
                 {version.isDevelopment ? 'Development' : 'Canary'}
               </Table.Cell>
             </Table.Row>
