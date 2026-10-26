@@ -1162,6 +1162,11 @@ time {
     z-index: 1000 !important;
     margin: 0 !important;
     border-radius: 0 !important;
+    /* the height the layout is written around (--footer-height, and the
+       phone's room above its bottom bar): set, rather than left to what the
+       items inside happen to add up to, so a smaller font or a taller button
+       in the slot cannot open a gap above it or run under the page */
+    height: 41px;
 }
 
 .footer-logo {
@@ -1170,25 +1175,63 @@ time {
     vertical-align: middle;
 }
 
+/* The footer is shared with the actions a page puts in it -- a selection's
+   buttons, and whatever the injected scripts add to them -- so its own items
+   are kept small: tighter than Semantic's menu padding, the stats a size down
+   and abbreviated (in full in their titles), the version short (in full in
+   the modal it opens). */
+.footer.ui.menu > .item,
+.footer.ui.menu > .menu > .item {
+    padding-left: 0.7em;
+    padding-right: 0.7em;
+}
+
+/* a long username would otherwise take the room the actions need; it is in
+   full in the item's title */
+.footer-username {
+    max-width: 10em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .footer-version {
     margin-left: 6px;
     font-family: monospace;
-    font-size: 14px;
+    font-size: 13px;
     opacity: 0.7;
     margin-top: 1px;
 }
 
-.footer-license {
-    margin-left: 6px;
+/* a button, for the keyboard and for what it does, drawn as the menu item
+   it sits among */
+.footer.ui.menu .footer-about {
+    background: none;
+    border: 0;
+    color: inherit;
+    cursor: pointer;
+    font: inherit;
+    /* font: inherit brings the body's line height, taller than the 1 every
+       other menu item has, and made the footer 6px taller */
+    line-height: 1;
+}
+
+.footer.ui.menu .footer-about:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.footer.ui.menu .footer-about:focus-visible {
+    outline: 2px solid #58a6ff;
+    outline-offset: -2px;
+}
+
+.footer-version-full {
     font-family: monospace;
-    font-size: 14px;
-    opacity: 0.5;
-    margin-top: 1px;
 }
 
 .footer-stat-detail {
-    margin-left: 6px;
-    font-size: 14px;
+    margin-left: 5px;
+    font-size: 12px;
     opacity: 0.7;
 }
 
@@ -1196,7 +1239,7 @@ time {
 .footer-upload {
     white-space: pre;
     font-family: monospace;
-    font-size: 14px;
+    font-size: 13px;
     margin-top: 1px;
 }
 /* The link to a user's shares, wherever their name is shown -- a search
