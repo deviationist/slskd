@@ -1225,6 +1225,11 @@ time {
     outline-offset: -2px;
 }
 
+.footer.ui.menu .footer-about .footer-build {
+    margin: 0 0 0 5px;
+    font-size: 12px;
+}
+
 .footer-version-full {
     font-family: monospace;
 }

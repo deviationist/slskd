@@ -123,6 +123,11 @@ const AppFooter = ({
   const { isConnected } = server;
   const { username } = user;
   const { current } = version;
+  const build = version.isDevelopment
+    ? 'development build'
+    : version.isCanary
+      ? 'canary build'
+      : undefined;
   const downloads = transferMetrics?.downloads;
   const uploads = transferMetrics?.uploads;
 
@@ -181,7 +186,9 @@ const AppFooter = ({
           as="button"
           className="footer-about"
           onClick={() => setShowingVersion(true)}
-          title={current ? `slskd ${current}` : 'slskd'}
+          title={[current ? `slskd ${current}` : 'slskd', build]
+            .filter(Boolean)
+            .join(', ')}
           type="button"
         >
           <img
@@ -191,6 +198,16 @@ const AppFooter = ({
           />
           {current && (
             <span className="footer-version">{shortVersion(current)}</span>
+          )}
+          {/* a mark, not a menu entry: every build of ours is a canary by
+              upstream's definition (the .65534 revision), so a whole menu
+              item said the same thing on every page; the modal names it */}
+          {build && (
+            <Icon
+              className="footer-build"
+              color="yellow"
+              name="flask"
+            />
           )}
         </Menu.Item>
       </Menu.Menu>

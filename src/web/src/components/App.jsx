@@ -558,15 +558,6 @@ class App extends Component {
             visible
             width="thin"
           >
-            {version.isCanary && (
-              <Menu.Item>
-                <Icon
-                  color="yellow"
-                  name="flask"
-                />
-                Canary
-              </Menu.Item>
-            )}
             {isAgent ? (
               <Menu.Item>
                 <Icon name="detective" />
