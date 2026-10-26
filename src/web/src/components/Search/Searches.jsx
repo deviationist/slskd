@@ -15,6 +15,9 @@ import { toast } from 'react-toastify';
 import { Button, Icon, Input, Popup, Segment } from 'semantic-ui-react';
 import { v4 as uuidv4 } from 'uuid';
 
+// how soon after a search starts a second Enter counts as asking to open it
+const DOUBLE_ENTER_MS = 1_000;
+
 const Searches = ({ server } = {}) => {
   const [connecting, setConnecting] = useState(true);
   const [error, setError] = useState(undefined);
@@ -29,6 +32,9 @@ const Searches = ({ server } = {}) => {
   const [confirmingClear, setConfirmingClear] = useState(false);
 
   const inputRef = useRef();
+  // the search the last Enter started, and when: a second Enter straight after
+  // opens it -- see onKeyUp on the input
+  const lastCreatedRef = useRef(null);
 
   const { id: searchId } = useParams();
   const history = useHistory();
@@ -145,6 +151,7 @@ const Searches = ({ server } = {}) => {
       }
 
       setCreating(false);
+      lastCreatedRef.current = { at: Date.now(), id };
 
       if (navigate) {
         history.push(`${match.url.replace(`/${searchId}`, '')}/${id}`);
@@ -391,7 +398,30 @@ const Searches = ({ server } = {}) => {
             />
           }
           loading={creating}
-          onKeyUp={(keyUpEvent) => (keyUpEvent.key === 'Enter' ? create() : '')}
+          onKeyUp={(keyUpEvent) => {
+            if (keyUpEvent.key !== 'Enter') return;
+
+            // Enter starts a search and stays here, clearing the field for
+            // the next; Enter again at once, on the field it just cleared,
+            // opens the one it started. The search icon does both in one go,
+            // but on a phone the keyboard's own key is where the thumb is.
+            const last = lastCreatedRef.current;
+            const empty = !keyUpEvent.target.value;
+
+            if (empty && last && Date.now() - last.at < DOUBLE_ENTER_MS) {
+              lastCreatedRef.current = null;
+              history.push(
+                `${match.url.replace(`/${searchId}`, '')}/${last.id}`,
+              );
+              return;
+            }
+
+            // a second Enter that came too late is not a request to search
+            // for nothing
+            if (empty) return;
+
+            create();
+          }}
           placeholder="Search phrase"
           ref={inputRef}
           size="big"
