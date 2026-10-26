@@ -3,12 +3,16 @@ import { formatBytes } from '../lib/util';
 import React, { useState } from 'react';
 import { Button, Icon, Menu, Modal, Table } from 'semantic-ui-react';
 
+// unpadded: padding to a fixed width kept the text beside it from moving as
+// the speed changed, at the cost of up to three spaces before every speed --
+// room the footer shares with a page's actions, which are right-aligned and
+// do not move either way
 const formatSpeed = (bytesPerSecond) => {
   if (!bytesPerSecond || bytesPerSecond < 1) {
-    return '   0 B/s';
+    return '0 B/s';
   }
 
-  return `${formatBytes(bytesPerSecond, 1, 4, ' ')}/s`;
+  return `${formatBytes(bytesPerSecond, 1)}/s`;
 };
 
 /**
@@ -31,7 +35,7 @@ const TransferStat = ({ active, color, icon, label, queued, speed }) => {
   return (
     <Menu.Item
       className="footer-stat"
-      title={`${label}: ${text.trim()}, ${active} active, ${queued} queued`}
+      title={`${label}: ${text}, ${active} active, ${queued} queued`}
     >
       <Icon
         color={color}
