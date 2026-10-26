@@ -1749,3 +1749,11 @@ time {
         flex-shrink: 0;
     }
 }
+
+/* The new-build toast: what happened, then Later and Update at its right. */
+.client-update-prompt-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 8px;
+}

@@ -1,6 +1,7 @@
 import 'react-toastify/dist/ReactToastify.css';
 import './App.css';
 import { urlBase } from '../config';
+import { applyUpdate, watchForUpdate } from '../lib/clientUpdate';
 import {
   createApplicationHubConnection,
   createMetricsHubConnection,
@@ -84,6 +85,7 @@ const preferredTheme = () =>
  * Red while the server is unreachable, since the footer that says so is hidden
  * on a phone; yellow while something under More is asking to be looked at.
  * @param {object} params - The parts of the application's state that can ask.
+ * @param {boolean} params.clientUpdate - Whether a newer build of this page is being served.
  * @param {boolean} params.isAgent - Whether this is a relay agent, which has no server of its own.
  * @param {boolean} params.isUpdateAvailable - Whether a newer release is out.
  * @param {boolean} params.pendingReconnect - Whether a reconnect is waiting to happen.
@@ -93,6 +95,7 @@ const preferredTheme = () =>
  * @returns {string|null} 'red', 'yellow' or null.
  */
 const navAlertOf = ({
+  clientUpdate,
   isAgent,
   isUpdateAvailable,
   pendingReconnect,
@@ -107,7 +110,8 @@ const navAlertOf = ({
   return pendingReconnect ||
     pendingRestart ||
     pendingShareRescan ||
-    isUpdateAvailable
+    isUpdateAvailable ||
+    clientUpdate
     ? 'yellow'
     : null;
 };
@@ -116,6 +120,34 @@ const navAlertOf = ({
 // drawing the page without them: long enough for a slow link, short enough
 // that a server that never sends them does not hold the page hostage
 const FIRST_PUSH_TIMEOUT = 3_000;
+
+/*
+ * The offer to load a new build, as a toast that stays until answered. Later
+ * only closes it: the menu keeps an Update item, and More its dot, for as long
+ * as this page is the old build.
+ */
+const UpdatePrompt = ({ closeToast }) => (
+  <div className="client-update-prompt">
+    <div>A new version of slskd has been deployed.</div>
+    <div className="client-update-prompt-actions">
+      <Button
+        compact
+        onClick={closeToast}
+        size="small"
+      >
+        Later
+      </Button>
+      <Button
+        compact
+        onClick={applyUpdate}
+        primary
+        size="small"
+      >
+        Update
+      </Button>
+    </div>
+  </div>
+);
 
 const initialState = {
   applicationOptions: {},
@@ -247,6 +279,7 @@ class App extends Component {
     */
     this.state = {
       ...initialState,
+      clientUpdate: false,
       navOpen: false,
       theme: preferredTheme(),
       wide: savedWide(),
@@ -289,8 +322,29 @@ class App extends Component {
         );
     }
 
+    this.updateWatch = watchForUpdate(this.handleClientUpdate);
+
     this.init();
   }
+
+  componentWillUnmount() {
+    this.updateWatch?.stop();
+  }
+
+  /*
+   * A deploy is noticed by this page rather than pushed to it: the server's
+   * index.html names a different bundle from the one running here (see
+   * lib/clientUpdate). Asked once; the answer is not remembered, because the
+   * next load is the new build and the question no longer arises.
+   */
+  handleClientUpdate = () => {
+    this.setState({ clientUpdate: true });
+    toast(<UpdatePrompt />, {
+      autoClose: false,
+      closeOnClick: false,
+      toastId: 'client-update',
+    });
+  };
 
   init = async () => {
     this.setState({ initialized: false }, async () => {
@@ -341,9 +395,11 @@ class App extends Component {
           appHub.onclose(() =>
             this.setState({ error: true, retriesExhausted: true }),
           );
-          appHub.onreconnected(() =>
-            this.setState({ error: false, retriesExhausted: false }),
-          );
+          appHub.onreconnected(() => {
+            this.setState({ error: false, retriesExhausted: false });
+            // a deploy restarts slskd, so coming back is when to look
+            this.updateWatch?.check();
+          });
 
           await this.hubConnections.appHub?.stop();
           this.hubConnections.appHub = appHub;
@@ -456,6 +512,7 @@ class App extends Component {
     const {
       applicationOptions = {},
       applicationState = {},
+      clientUpdate,
       error,
       initialized,
       login,
@@ -700,6 +757,18 @@ class App extends Component {
                   </Modal.Actions>
                 </Modal>
               )}
+              {clientUpdate && (
+                <Menu.Item
+                  onClick={applyUpdate}
+                  title="A new version has been deployed; load it"
+                >
+                  <Icon
+                    color="green"
+                    name="arrow alternate circle up"
+                  />
+                  Update
+                </Menu.Item>
+              )}
               <Link to={`${urlBase}/system`}>
                 <Menu.Item>
                   <Icon name="cogs" />
@@ -892,6 +961,7 @@ class App extends Component {
         <MobileNav
           agent={isAgent}
           alert={navAlertOf({
+            clientUpdate,
             isAgent,
             isUpdateAvailable,
             pendingReconnect,
