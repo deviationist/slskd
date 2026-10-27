@@ -211,8 +211,9 @@ least recently used are dropped past the cache's capacity.
 
 As with remote file retrieval, the file is identified by the **id of the download** and resolved from the path recorded when it was written; it must be inside
 the 'Downloads' directory, symbolic links followed, and be audio. The audio and the cover are fetched by `<audio>` and `<img>` elements, which cannot carry an
-authorization header, so they are authorized by a **stream ticket** in the query string: issued to an authenticated caller, bound to that one download,
-reusable while the track is playing (each seek is a request), and expiring after an hour unused or twelve hours in all.
+authorization header, so they are authorized by a **stream ticket** in the query string: issued to an authenticated caller, admitting those two routes and
+nothing else, reusable (each seek is a request), and expiring after an hour unused or twelve hours in all. It is one per player rather than one per track
+because iOS starts sound only inside the tap that asked for it, and fetching a ticket between the tap and the play would lose it.
 
 | Command-Line       | Environment Variable     | Description                                        |
 | ------------------ | ------------------------ | -------------------------------------------------- |

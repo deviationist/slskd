@@ -123,6 +123,23 @@ namespace slskd.Tests.Unit.Player
             Assert.Null(answer.Analysis);
         }
 
+        [Fact]
+        public async Task A_caller_that_will_not_wait_is_told_pending_and_the_answer_arrives_for_the_next()
+        {
+            var gate = new TaskCompletionSource();
+            Responses.Enqueue(Json(HttpStatusCode.OK, Document));
+            var provider = Provider(hold: gate.Task);
+
+            var first = await provider.GetAsync(Track, wait: false);
+            gate.SetResult();
+            var second = await provider.GetAsync(Track);
+
+            Assert.Equal(AnalysisState.Pending, first.State);
+            Assert.NotNull(first.RetryAfter);
+            Assert.Equal(AnalysisState.Ready, second.State);
+            Assert.Single(Requests);
+        }
+
         [Theory]
         [InlineData(HttpStatusCode.Forbidden, AnalysisState.None)]
         [InlineData(HttpStatusCode.NotFound, AnalysisState.None)]
@@ -134,11 +151,17 @@ namespace slskd.Tests.Unit.Player
         private static HttpResponseMessage Json(HttpStatusCode status, string body)
             => new(status) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
 
-        private AnalysisProvider Provider(string url = "http://provider.invalid/contract")
+        private AnalysisProvider Provider(string url = "http://provider.invalid/contract", Task hold = null)
         {
-            var handler = new Handler(request =>
+            var handler = new Handler(async request =>
             {
                 Requests.Add(request);
+
+                if (hold is not null)
+                {
+                    await hold;
+                }
+
                 return Responses.Count > 0 ? Responses.Dequeue() : new HttpResponseMessage(HttpStatusCode.InternalServerError);
             });
 
@@ -162,10 +185,10 @@ namespace slskd.Tests.Unit.Player
             }));
         }
 
-        private sealed class Handler(Func<HttpRequestMessage, HttpResponseMessage> respond) : HttpMessageHandler
+        private sealed class Handler(Func<HttpRequestMessage, Task<HttpResponseMessage>> respond) : HttpMessageHandler
         {
             protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-                => Task.FromResult(respond(request));
+                => respond(request);
         }
     }
 }

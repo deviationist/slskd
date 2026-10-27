@@ -37,13 +37,19 @@ using System.Security.Cryptography;
 using Microsoft.Extensions.Caching.Memory;
 
 /// <summary>
-///     Short-lived permission to stream one download's audio and cover.
+///     Short-lived permission to stream finished downloads' audio and covers.
 /// </summary>
 /// <remarks>
 ///     <para>
 ///         An <c>&lt;audio&gt;</c> or <c>&lt;img&gt;</c> element cannot send an Authorization header, and putting the
 ///         session token in the URL would leave it in every proxy's access log. A ticket is what goes in the URL
-///         instead: it is bound to one transfer, so a leaked one plays that file for a while and reaches nothing else.
+///         instead, and it admits the player's audio and cover routes and nothing else: a leaked one lets someone listen
+///         to finished downloads for a while, and reaches no other part of the API.
+///     </para>
+///     <para>
+///         One per player rather than one per track, because of iOS: <c>play()</c> starts sound only inside the tap
+///         that asked for it, and a round trip for a ticket between the tap and the call loses the tap. The player holds
+///         a ticket before anything is pressed, so the audio's address is known synchronously.
 ///     </para>
 ///     <para>
 ///         Reusable within its lifetime, unlike the archive's <see cref="slskd.Transfers.DownloadTicketService"/>:
@@ -79,16 +85,15 @@ public class StreamTickets
     private IMemoryCache Cache { get; } = new MemoryCache(new MemoryCacheOptions());
 
     /// <summary>
-    ///     Issues a ticket for one download.
+    ///     Issues a ticket.
     /// </summary>
-    /// <param name="id">The download's id.</param>
     /// <returns>The ticket.</returns>
-    public string Issue(Guid id)
+    public string Issue()
     {
         var ticket = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
             .TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
-        Cache.Set(ticket, id, new MemoryCacheEntryOptions
+        Cache.Set(ticket, true, new MemoryCacheEntryOptions
         {
             SlidingExpiration = IdleLifetime,
             AbsoluteExpirationRelativeToNow = CapLifetime,
@@ -98,11 +103,10 @@ public class StreamTickets
     }
 
     /// <summary>
-    ///     Whether <paramref name="ticket"/> was issued for <paramref name="id"/> and is still live. Using it extends it.
+    ///     Whether <paramref name="ticket"/> was issued and is still live. Using it extends it.
     /// </summary>
     /// <param name="ticket">The ticket.</param>
-    /// <param name="id">The download it is presented for.</param>
     /// <returns>A value indicating whether it admits.</returns>
-    public bool Admits(string ticket, Guid id)
-        => !string.IsNullOrEmpty(ticket) && Cache.TryGetValue(ticket, out Guid issuedFor) && issuedFor == id;
+    public bool Admits(string ticket)
+        => !string.IsNullOrEmpty(ticket) && Cache.TryGetValue(ticket, out bool _);
 }

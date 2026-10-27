@@ -158,15 +158,13 @@ namespace slskd.Tests.Unit.Player
     public class StreamTicketsTests
     {
         [Fact]
-        public void A_ticket_admits_the_download_it_was_issued_for_and_no_other()
+        public void An_issued_ticket_admits_while_it_lives()
         {
             var tickets = new StreamTickets();
-            var id = Guid.NewGuid();
-            var ticket = tickets.Issue(id);
+            var ticket = tickets.Issue();
 
-            Assert.True(tickets.Admits(ticket, id));
-            Assert.True(tickets.Admits(ticket, id));
-            Assert.False(tickets.Admits(ticket, Guid.NewGuid()));
+            Assert.True(tickets.Admits(ticket));
+            Assert.True(tickets.Admits(ticket));
         }
 
         [Theory]
@@ -174,25 +172,27 @@ namespace slskd.Tests.Unit.Player
         [InlineData("")]
         [InlineData("made-up")]
         public void A_ticket_never_issued_admits_nothing(string ticket)
-            => Assert.False(new StreamTickets().Admits(ticket, Guid.NewGuid()));
+            => Assert.False(new StreamTickets().Admits(ticket));
 
         [Fact]
         public void A_ticket_left_unused_past_its_idle_time_expires()
         {
             var tickets = new StreamTickets(idle: TimeSpan.FromMilliseconds(50));
-            var id = Guid.NewGuid();
-            var ticket = tickets.Issue(id);
+            var ticket = tickets.Issue();
 
             System.Threading.Thread.Sleep(300);
 
-            Assert.False(tickets.Admits(ticket, id));
+            Assert.False(tickets.Admits(ticket));
         }
 
         [Fact]
-        public void Tickets_are_url_safe()
+        public void Each_ticket_is_new_and_url_safe()
         {
-            var ticket = new StreamTickets().Issue(Guid.NewGuid());
-            Assert.Matches("^[A-Za-z0-9_-]+$", ticket);
+            var tickets = new StreamTickets();
+            var first = tickets.Issue();
+
+            Assert.Matches("^[A-Za-z0-9_-]{40,}$", first);
+            Assert.NotEqual(first, tickets.Issue());
         }
     }
 }

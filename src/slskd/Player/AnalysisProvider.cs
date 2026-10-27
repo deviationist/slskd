@@ -107,9 +107,13 @@ public class AnalysisProvider
     /// </summary>
     public const int Contract = 1;
 
+    // how soon a caller that did not wait is told to ask again
+    private const int PollAfter = 3;
+
     private static readonly TimeSpan NoneFor = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan UnavailableFor = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan ConflictRetry = TimeSpan.FromSeconds(2);
+
 
     /// <summary>
     ///     Initializes a new instance of the <see cref="AnalysisProvider"/> class.
@@ -156,9 +160,14 @@ public class AnalysisProvider
     ///     The analysis of <paramref name="file"/>, from the cache or the provider.
     /// </summary>
     /// <param name="file">The resolved file.</param>
+    /// <param name="wait">
+    ///     Whether to wait for the provider. Without, an answer not yet known is <see cref="AnalysisState.Pending"/>
+    ///     at once and the request carries on, so a page asking about every row it draws holds no connection open
+    ///     while the provider works.
+    /// </param>
     /// <param name="cancellationToken">A token to stop waiting. The request itself carries on for whoever asks next.</param>
     /// <returns>The answer.</returns>
-    public async Task<AnalysisAnswer> GetAsync(FileInfo file, CancellationToken cancellationToken = default)
+    public async Task<AnalysisAnswer> GetAsync(FileInfo file, bool wait = true, CancellationToken cancellationToken = default)
     {
         if (!Configured)
         {
@@ -181,8 +190,14 @@ public class AnalysisProvider
         }
 
         var lazy = InFlight.GetOrAdd(key, _ => new Lazy<Task<AnalysisAnswer>>(() => AskAndKeepAsync(key, located.Value, file)));
+        var task = lazy.Value;
 
-        return await lazy.Value.WaitAsync(cancellationToken);
+        if (!wait && !task.IsCompleted)
+        {
+            return new AnalysisAnswer(AnalysisState.Pending, RetryAfter: PollAfter);
+        }
+
+        return await task.WaitAsync(cancellationToken);
     }
 
     private async Task<AnalysisAnswer> AskAndKeepAsync(string key, (string Root, string File) located, FileInfo file)

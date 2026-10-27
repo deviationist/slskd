@@ -57,7 +57,7 @@ using slskd.Transfers;
 ///     <para>
 ///         The audio and the cover are fetched by an <c>&lt;audio&gt;</c> and an <c>&lt;img&gt;</c>, which cannot send
 ///         an Authorization header, so those two are admitted by a <see cref="StreamTickets">stream ticket</see> in the
-///         query string instead; the ticket is issued to an authenticated caller and is good for that download only.
+///         query string instead; the ticket is issued to an authenticated caller and admits those two routes only.
 ///     </para>
 ///     <para>
 ///         A 404 means the file has gone for good and the caller should stop asking. A 409 means the download has not
@@ -103,40 +103,36 @@ public class PlayerController : ControllerBase
     private ILogger Log { get; } = Serilog.Log.ForContext<PlayerController>();
 
     /// <summary>
-    ///     Issues a stream ticket for one download's audio and cover.
+    ///     Issues a stream ticket for the audio and art routes.
     /// </summary>
-    /// <param name="id">The download's id.</param>
     /// <returns>The ticket.</returns>
     /// <response code="200">The request completed successfully.</response>
-    /// <response code="404">The player is off, or there is no such playable download.</response>
-    /// <response code="409">The download has not finished.</response>
-    [HttpPost("{id}/ticket")]
+    /// <response code="404">The player is off.</response>
+    [HttpPost("ticket")]
     [Authorize(Policy = AuthPolicy.Any)]
     [ProducesResponseType(typeof(StreamTicketResponse), 200)]
-    public IActionResult CreateTicket([FromRoute] string id)
+    public IActionResult CreateTicket()
     {
-        var (guid, _, refusal) = Resolve(id);
-
-        if (refusal is not null)
+        if (Program.IsRelayAgent || !OptionsMonitor.CurrentValue.Player.Enabled)
         {
-            return refusal;
+            return NotFound();
         }
 
-        return Ok(new StreamTicketResponse { Ticket = Tickets.Issue(guid) });
+        return Ok(new StreamTicketResponse { Ticket = Tickets.Issue() });
     }
 
     /// <summary>
     ///     The audio, as a file a browser can play, honouring byte ranges.
     /// </summary>
     /// <param name="id">The download's id.</param>
-    /// <param name="ticket">A stream ticket issued for this download.</param>
+    /// <param name="ticket">A stream ticket.</param>
     /// <param name="codec"><c>opus</c> (the default) or <c>aac</c>, which WebKit needs for its meter to read anything.</param>
     /// <param name="cancellationToken">The request's cancellation token.</param>
     /// <returns>The audio.</returns>
     /// <response code="200">The request completed successfully.</response>
     /// <response code="206">A range of the audio.</response>
     /// <response code="400">The codec is not one this serves.</response>
-    /// <response code="403">The ticket does not admit this download.</response>
+    /// <response code="403">The ticket was not issued here, or has expired.</response>
     /// <response code="502">The transcode failed.</response>
     [HttpGet("{id}/audio")]
     [AllowAnonymous]
@@ -235,7 +231,7 @@ public class PlayerController : ControllerBase
     ///     The cover embedded in the file itself.
     /// </summary>
     /// <param name="id">The download's id.</param>
-    /// <param name="ticket">A stream ticket issued for this download.</param>
+    /// <param name="ticket">A stream ticket.</param>
     /// <returns>The image.</returns>
     /// <response code="200">The request completed successfully.</response>
     /// <response code="304">The cover has not changed.</response>
@@ -273,13 +269,14 @@ public class PlayerController : ControllerBase
     ///     What the configured analysis provider found, if one is configured.
     /// </summary>
     /// <param name="id">The download's id.</param>
+    /// <param name="wait">False to be told <c>pending</c> at once rather than wait for the provider.</param>
     /// <param name="cancellationToken">The request's cancellation token.</param>
     /// <returns>The answer: its state, and the provider's document when it is ready.</returns>
     /// <response code="200">The request completed successfully; see <c>state</c>.</response>
     [HttpGet("{id}/analysis")]
     [Authorize(Policy = AuthPolicy.Any)]
     [ProducesResponseType(typeof(AnalysisResponse), 200)]
-    public async Task<IActionResult> GetAnalysisAsync([FromRoute] string id, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetAnalysisAsync([FromRoute] string id, [FromQuery] bool wait = true, CancellationToken cancellationToken = default)
     {
         if (!Analysis.Configured)
         {
@@ -293,7 +290,7 @@ public class PlayerController : ControllerBase
             return refusal;
         }
 
-        return Ok(AnalysisResponse.From(await Analysis.GetAsync(file, cancellationToken)));
+        return Ok(AnalysisResponse.From(await Analysis.GetAsync(file, wait, cancellationToken)));
     }
 
     private (Guid Id, FileInfo File, IActionResult Refusal) Resolve(string id, string ticket = null, bool requireTicket = false)
@@ -310,9 +307,9 @@ public class PlayerController : ControllerBase
 
         // a route reached with a ticket is admitted by that ticket alone; it is the only credential an audio element
         // can carry. checked before the download is looked up, so a bad ticket learns nothing about which ids exist
-        if (requireTicket && !Tickets.Admits(ticket, guid))
+        if (requireTicket && !Tickets.Admits(ticket))
         {
-            return (guid, null, StatusCode(403, "The ticket does not admit this download"));
+            return (guid, null, StatusCode(403, "The ticket is not one this server issued, or it has expired"));
         }
 
         var download = Transfers.Downloads.Find(t => t.Id == guid);
