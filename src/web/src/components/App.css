@@ -1455,6 +1455,17 @@ time {
     outline-offset: -2px;
 }
 
+/* The page that is open, in the menu: NavLink marks its link `active` (a
+   search's detail counts as Search). The same blue as the phone bar's
+   current item, so the bar and the panel above it agree on where you are. */
+.ui.sidebar.navigation a.active > .item {
+    color: #58a6ff !important;
+}
+
+:root.nav-open .ui.sidebar.navigation a.active > .item {
+    background: rgba(88, 166, 255, 0.12) !important;
+}
+
 @media only screen and (max-width: 767px), only screen and (max-height: 500px) and (orientation: landscape) {
     :root {
         /* The bar runs to the bottom of the glass, so its parts -- and the
