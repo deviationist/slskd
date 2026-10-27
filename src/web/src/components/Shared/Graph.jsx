@@ -10,7 +10,6 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
-  Legend,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -176,96 +175,108 @@ const Graph = ({ data = [], defaultSeries, height = 200, series = [] }) => {
     );
   };
 
-  const renderLegend = ({ payload }) => (
+  // drawn under the chart rather than as recharts' Legend, which takes its
+  // room out of `height`: on a phone the series wrap to six lines, and the
+  // legend left the plot no height at all
+  const renderLegend = () => (
     <div
       style={{
         display: 'flex',
         flexWrap: 'wrap',
         fontSize: '0.875em',
-        gap: '1em',
+        gap: '0.5em 1em',
         justifyContent: 'center',
+        marginTop: '0.5em',
       }}
     >
-      {payload.map((entry) => (
-        <span
-          aria-checked={visible.has(entry.dataKey)}
-          key={entry.dataKey}
-          onClick={() => toggle(entry.dataKey)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              toggle(entry.dataKey);
-            }
-          }}
-          role="checkbox"
-          style={{
-            alignItems: 'center',
-            cursor: 'pointer',
-            display: 'flex',
-            gap: '0.4em',
-            opacity: visible.has(entry.dataKey) ? 1 : 0.35,
-          }}
-          tabIndex={0}
-        >
-          <svg
-            height="10"
-            width="16"
+      {series
+        .map(({ color, key, name }) => ({
+          color,
+          dataKey: key,
+          value: name,
+        }))
+        .map((entry) => (
+          <span
+            aria-checked={visible.has(entry.dataKey)}
+            key={entry.dataKey}
+            onClick={() => toggle(entry.dataKey)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                toggle(entry.dataKey);
+              }
+            }}
+            role="checkbox"
+            style={{
+              alignItems: 'center',
+              cursor: 'pointer',
+              display: 'flex',
+              gap: '0.4em',
+              opacity: visible.has(entry.dataKey) ? 1 : 0.35,
+            }}
+            tabIndex={0}
           >
-            <line
-              stroke={entry.color}
-              strokeWidth="2"
-              x1="0"
-              x2="16"
-              y1="5"
-              y2="5"
-            />
-          </svg>
-          {entry.value}
-        </span>
-      ))}
+            <svg
+              height="10"
+              width="16"
+            >
+              <line
+                stroke={entry.color}
+                strokeWidth="2"
+                x1="0"
+                x2="16"
+                y1="5"
+                y2="5"
+              />
+            </svg>
+            {entry.value}
+          </span>
+        ))}
     </div>
   );
 
   return (
-    <ResponsiveContainer
-      height={height}
-      width="100%"
-    >
-      <AreaChart data={data}>
-        <CartesianGrid
-          stroke={isDark ? 'rgba(255,255,255,0.20)' : '#d0d0d0'}
-          strokeDasharray="3 3"
-        />
-        <XAxis
-          dataKey="timestamp"
-          domain={['dataMin', 'dataMax']}
-          style={axisStyle}
-          tickFormatter={xFormatter}
-          ticks={xTicks}
-          type="number"
-        />
-        <YAxis
-          style={axisStyle}
-          tickFormatter={yFormatter}
-        />
-        <Tooltip content={renderTooltip} />
-        <Legend content={renderLegend} />
-        {series.map(({ color, key, name }) => (
-          <Area
-            dataKey={key}
-            dot={false}
-            fill={color}
-            fillOpacity={0.15}
-            hide={!visible.has(key)}
-            isAnimationActive={false}
-            key={key}
-            name={name}
-            stroke={color}
-            strokeOpacity={visible.has(key) ? 1 : 0}
-            type="monotone"
+    <>
+      <ResponsiveContainer
+        height={height}
+        width="100%"
+      >
+        <AreaChart data={data}>
+          <CartesianGrid
+            stroke={isDark ? 'rgba(255,255,255,0.20)' : '#d0d0d0'}
+            strokeDasharray="3 3"
           />
-        ))}
-      </AreaChart>
-    </ResponsiveContainer>
+          <XAxis
+            dataKey="timestamp"
+            domain={['dataMin', 'dataMax']}
+            style={axisStyle}
+            tickFormatter={xFormatter}
+            ticks={xTicks}
+            type="number"
+          />
+          <YAxis
+            style={axisStyle}
+            tickFormatter={yFormatter}
+          />
+          <Tooltip content={renderTooltip} />
+          {series.map(({ color, key, name }) => (
+            <Area
+              dataKey={key}
+              dot={false}
+              fill={color}
+              fillOpacity={0.15}
+              hide={!visible.has(key)}
+              isAnimationActive={false}
+              key={key}
+              name={name}
+              stroke={color}
+              strokeOpacity={visible.has(key) ? 1 : 0}
+              type="monotone"
+            />
+          ))}
+        </AreaChart>
+      </ResponsiveContainer>
+      {renderLegend()}
+    </>
   );
 };
 

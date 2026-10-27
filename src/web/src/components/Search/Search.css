@@ -389,7 +389,13 @@
     right: 10px;
   }
 
+  /* stays a flex line, not the block every other cell becomes: as a block
+     the Watching badge sat on the text's baseline and hung below the phrase */
   .search-list-wrapper .ui.table > tbody > tr > td.search-list-phrase-cell {
+    display: flex;
+    align-items: center;
+    column-gap: 0.5em;
+    row-gap: 4px;
     flex: 1 1 100%;
     flex-wrap: wrap;
     font-size: 1em;

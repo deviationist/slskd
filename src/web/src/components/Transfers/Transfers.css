@@ -438,6 +438,16 @@
     flex: 1 1 auto;
   }
 
+  /* Semantic's buttons grow alike, so the caret got half the button and sat at
+     the left of its half once the label had gone. It keeps its own square and
+     the action takes the rest. */
+  .transfers-header-buttons > .shrinkable-dropdown > .ui.dropdown.button {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
   .transfers-header-sort {
     order: 5;
   }
