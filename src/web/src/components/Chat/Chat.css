@@ -379,3 +379,45 @@
     height: calc(100dvh - var(--mobile-nav-bottom) - var(--top-bar-height) - 220px);
   }
 }
+
+/* The peer, in the conversation's header and beside each row of the picker,
+   opens on Users. In the header it keeps the header's colour: it is the
+   conversation's title first and a link second. */
+.chat-active-user {
+  color: inherit;
+}
+
+@media (hover: hover) {
+  .chat-active-user:hover {
+    text-decoration: underline;
+  }
+}
+
+.conversation-row-item {
+  display: flex;
+  align-items: stretch;
+}
+
+.conversation-row-item > .conversation-row {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.conversation-row-user {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  color: inherit;
+  opacity: 0.6;
+}
+
+.conversation-row-user > .icon {
+  margin: 0;
+}
+
+/* the active row's shading runs under its icon too, not short of it */
+.conversation-row-item:has(> .conversation-row.active) {
+  background: var(--slskd-subtle-background, rgba(0, 0, 0, 0.05));
+}

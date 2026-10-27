@@ -1,10 +1,12 @@
 import './Chat.css';
 import { activeChatKey } from '../../config';
 import * as chat from '../../lib/chat';
+import { userPath } from '../../lib/users';
 import PlaceholderSegment from '../Shared/PlaceholderSegment';
 import Timestamp from '../Shared/Timestamp';
 import ChatMenu from './ChatMenu';
 import React, { Component, createRef } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Card,
   Dimmer,
@@ -259,7 +261,14 @@ class Chat extends Component {
                   color="green"
                   name="circle"
                 />
-                {active}
+                <Link
+                  className="chat-active-user"
+                  onClick={(event) => event.stopPropagation()}
+                  title="Open on Users"
+                  to={userPath(active)}
+                >
+                  {active}
+                </Link>
                 <Icon
                   className="close-button"
                   color="red"
