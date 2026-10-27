@@ -291,6 +291,18 @@ const Searches = ({ server } = {}) => {
     }
   };
 
+  // focus the field when it appears and when a modal over it closes -- not on
+  // every render. The hub pushes search updates continuously, and anything
+  // else that re-renders the page did it too: opening the phone menu put the
+  // caret in the field behind it and brought up the keyboard over the menu,
+  // and an open modal had focus pulled out from under it several times a
+  // second.
+  useEffect(() => {
+    if (!watchDraft) {
+      inputRef?.current?.inputRef?.current?.focus();
+    }
+  }, [connecting, error, searchId, watchDraft]);
+
   if (connecting) {
     return <LoaderSegment />;
   }
@@ -321,14 +333,6 @@ const Searches = ({ server } = {}) => {
     // if the searchId doesn't match a search we know about, chop
     // the id off of the url and force navigation back to the list
     history.replace(match.url.replace(`/${searchId}`, ''));
-  }
-
-  // not while a modal is open. this runs on *every* render, and the hub pushes
-  // search updates continuously -- so an open modal had focus pulled out from
-  // under it several times a second, which sent typing to the field behind it
-  // and closed any menu the moment it was opened
-  if (!watchDraft) {
-    inputRef?.current?.inputRef?.current?.focus();
   }
 
   return (
