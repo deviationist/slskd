@@ -41,7 +41,10 @@ RUN bash ./bin/publish --no-prebuild --platform $TARGETPLATFORM --version $VERSI
 FROM mcr.microsoft.com/dotnet/runtime-deps:10.0-noble AS slskd
 ARG TARGETPLATFORM
 
+# ffmpeg is the player's: it transcodes finished downloads (mostly AIFF, which most browsers do not play) and draws
+# their waveforms. see src/slskd/Player
 RUN apt-get update && apt-get install --no-install-recommends -y \
+  ffmpeg \
   jq \
   wget \
   tini \
