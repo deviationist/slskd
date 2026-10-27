@@ -442,9 +442,39 @@ deployed in any order during the move.
    and their vhost entries **stay**, because media-bridge's own player still
    plays slskd downloads through them.
 
+## Built after this plan, and why the shape changed
+
+- **One stream ticket per player, not per track.** iOS starts sound only
+  inside the tap that asked for it, and fetching a per-track ticket between the
+  tap and `play()` loses the tap. The player holds one before anything is
+  pressed (renewed every 30 minutes); it still admits the audio and art routes
+  only. The ticket response also says whether a provider is configured, so the
+  page knows whether to draw analysis without asking about a file.
+- **The source is set by hand, in the press.** React 16 runs effects after
+  paint, which on iOS is outside the tap; `play()` from an effect is refused
+  there. The provider sets `src` and calls `play()` inside the handler.
+- **Polling instead of SignalR for analyses.** `GET analysis?wait=false`
+  answers `pending` at once and keeps the provider working; a row asks again
+  when told to. The backend's queue does the rate-limiting, so a page holds no
+  connection open meanwhile and needed no new hub.
+- **A gone file has no analysis, rather than a 404**; **a missing cover is
+  204**. Both are ordinary answers, and as 4xx they filled every page's console
+  with errors about nothing.
+- **±10 s in the drawer instead of prev/next.** A phone has no arrow keys, and
+  the transfer list is not a playlist.
+- **Escape listens on `window`, capture phase.** Semantic closes its modal from
+  its own listener on `document`; listening after it, one press closed the
+  findings sheet and the player.
+- **The findings are a sheet, not a panel in the row.** It opens from the bar
+  as well as a badge, and a phone's row has no room for a box of prose.
+- **The hook takes an id, or a peer and remote name**, which is what Compare in
+  `slskd-ingest.js` knows a copy by. Rows carry `data-id` too.
+
 ## Open questions
 
 - Whether TagLibSharp reads AIFF covers cheaply enough (see *Image and options*).
+  It reads them correctly (checked on real AIFFs on 2026-10-27); the cost over NFS
+  is not yet measured.
 - Which network path the provider call takes (see *media-bridge's side*).
 - Whether shares (`/app/shared`) become playable too. Not in v1: they are not
   transfers and have no id.
