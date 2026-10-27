@@ -485,15 +485,42 @@ export const PlayerProvider = ({ children, enabled = true }) => {
 
   useEffect(() => {
     window.slskd = window.slskd ?? {};
+    // by id, or by the peer and the remote name -- what Compare in
+    // slskd-ingest.js knows a copy by -- looked up in this user's downloads
+    const find = async ({ filename, id, username }) => {
+      if (id) {
+        return { filename, id, username };
+      }
+
+      if (!username || !filename) {
+        return null;
+      }
+
+      const { data } = await api.get(
+        `/transfers/downloads/${encodeURIComponent(username)}`,
+      );
+      const files = (data?.directories ?? []).flatMap((directory) => directory.files ?? []);
+
+      return files.find((file) => file.filename === filename) ?? null;
+    };
+
     window.slskd.player = {
       current: () => apiRef.current.current,
       pause: () => audio.current?.pause(),
-      play: (file) => {
+      play: async (wanted) => {
+        const found = await find(wanted ?? {});
         const row = {
           direction: 'Download',
           state: 'Completed, Succeeded',
-          ...file,
+          username: wanted?.username,
+          ...found,
         };
+
+        if (found && isPlayable(row)) {
+          apiRef.current.toggle(trackOf(row));
+        }
+      },
+    };
 
         if (isPlayable(row)) {
           apiRef.current.toggle(trackOf(row));

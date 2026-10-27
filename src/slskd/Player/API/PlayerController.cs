@@ -63,6 +63,10 @@ using slskd.Transfers;
 ///         A 404 means the file has gone for good and the caller should stop asking. A 409 means the download has not
 ///         finished yet, and asking again shortly is right.
 ///     </para>
+///     <para>
+///         The audio and art routes declare no <c>[Produces]</c> of their own: a file result is not negotiated, but an
+///         error is, and with only audio types to choose from a 403 or a 400 came back as 406.
+///     </para>
 /// </remarks>
 [Route("api/v{version:apiVersion}/player")]
 [ApiVersion("0")]
@@ -136,7 +140,6 @@ public class PlayerController : ControllerBase
     /// <response code="502">The transcode failed.</response>
     [HttpGet("{id}/audio")]
     [AllowAnonymous]
-    [Produces("audio/webm", "audio/mp4", "audio/mpeg")]
     public async Task<IActionResult> GetAudioAsync([FromRoute] string id, [FromQuery] string ticket, [FromQuery] string codec, CancellationToken cancellationToken)
     {
         var chosen = Codecs.Find(codec);
@@ -238,7 +241,6 @@ public class PlayerController : ControllerBase
     /// <response code="404">The file carries no cover. Not an error: the player draws an empty frame.</response>
     [HttpGet("{id}/art")]
     [AllowAnonymous]
-    [Produces("image/jpeg", "image/png")]
     public IActionResult GetArt([FromRoute] string id, [FromQuery] string ticket)
     {
         var (_, file, refusal) = Resolve(id, ticket, requireTicket: true);

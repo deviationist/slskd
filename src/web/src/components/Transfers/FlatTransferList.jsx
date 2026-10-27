@@ -932,6 +932,9 @@ const FlatTransferList = ({
                    * attaches to a file it cannot name.
                    */
                   data-filename={row.filename}
+                  // and its id, which is what slskd's own player is asked for
+                  // by (window.slskd.player)
+                  data-id={row.id}
                   data-index={virtual.index}
                   /*
                    * The state too, for the same reason: media-bridge decides
