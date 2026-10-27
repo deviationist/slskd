@@ -238,7 +238,10 @@ public class PlayerController : ControllerBase
     /// <returns>The image.</returns>
     /// <response code="200">The request completed successfully.</response>
     /// <response code="304">The cover has not changed.</response>
-    /// <response code="404">The file carries no cover. Not an error: the player draws an empty frame.</response>
+    /// <response code="204">
+    ///     The file carries no cover. Not an error -- the player draws an empty frame -- and so not a 404, which a
+    ///     browser logs as a failed request for every track without a sleeve.
+    /// </response>
     [HttpGet("{id}/art")]
     [AllowAnonymous]
     public IActionResult GetArt([FromRoute] string id, [FromQuery] string ticket)
@@ -254,7 +257,7 @@ public class PlayerController : ControllerBase
 
         if (cover is null)
         {
-            return NotFound();
+            return NoContent();
         }
 
         if (Request.Headers.IfNoneMatch.ToString() == cover.ETag)

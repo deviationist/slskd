@@ -492,13 +492,19 @@ const Bar = ({ player }) => {
 
   // --- the keyboard --------------------------------------------------------
 
+  // the latest of what a key press needs, so the listener is added once rather
+  // than on every tick of the playhead
+  const keys = useRef();
+  keys.current = { at, expanded, fold, length, seek, stop, toggle };
+
   useEffect(() => {
     const onKey = (event) => {
       if (event.defaultPrevented) {
         return;
       }
 
-      const action = keyAction(event, { at, length });
+      const latest = keys.current;
+      const action = keyAction(event, { at: latest.at, length: latest.length });
 
       if (!action) {
         return;
@@ -511,10 +517,10 @@ const Bar = ({ player }) => {
           return;
         }
 
-        if (expanded) {
-          fold();
+        if (latest.expanded) {
+          latest.fold();
         } else {
-          stop();
+          latest.stop();
         }
 
         return;
@@ -523,16 +529,22 @@ const Bar = ({ player }) => {
       event.preventDefault();
 
       if (action.type === 'toggle') {
-        toggle();
+        latest.toggle();
       } else {
-        seek(action.to);
+        latest.seek(action.to);
       }
     };
 
-    document.addEventListener('keydown', onKey);
+    // on window, in the capture phase: before Semantic's own handler, which
+    // listens on document and closes a modal on the same Escape. listening
+    // after it, the modal was already gone when the player asked, and one
+    // press closed the sheet and the player. same-target listeners run in the
+    // order they were added, so document alone is not enough -- and this one
+    // used to be re-added on every tick of the playhead, which put it last
+    window.addEventListener('keydown', onKey, true);
 
-    return () => document.removeEventListener('keydown', onKey);
-  }, [at, expanded, fold, length, seek, stop, toggle]);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, []);
 
   // --- scrubbing -----------------------------------------------------------
 

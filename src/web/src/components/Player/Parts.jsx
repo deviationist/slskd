@@ -9,7 +9,9 @@ import React, { useEffect, useState } from 'react';
 import { Checkbox, Modal } from 'semantic-ui-react';
 
 /*
- * The sleeve, from the file's own tag block. An empty frame of the same size
+ * The sleeve, from the file's own tag block -- a 204 when it carries none, which
+ * an <img> reports as an error, and that is what draws the empty frame. An empty
+ * frame of the same size
  * when there is none, so the bar keeps its shape between tracks; a button only
  * when there is a picture behind it, because a control that opens nothing is
  * worse than none.
