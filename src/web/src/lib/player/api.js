@@ -11,7 +11,9 @@ const base = (id) => `/player/${encodeURIComponent(id)}`;
 
 // a stream ticket: what the <audio> and <img> carry instead of a header. one
 // per player, held before anything is pressed -- see StreamTickets.cs for why
-export const getTicket = async () => (await api.post('/player/ticket')).data.ticket;
+// per player, held before anything is pressed -- see StreamTickets.cs for why.
+// it also says whether an analysis provider is configured: { ticket, analysis }
+export const getTicket = async () => (await api.post('/player/ticket')).data;
 
 export const getPeaks = async (id, { signal } = {}) =>
   (await api.get(`${base(id)}/peaks`, { signal })).data;

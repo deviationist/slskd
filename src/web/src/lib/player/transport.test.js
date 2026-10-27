@@ -5,8 +5,8 @@ import {
   keyAction,
   modeFor,
   outline,
-  scrubSeekDue,
   SCRUB_STEP_MS,
+  scrubSeekDue,
   SEEK_STEP,
   seekOnRelease,
   shownTime,
@@ -56,7 +56,11 @@ describe('outline', () => {
   });
 
   it('samples down to the width rather than drawing every bucket', () => {
-    const path = outline(Array.from({ length: 1_600 }, () => 0.5), 100, 10);
+    const path = outline(
+      Array.from({ length: 1_600 }, () => 0.5),
+      100,
+      10,
+    );
     expect(path.split('L').length).toBeLessThan(250);
   });
 });
@@ -66,35 +70,73 @@ describe('what a key press is for', () => {
     expect(typingIn(element('INPUT'))).toBe(true);
     expect(typingIn(element('DIV', { isContentEditable: true }))).toBe(true);
     expect(typingIn(element('BUTTON'))).toBe(false);
-    expect(keyAction(press('ArrowRight', { target: element('INPUT') }), { at: 0, length: 100 })).toBeNull();
+    expect(
+      keyAction(press('ArrowRight', { target: element('INPUT') }), {
+        at: 0,
+        length: 100,
+      }),
+    ).toBeNull();
   });
 
   it('leaves space to a focused button, which would act on it anyway', () => {
     // two actions from one press -- and one button within reach deletes a file
     expect(activatesOnSpace(element('BUTTON'))).toBe(true);
-    expect(activatesOnSpace(element('DIV', { getAttribute: () => 'button' }))).toBe(true);
-    expect(keyAction(press(' ', { target: element('BUTTON') }), { at: 0, length: 1 })).toBeNull();
-    expect(keyAction(press(' '), { at: 0, length: 1 })).toEqual({ type: 'toggle' });
+    expect(
+      activatesOnSpace(element('DIV', { getAttribute: () => 'button' })),
+    ).toBe(true);
+    expect(
+      keyAction(press(' ', { target: element('BUTTON') }), {
+        at: 0,
+        length: 1,
+      }),
+    ).toBeNull();
+    expect(keyAction(press(' '), { at: 0, length: 1 })).toEqual({
+      type: 'toggle',
+    });
   });
 
   it('moves the arrows SEEK_STEP, never before the start or past the end', () => {
-    expect(keyAction(press('ArrowRight'), { at: 5, length: 100 })).toEqual({ to: 5 + SEEK_STEP, type: 'seek' });
-    expect(keyAction(press('ArrowLeft'), { at: 5, length: 100 })).toEqual({ to: 0, type: 'seek' });
-    expect(keyAction(press('ArrowRight'), { at: 95, length: 100 })).toEqual({ to: 100, type: 'seek' });
+    expect(keyAction(press('ArrowRight'), { at: 5, length: 100 })).toEqual({
+      to: 5 + SEEK_STEP,
+      type: 'seek',
+    });
+    expect(keyAction(press('ArrowLeft'), { at: 5, length: 100 })).toEqual({
+      to: 0,
+      type: 'seek',
+    });
+    expect(keyAction(press('ArrowRight'), { at: 95, length: 100 })).toEqual({
+      to: 100,
+      type: 'seek',
+    });
   });
 
   it('jumps to tenths with the digits, but only with a length to take a tenth of', () => {
-    expect(keyAction(press('3'), { at: 0, length: 200 })).toEqual({ to: 60, type: 'seek' });
+    expect(keyAction(press('3'), { at: 0, length: 200 })).toEqual({
+      to: 60,
+      type: 'seek',
+    });
     expect(keyAction(press('3'), { at: 0, length: 0 })).toBeNull();
   });
 
   it('leaves modified keys to the browser and the OS', () => {
-    expect(keyAction(press('ArrowLeft', { metaKey: true }), { at: 5, length: 100 })).toBeNull();
-    expect(keyAction(press('ArrowLeft', { ctrlKey: true }), { at: 5, length: 100 })).toBeNull();
+    expect(
+      keyAction(press('ArrowLeft', { metaKey: true }), { at: 5, length: 100 }),
+    ).toBeNull();
+    expect(
+      keyAction(press('ArrowLeft', { ctrlKey: true }), { at: 5, length: 100 }),
+    ).toBeNull();
   });
 
-  it('reports Escape for the caller to decide, even while typing', () => {
-    expect(keyAction(press('Escape', { target: element('INPUT') }), { at: 0, length: 1 })).toEqual({ type: 'escape' });
+  it('reports Escape for the caller to decide, but not from a search box', () => {
+    expect(keyAction(press('Escape'), { at: 0, length: 1 })).toEqual({
+      type: 'escape',
+    });
+    expect(
+      keyAction(press('Escape', { target: element('INPUT') }), {
+        at: 0,
+        length: 1,
+      }),
+    ).toBeNull();
   });
 });
 

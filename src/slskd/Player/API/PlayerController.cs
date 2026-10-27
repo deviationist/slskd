@@ -118,7 +118,7 @@ public class PlayerController : ControllerBase
             return NotFound();
         }
 
-        return Ok(new StreamTicketResponse { Ticket = Tickets.Issue() });
+        return Ok(new StreamTicketResponse { Ticket = Tickets.Issue(), Analysis = Analysis.Configured });
     }
 
     /// <summary>

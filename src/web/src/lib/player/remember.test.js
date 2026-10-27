@@ -27,7 +27,12 @@ describe('the remembered track', () => {
   it('reads back what was written', () => {
     const storage = memory();
     writeLast({ at: 42, id: ID, title: 'x', username: 'u' }, storage);
-    expect(readLast(storage)).toEqual({ at: 42, id: ID, title: 'x', username: 'u' });
+    expect(readLast(storage)).toEqual({
+      at: 42,
+      id: ID,
+      title: 'x',
+      username: 'u',
+    });
   });
 
   it('forgets on null, so closing the player is not undone by a reload', () => {
@@ -42,12 +47,17 @@ describe('the remembered track', () => {
     ['no id', JSON.stringify({ title: 'x' })],
     ['an id that is not an id', JSON.stringify({ id: '../etc', title: 'x' })],
     ['no title', JSON.stringify({ id: ID })],
-  ])('reads %s as nothing rather than as a track that cannot load', (_, raw) => {
-    expect(readLast(memory({ [LAST_KEY]: raw }))).toBeNull();
-  });
+  ])(
+    'reads %s as nothing rather than as a track that cannot load',
+    (_, raw) => {
+      expect(readLast(memory({ [LAST_KEY]: raw }))).toBeNull();
+    },
+  );
 
   it('reads a nonsense position as the start', () => {
-    const storage = memory({ [LAST_KEY]: JSON.stringify({ at: 'x', id: ID, title: 't' }) });
+    const storage = memory({
+      [LAST_KEY]: JSON.stringify({ at: 'x', id: ID, title: 't' }),
+    });
     expect(readLast(storage).at).toBe(0);
   });
 

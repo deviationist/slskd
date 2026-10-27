@@ -43,6 +43,12 @@ public record StreamTicketResponse
     ///     Gets the ticket, for the <c>ticket</c> query parameter of the audio and art routes.
     /// </summary>
     public string Ticket { get; init; }
+
+    /// <summary>
+    ///     Gets a value indicating whether an analysis provider is configured, so the page knows whether to draw any
+    ///     analysis at all without asking about a file to find out.
+    /// </summary>
+    public bool Analysis { get; init; }
 }
 
 /// <summary>

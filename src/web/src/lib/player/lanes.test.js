@@ -59,7 +59,10 @@ describe('lanesFor', () => {
       ],
     });
 
-    expect(lanes.map((lane) => lane.finding.id)).toEqual(['dropouts', 'clipping']);
+    expect(lanes.map((lane) => lane.finding.id)).toEqual([
+      'dropouts',
+      'clipping',
+    ]);
     expect(lanes[0].finding.level).toBe('warn');
   });
 

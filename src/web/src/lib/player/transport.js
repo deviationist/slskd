@@ -56,10 +56,14 @@ export const outline = (peaks, width = WAVE_WIDTH, height = WAVE_HEIGHT) => {
   const top = [];
   const bottom = [];
 
-  for (let x = 0, index = 0; index < peaks.length; x++, index += step) {
+  for (let index = 0, x = 0; index < peaks.length; x++, index += step) {
     let peak = 0;
 
-    for (let inner = index; inner < Math.min(index + step, peaks.length); inner++) {
+    for (
+      let inner = index;
+      inner < Math.min(index + step, peaks.length);
+      inner++
+    ) {
       peak = Math.max(peak, peaks[inner] ?? 0);
     }
 
@@ -102,20 +106,26 @@ export const activatesOnSpace = (element) => {
  * What a key press asks of the player, or null for nothing.
  *
  * Space plays and pauses, the arrows move SEEK_STEP, 0-9 jump to tenths, and
- * Escape is the caller's to decide (innermost thing first). Modifiers belong to
+ * Escape is the caller's to decide (innermost thing first). Nothing at all
+ * while something is being typed into. Modifiers belong to
  * the browser and the OS: ctrl+arrow is a word jump, cmd+arrow is history.
  */
-export const keyAction = ({ key, code, ctrlKey, metaKey, altKey, target }, { at, length }) => {
+export const keyAction = (
+  { key, code, ctrlKey, metaKey, altKey, target },
+  { at, length },
+) => {
   if (ctrlKey || metaKey || altKey) {
+    return null;
+  }
+
+  // before Escape too: pressed in a search box it means "clear this", and the
+  // inputs here do not say they took it
+  if (typingIn(target)) {
     return null;
   }
 
   if (key === 'Escape') {
     return { type: 'escape' };
-  }
-
-  if (typingIn(target)) {
-    return null;
   }
 
   if (key === ' ' || code === 'Space') {
@@ -125,7 +135,10 @@ export const keyAction = ({ key, code, ctrlKey, metaKey, altKey, target }, { at,
   if (key === 'ArrowLeft' || key === 'ArrowRight') {
     const to = at + (key === 'ArrowRight' ? SEEK_STEP : -SEEK_STEP);
 
-    return { to: Math.max(0, length ? Math.min(to, length) : to), type: 'seek' };
+    return {
+      to: Math.max(0, length ? Math.min(to, length) : to),
+      type: 'seek',
+    };
   }
 
   // needs a length: without one there is no tenth, and seeking to NaN silently
@@ -139,10 +152,13 @@ export const keyAction = ({ key, code, ctrlKey, metaKey, altKey, target }, { at,
 
 // where along a box a pointer is, 0..1
 export const fractionAt = (clientX, box) =>
-  box.width > 0 ? Math.min(1, Math.max(0, (clientX - box.left) / box.width)) : 0;
+  box.width > 0
+    ? Math.min(1, Math.max(0, (clientX - box.left) / box.width))
+    : 0;
 
 // whether a scrub's move should send the audio there now
-export const scrubSeekDue = (now, lastSeekAt) => now - lastSeekAt >= SCRUB_STEP_MS;
+export const scrubSeekDue = (now, lastSeekAt) =>
+  now - lastSeekAt >= SCRUB_STEP_MS;
 
 // whether letting go should seek again, or is the second half of a click
 export const seekOnRelease = (fraction, lastSentFraction, length) =>
@@ -166,4 +182,5 @@ export const modeFor = (phone, expanded) => {
 // the playhead clamped to the track, so a clock can never read past the end of
 // the very track it is in. only with a length: clamping to an unknown 0 would
 // freeze the clock over audible playback
-export const shownTime = (at, length) => (length > 0 ? Math.min(at, length) : at);
+export const shownTime = (at, length) =>
+  length > 0 ? Math.min(at, length) : at;

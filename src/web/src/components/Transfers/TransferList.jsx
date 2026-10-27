@@ -1,6 +1,7 @@
 import * as shareLinks from '../../lib/shareLinks';
 import * as transfers from '../../lib/transfers';
 import { formatBytes, formatBytesAsUnit, getFileName } from '../../lib/util';
+import { RowBadge, RowPlay } from '../Player/Parts';
 import TransferDetails from './TransferDetails';
 import React, { Component, useEffect } from 'react';
 import { toast } from 'react-toastify';
@@ -399,7 +400,9 @@ class TransferList extends Component {
                           />
                         </Table.Cell>
                         <Table.Cell className="transferlist-filename">
+                          <RowPlay file={f} />
                           {getFileName(f.filename)}
+                          <RowBadge file={f} />
                         </Table.Cell>
                         <Table.Cell className="transferlist-progress">
                           {f.state === 'InProgress' ? (

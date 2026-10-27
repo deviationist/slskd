@@ -24,6 +24,7 @@ import {
   offsetWithin,
   scrollParentOf,
 } from '../../lib/util';
+import { RowBadge, RowPlay } from '../Player/Parts';
 import {
   ColumnPicker,
   EmptyTableRow,
@@ -646,7 +647,9 @@ const FlatTransferList = ({
             title={row.filename}
           >
             <div className="flatlist-cell">
+              <RowPlay file={row} />
               <span className="flatlist-name">{getFileName(row.filename)}</span>
+              <RowBadge file={row} />
             </div>
           </Table.Cell>
         );

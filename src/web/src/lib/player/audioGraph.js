@@ -62,14 +62,19 @@ export const primeAudio = (element) => {
   // may settle later, and tapping then needs no gesture of its own
   if (context.state === 'running') {
     tap(element);
-  } else {
-    context
-      .resume()
-      .then(() => tap(element))
-      .catch(() => {
-        // stays untapped: plain playback
-      });
+    return;
   }
+
+  const resuming = context.resume();
+
+  (async () => {
+    try {
+      await resuming;
+      tap(element);
+    } catch {
+      // stays untapped: plain playback
+    }
+  })();
 };
 
 // what the meter reads, or null while nothing live is there to read -- never
