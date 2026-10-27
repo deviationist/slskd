@@ -28,7 +28,7 @@ import TopBar from './TopBar';
 import Transfers from './Transfers/Transfers';
 import Users from './Users/Users';
 import React, { Component } from 'react';
-import { Link, Redirect, Route, Switch } from 'react-router-dom';
+import { Link, NavLink, Redirect, Route, Switch } from 'react-router-dom';
 import { toast, ToastContainer } from 'react-toastify';
 import {
   Button,
@@ -622,62 +622,62 @@ class App extends Component {
               </Menu.Item>
             ) : (
               <>
-                <Link to={`${urlBase}/dashboard`}>
+                <NavLink to={`${urlBase}/dashboard`}>
                   <Menu.Item>
                     <Icon name="chart bar" />
                     Dashboard
                   </Menu.Item>
-                </Link>
-                <Link to={`${urlBase}/searches`}>
+                </NavLink>
+                <NavLink to={`${urlBase}/searches`}>
                   <Menu.Item>
                     <Icon name="search" />
                     Search
                   </Menu.Item>
-                </Link>
-                <Link to={`${urlBase}/downloads`}>
+                </NavLink>
+                <NavLink to={`${urlBase}/downloads`}>
                   <Menu.Item>
                     <Icon name="download" />
                     Downloads
                   </Menu.Item>
-                </Link>
-                <Link to={`${urlBase}/uploads`}>
+                </NavLink>
+                <NavLink to={`${urlBase}/uploads`}>
                   <Menu.Item>
                     <Icon name="upload" />
                     Uploads
                   </Menu.Item>
-                </Link>
+                </NavLink>
                 {applicationOptions?.transfers?.shareLinks?.enabled && (
-                  <Link to={`${urlBase}/shared`}>
+                  <NavLink to={`${urlBase}/shared`}>
                     <Menu.Item>
                       <Icon name="share alternate" />
                       Shared
                     </Menu.Item>
-                  </Link>
+                  </NavLink>
                 )}
-                <Link to={`${urlBase}/rooms`}>
+                <NavLink to={`${urlBase}/rooms`}>
                   <Menu.Item>
                     <Icon name="comments" />
                     Rooms
                   </Menu.Item>
-                </Link>
-                <Link to={`${urlBase}/chat`}>
+                </NavLink>
+                <NavLink to={`${urlBase}/chat`}>
                   <Menu.Item>
                     <Icon name="comment" />
                     Chat
                   </Menu.Item>
-                </Link>
-                <Link to={`${urlBase}/users`}>
+                </NavLink>
+                <NavLink to={`${urlBase}/users`}>
                   <Menu.Item>
                     <Icon name="users" />
                     Users
                   </Menu.Item>
-                </Link>
-                <Link to={`${urlBase}/browse`}>
+                </NavLink>
+                <NavLink to={`${urlBase}/browse`}>
                   <Menu.Item>
                     <Icon name="folder open" />
                     Browse
                   </Menu.Item>
-                </Link>
+                </NavLink>
               </>
             )}
             <Menu
@@ -770,12 +770,12 @@ class App extends Component {
                   Update
                 </Menu.Item>
               )}
-              <Link to={`${urlBase}/system`}>
+              <NavLink to={`${urlBase}/system`}>
                 <Menu.Item>
                   <Icon name="cogs" />
                   System
                 </Menu.Item>
-              </Link>
+              </NavLink>
               {session.isLoggedIn() && (
                 <Modal
                   actions={[
