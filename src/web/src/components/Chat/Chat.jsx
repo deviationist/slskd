@@ -1,6 +1,7 @@
 import './Chat.css';
 import { activeChatKey } from '../../config';
 import * as chat from '../../lib/chat';
+import { registerPullRefresh } from '../../lib/pullToRefresh';
 import { userPath } from '../../lib/users';
 import PlaceholderSegment from '../Shared/PlaceholderSegment';
 import Timestamp from '../Shared/Timestamp';
@@ -58,6 +59,7 @@ class Chat extends Component {
   }
 
   componentDidMount() {
+    this.unregisterPullRefresh = registerPullRefresh(this.refreshForPull);
     this.setState(
       {
         active: sessionStorage.getItem(activeChatKey) || '',
@@ -73,9 +75,23 @@ class Chat extends Component {
   }
 
   componentWillUnmount() {
+    this.unregisterPullRefresh?.();
     clearInterval(this.state.interval);
     this.setState({ interval: undefined });
   }
+
+  // the list of conversations and the open one's messages, which otherwise
+  // only change when a conversation is picked or a message is sent
+  refreshForPull = async () => {
+    await this.fetchConversations();
+    const { active } = this.state;
+    if (!active) return;
+    const conversation = await chat.get({ username: active });
+    if (this.state.active !== active) return;
+    this.setState((previousState) => ({
+      conversations: { ...previousState.conversations, [active]: conversation },
+    }));
+  };
 
   listRef = createRef();
 

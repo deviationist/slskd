@@ -1,4 +1,5 @@
 import { activeRoomKey } from '../../config';
+import { registerPullRefresh } from '../../lib/pullToRefresh';
 import * as rooms from '../../lib/rooms';
 import { browsePath, userPath } from '../../lib/users';
 import PlaceholderSegment from '../Shared/PlaceholderSegment';
@@ -77,6 +78,10 @@ class Rooms extends Component {
   }
 
   componentDidMount() {
+    // polled every second already; a pull just does it now
+    this.unregisterPullRefresh = registerPullRefresh(() =>
+      Promise.all([this.fetchJoinedRooms(), this.fetchActiveRoom()]),
+    );
     this.setState(
       {
         active: sessionStorage.getItem(activeRoomKey) || '',
@@ -94,6 +99,7 @@ class Rooms extends Component {
   }
 
   componentWillUnmount() {
+    this.unregisterPullRefresh?.();
     const { messages: messagesInterval, rooms: roomsInterval } =
       this.state.intervals;
 

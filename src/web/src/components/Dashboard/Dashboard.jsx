@@ -1,8 +1,9 @@
 import './Dashboard.css';
+import { usePullRefresh } from '../../lib/pullToRefresh';
 import * as reports from '../../lib/reports';
 import HistoricalStatistics from './HistoricalStatistics';
 import SearchBar from './SearchBar';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 const HISTORY_RANGES = [
   { label: '24h', days: 1, buckets: 24 },
@@ -39,6 +40,10 @@ const Dashboard = ({ server } = {}) => {
   const [historyLabel, setHistoryLabel] = useState('30d');
   const [historyTab, setHistoryTab] = useState(0);
   const [data, setData] = useState(initialState);
+  // a pull moves the window's end up to now, and refetches without the loader
+  // that would otherwise blank the page while it does
+  const [refreshed, setRefreshed] = useState(0);
+  const quiet = useRef(null);
 
   const historyParameters = useMemo(() => {
     const range =
@@ -52,13 +57,13 @@ const Dashboard = ({ server } = {}) => {
           ? new Date(now - range.days * 86_400_000).toISOString()
           : new Date(0).toISOString(),
     };
-  }, [historyLabel]);
+  }, [historyLabel, refreshed]); // eslint-disable-line react-hooks/exhaustive-deps -- a pull's new end
 
   const fetchAll = async (parameters) => {
     const start = parameters.start ? new Date(parameters.start) : undefined;
     const end = new Date(parameters.end);
 
-    setLoading(true);
+    if (!quiet.current) setLoading(true);
 
     const [
       summary,
@@ -137,8 +142,25 @@ const Dashboard = ({ server } = {}) => {
   };
 
   useEffect(() => {
-    fetchAll(historyParameters);
+    const done = quiet.current;
+
+    (async () => {
+      await fetchAll(historyParameters);
+
+      if (done) {
+        quiet.current = null;
+        done();
+      }
+    })();
   }, [historyParameters]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  usePullRefresh(
+    () =>
+      new Promise((resolve) => {
+        quiet.current = resolve;
+        setRefreshed((count) => count + 1);
+      }),
+  );
 
   return (
     <div className="dashboard">
