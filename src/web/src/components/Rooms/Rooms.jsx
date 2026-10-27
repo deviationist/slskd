@@ -1,5 +1,6 @@
 import { activeRoomKey } from '../../config';
 import * as rooms from '../../lib/rooms';
+import { browsePath, userPath } from '../../lib/users';
 import PlaceholderSegment from '../Shared/PlaceholderSegment';
 import Timestamp from '../Shared/Timestamp';
 import RoomMenu from './RoomMenu';
@@ -238,16 +239,17 @@ class Rooms extends Component {
     );
   };
 
+  // by address, as everything else links to a user: Users stopped reading a
+  // name from location state when it moved to /users/<name>, and this opened
+  // an empty Users page
   handleUserProfile = () => {
-    this.props.history.push('/users', {
-      user: this.state.contextMenu.message.username,
-    });
+    this.props.history.push(userPath(this.state.contextMenu.message.username));
   };
 
   handleBrowseShares = () => {
-    this.props.history.push('/browse', {
-      user: this.state.contextMenu.message.username,
-    });
+    this.props.history.push(
+      browsePath(this.state.contextMenu.message.username),
+    );
   };
 
   renderContextMenu() {

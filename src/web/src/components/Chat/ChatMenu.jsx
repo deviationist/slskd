@@ -1,8 +1,10 @@
 import './Chat.css';
 import { byRecency, describeAgo } from '../../lib/chat';
+import { userPath } from '../../lib/users';
 import SendMessageModal from './SendMessageModal';
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Link } from 'react-router-dom';
 import { Button, Icon, Label } from 'semantic-ui-react';
 
 /*
@@ -15,14 +17,16 @@ const typesFirst = () =>
 
 /*
  * One conversation as the picker lists it: who, how long since the last
- * message, whether any of it is unread, and the start of what was said.
+ * message, whether any of it is unread, and the start of what was said. The
+ * row picks the conversation; the icon beside it opens the peer on Users, a
+ * sibling rather than a link inside the row, which is already a button.
  */
 const ConversationRow = ({ active, conversation, now, onPick }) => {
   const { lastMessage, unAcknowledgedMessageCount, username } = conversation;
   const unread = unAcknowledgedMessageCount > 0;
 
   return (
-    <li>
+    <li className="conversation-row-item">
       <button
         aria-current={active ? 'true' : undefined}
         className={`conversation-row${active ? ' active' : ''}${unread ? ' unread' : ''}`}
@@ -50,6 +54,14 @@ const ConversationRow = ({ active, conversation, now, onPick }) => {
           )}
         </span>
       </button>
+      <Link
+        aria-label={`Open ${username} on Users`}
+        className="conversation-row-user"
+        title="Open on Users"
+        to={userPath(username)}
+      >
+        <Icon name="user" />
+      </Link>
     </li>
   );
 };
