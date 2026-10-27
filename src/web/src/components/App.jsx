@@ -7,6 +7,7 @@ import {
   createMetricsHubConnection,
 } from '../lib/hubFactory';
 import { isStandaloneIos } from '../lib/navigation';
+import { installPullToRefresh, isStandalone } from '../lib/pullToRefresh';
 import * as relayAPI from '../lib/relay';
 import { connect, disconnect } from '../lib/server';
 import * as session from '../lib/session';
@@ -324,11 +325,17 @@ class App extends Component {
 
     this.updateWatch = watchForUpdate(this.handleClientUpdate);
 
+    // the installed app only: a browser tab has a pull-to-refresh of its own
+    if (isStandalone()) {
+      this.removePullToRefresh = installPullToRefresh();
+    }
+
     this.init();
   }
 
   componentWillUnmount() {
     this.updateWatch?.stop();
+    this.removePullToRefresh?.();
   }
 
   /*

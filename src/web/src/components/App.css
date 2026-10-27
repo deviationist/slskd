@@ -1979,3 +1979,42 @@ time {
 html {
     touch-action: manipulation;
 }
+
+/* The pull-to-refresh dial (lib/pullToRefresh.js). It starts tucked under the
+   title bar and is dragged down out from beneath it, so it sits just below the
+   bar's z-index; invisible until a finger asks, since its opacity is the pull's
+   progress. Armed -- far enough that letting go reloads -- it takes the link
+   colour, which is the whole of the "let go now" signal. */
+.pull-to-refresh {
+    position: fixed;
+    left: 50%;
+    top: 0;
+    z-index: 1002;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1px solid rgba(127, 127, 127, 0.35);
+    background: var(--slskd-subtle-background, #fff);
+    color: rgba(127, 127, 127, 0.9);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    opacity: 0;
+    pointer-events: none;
+    transform: translate3d(-50%, 0, 0) scale(0.7);
+}
+
+.dark .pull-to-refresh {
+    background: #161b22;
+}
+
+.pull-to-refresh[data-armed='true'] {
+    color: #58a6ff;
+    border-color: rgba(88, 166, 255, 0.5);
+}
+
+.pull-to-refresh > .icon {
+    margin: 0;
+    height: auto;
+}
