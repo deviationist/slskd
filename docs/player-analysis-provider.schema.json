@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/deviationist/slskd/docs/player-analysis-provider.schema.json",
+  "$comment": "The analysis contract, v1. Kept identically in slskd (docs/player-analysis-provider.schema.json) and media-bridge (contracts/analysis-v1.schema.json); each repo's tests hold its side to its copy. Change both, and bump `contract` only for a change a caller cannot ignore. Unknown fields are allowed everywhere so a provider can add more without coordinating.",
+  "title": "Analysis provider response",
+  "type": "object",
+  "required": ["contract", "provider", "verdict", "summary", "findings", "lanes"],
+  "properties": {
+    "contract": { "const": 1 },
+    "provider": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string" }
+      }
+    },
+    "verdict": {
+      "description": "The row badge and the bar's sub-line.",
+      "type": "object",
+      "required": ["level", "headline"],
+      "properties": {
+        "level": { "$ref": "#/$defs/level" },
+        "headline": { "type": "string" }
+      }
+    },
+    "summary": {
+      "description": "The findings panel's top line, free text, e.g. \"AIFF · 16-bit · 44.1 kHz · stereo · 1411 kbps · 4:55\".",
+      "type": "string"
+    },
+    "findings": {
+      "description": "The panel's rows, worst first.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "level", "value", "note"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "label": { "type": "string" },
+          "level": { "$ref": "#/$defs/level" },
+          "value": { "$ref": "#/$defs/text" },
+          "note": { "$ref": "#/$defs/text" }
+        }
+      }
+    },
+    "lanes": {
+      "description": "Where a finding sits in the track: weights 0..100 in equal buckets across the decoded length. Never sent empty. Label and level come from the finding it names.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["finding", "buckets"],
+        "properties": {
+          "finding": { "type": "string", "minLength": 1 },
+          "buckets": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "number", "minimum": 0, "maximum": 100 }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "level": { "enum": ["ok", "warn", "bad"] },
+    "text": {
+      "description": "Text as runs. A run with `seek` is a point in the track, in seconds, that a client may make clickable.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["text"],
+        "properties": {
+          "text": { "type": "string" },
+          "seek": { "type": "number", "minimum": 0 }
+        }
+      }
+    }
+  }
+}
