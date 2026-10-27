@@ -422,7 +422,7 @@ class TransferGroup extends Component {
 
     return (
       <Card.Content extra>
-        <Button.Group>
+        <Button.Group className="selection-actions">
           {withDividers([
             allRetryable && (
               <Button
