@@ -418,12 +418,27 @@
     order: 3;
   }
 
-  .transfers-header-sort {
+  /* The actions take a line of their own and share it out between them, so
+     each is as large a target as the screen allows; the sort, which only
+     card view has, comes after them. Retry is not offered on uploads, and
+     the other two then split the line between them. */
+  .transfers-header-buttons {
+    flex: 1 1 100%;
+    margin-left: 0;
     order: 4;
   }
 
-  .transfers-header-buttons {
-    margin-left: auto;
+  .transfers-header-buttons > .shrinkable-dropdown {
+    display: flex;
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .transfers-header-buttons > .shrinkable-dropdown > .ui.button:first-child {
+    flex: 1 1 auto;
+  }
+
+  .transfers-header-sort {
     order: 5;
   }
 }
@@ -435,4 +450,32 @@
     min-width: 0;
     width: 0;
   }
+}
+
+/* The selection's actions on a phone. As one joined group with "or" between
+   them, Retry, Cancel, Remove, Download and Share came to well over the width
+   of the screen and the last of them ran off its right-hand edge. Here they
+   are separate buttons that wrap onto as many lines as they need, and the
+   dividers go: with the buttons apart there is nothing to divide. */
+@media only screen and (max-width: 767px), only screen and (max-height: 500px) and (orientation: landscape) {
+    .ui.buttons.selection-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        width: 100%;
+    }
+
+    /* the clearfix Semantic hangs off a button group is a flex item here, and
+       took a gap's worth off whichever line it landed on */
+    .ui.buttons.selection-actions > .or,
+    .ui.buttons.selection-actions::after {
+        display: none;
+    }
+
+    .ui.buttons.selection-actions > .ui.button {
+        flex: 1 1 auto;
+        margin: 0 !important;
+        border-radius: 0.28571429rem !important;
+        white-space: nowrap;
+    }
 }

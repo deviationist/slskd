@@ -247,7 +247,9 @@ class Response extends Component {
                   style={{
                     backgroundColor: 'transparent',
                     border: 'none',
+                    color: 'inherit',
                     cursor: 'pointer',
+                    font: 'inherit',
                     width: '100%',
                   }}
                   type="button"

@@ -466,6 +466,85 @@ body {
     width: 65px;
 }
 
+/* A search result's files on a phone: one file to a small block rather than
+   a stack of labelled cells. Semantic's stacking put every cell -- and every
+   header -- on a line of its own, so the header read as a list of the words
+   File, Size, Attributes, Length, and each file took four lines with nothing
+   to say which number was which. Here the name has the line, the size,
+   attributes and length follow it as small print, and the checkbox stays at
+   the left; the header keeps only the select-all box. */
+@media only screen and (max-width: 767px), only screen and (max-height: 500px) and (orientation: landscape) {
+    .ui.table.filelist-table,
+    .ui.table.filelist-table > thead,
+    .ui.table.filelist-table > tbody,
+    .ui.table.filelist-table > tfoot {
+        display: block;
+        width: 100%;
+    }
+
+    .ui.table.filelist-table > thead > tr,
+    .ui.table.filelist-table > tbody > tr {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 2px 0;
+        position: relative;
+        padding: 9px 12px 9px 44px;
+    }
+
+    .ui.table.filelist-table > tbody > tr {
+        border-top: 1px solid rgba(127, 127, 127, 0.2);
+    }
+
+    .ui.table.filelist-table > thead > tr > th,
+    .ui.table.filelist-table > tbody > tr > td {
+        display: block;
+        width: auto !important;
+        padding: 0 !important;
+        border: none !important;
+    }
+
+    .ui.table.filelist-table > thead > tr > th:not(.filelist-selector):not(.filelist-filename) {
+        display: none;
+    }
+
+    .ui.table.filelist-table .filelist-selector {
+        position: absolute;
+        left: 14px;
+        top: 10px;
+    }
+
+    .ui.table.filelist-table > tbody > tr > td.filelist-filename {
+        flex: 1 1 100%;
+        overflow-wrap: anywhere;
+    }
+
+    .ui.table.filelist-table > tbody > tr > td.filelist-size,
+    .ui.table.filelist-table > tbody > tr > td.filelist-attributes,
+    .ui.table.filelist-table > tbody > tr > td.filelist-length {
+        font-size: 0.85em;
+        opacity: 0.7;
+    }
+
+    .ui.table.filelist-table > tbody > tr > td.filelist-attributes:not(:empty)::before,
+    .ui.table.filelist-table > tbody > tr > td.filelist-length:not(:empty)::before {
+        content: '\00a0\00b7\00a0';
+    }
+
+    .ui.table.filelist-table > tbody > tr > td:empty {
+        display: none;
+    }
+
+    .ui.table.filelist-table > tfoot > tr {
+        display: block;
+    }
+
+    .ui.table.filelist-table > tfoot > tr > th {
+        display: block;
+        width: auto !important;
+    }
+}
+
 /* The flat list: one row per file, with the peer as a column. Widths mirror
    the grouped view's file list so the two read the same, plus a user column
    wide enough for a Soulseek username without pushing the filename out. */
