@@ -1,5 +1,6 @@
 import './Search.css';
 import { createSearchHubConnection } from '../../lib/hubFactory';
+import { usePullRefresh } from '../../lib/pullToRefresh';
 import * as library from '../../lib/searches';
 import * as watchLibrary from '../../lib/watches';
 import ErrorSegment from '../Shared/ErrorSegment';
@@ -59,6 +60,35 @@ const Searches = ({ server } = {}) => {
     onConnected();
   };
 
+  const loadWatches = async () => {
+    try {
+      const all = await watchLibrary.getAll();
+
+      setWatches(
+        all.reduce((accumulator, watch) => {
+          accumulator[watch.searchId] = watch;
+          return accumulator;
+        }, {}),
+      );
+    } catch (watchError) {
+      // a list that cannot be badged is still a usable list
+      console.error(watchError);
+    }
+  };
+
+  // the hub keeps the list current; a pull reloads it from the server anyway,
+  // with the watches it is badged by
+  usePullRefresh(async () => {
+    const [all] = await Promise.all([library.getAll(), loadWatches()]);
+
+    setSearches(
+      all.reduce((accumulator, search) => {
+        accumulator[search.id] = search;
+        return accumulator;
+      }, {}),
+    );
+  });
+
   useEffect(() => {
     onConnecting();
 
@@ -108,22 +138,6 @@ const Searches = ({ server } = {}) => {
     };
 
     connect();
-
-    const loadWatches = async () => {
-      try {
-        const all = await watchLibrary.getAll();
-
-        setWatches(
-          all.reduce((accumulator, watch) => {
-            accumulator[watch.searchId] = watch;
-            return accumulator;
-          }, {}),
-        );
-      } catch (watchError) {
-        // a list that cannot be badged is still a usable list
-        console.error(watchError);
-      }
-    };
 
     loadWatches();
 

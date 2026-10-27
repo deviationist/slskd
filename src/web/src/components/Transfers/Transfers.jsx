@@ -1,4 +1,5 @@
 import './Transfers.css';
+import { usePullRefresh } from '../../lib/pullToRefresh';
 import * as transfersLibrary from '../../lib/transfers';
 import AppContext from '../AppContext';
 import { LoaderSegment, PlaceholderSegment } from '../Shared';
@@ -134,6 +135,14 @@ const Transfers = ({ direction, server }) => {
       window.clearTimeout(timer);
     };
   }, [direction]);
+
+  // a poll now, rather than up to a second from now; dropped if the direction
+  // has changed under it, as the poll's own replies are
+  usePullRefresh(async () => {
+    const asked = direction;
+    const response = await transfersLibrary.getAll({ direction: asked });
+    if (asked === direction) setTransfers(response);
+  });
 
   useMemo(() => {
     // this is used to prevent weird update issues if switching

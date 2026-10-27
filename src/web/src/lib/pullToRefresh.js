@@ -1,12 +1,18 @@
+import { useEffect, useRef } from 'react';
+
 /*
- * Pull down at the top of a page and let go to reload it, in the installed app.
+ * Pull down at the top of a page and let go to refetch what it shows, in the
+ * installed app.
  *
  * By hand, because the installed app has no gesture of its own: iOS standalone
  * offers only the rubber-band bounce, and a browser tab -- which has a native
- * one -- is left to it (see `isStandalone`). Refreshing is a reload: slskd's
- * pages each keep their own polling and hub state with no common way to
- * refetch, and nothing of the app is cached by the service worker, so a reload
- * is cheap and also picks up a new build.
+ * one -- is left to it (see `isStandalone`).
+ *
+ * Refreshing is in place, not a reload. Each page says what refetching it means
+ * with `usePullRefresh` (or `registerPullRefresh` from a class), and a pull runs
+ * every one registered: a page can be more than one source -- the search list
+ * with a search open over it -- and all of them are on screen. A page that
+ * registers nothing has no pull at all, rather than one that reloads the app.
  *
  * The approach is hospex-watcher's (components/pull-to-refresh.tsx there),
  * where the timing was learned the hard way: the gesture is claimed on the
@@ -24,20 +30,47 @@
  * repaints every frame, and nothing about it needs rendering.
  */
 
-// how far the dial travels before letting go means "reload"; dial pixels, so
+// how far the dial travels before letting go means "refresh"; dial pixels, so
 // the finger goes further than this (see damp)
 const TRIGGER = 64;
 
 // the curve's asymptote: pull as hard as you like, the dial stops here
 const MAX = 140;
 
-// where the dial waits while the page reloads
+// where the dial waits while the page refetches, and for how long at least:
+// off the local network an answer can land in 40ms, which reads as a flicker
+// rather than as an answer
 const REST = 52;
+const MIN_SPIN_MS = 450;
 
 // finger travel before a move counts at all: a noise filter, not a dead zone
 const AXIS = 3;
 
 const damp = (travel) => MAX * (1 - Math.exp(-travel / MAX));
+
+const sources = new Set();
+
+/**
+ * Says what a pull refetches while the caller is on screen.
+ * @param {Function} refresh - Refetches; may return a promise, which the dial spins until.
+ * @returns {Function} Unregisters it.
+ */
+export const registerPullRefresh = (refresh) => {
+  sources.add(refresh);
+  return () => sources.delete(refresh);
+};
+
+/**
+ * `registerPullRefresh` for a function component, for as long as it is mounted.
+ * Always calls the latest `refresh`, so it can close over state freely.
+ * @param {Function} refresh - Refetches; may return a promise.
+ */
+export const usePullRefresh = (refresh) => {
+  const latest = useRef(refresh);
+  latest.current = refresh;
+
+  useEffect(() => registerPullRefresh(() => latest.current()), []);
+};
 
 /**
  * Whether this is the installed app: iOS from the home screen, or any browser's
@@ -73,15 +106,16 @@ const covered = () =>
   document.body.classList.contains('dimmed') ||
   document.querySelector('.conversation-sheet-backdrop') !== null;
 
+// every source at once; a failed refetch is its page's to report, the dial's
+// job is only to stop
+const refreshAll = () =>
+  Promise.allSettled([...sources].map((refresh) => refresh()));
+
 /**
  * Installs the gesture on the document.
- * @param {object} [options] - Options.
- * @param {Function} [options.onRefresh] - What letting go does; a reload unless given.
  * @returns {Function} Removes the gesture and its dial.
  */
-export const installPullToRefresh = ({
-  onRefresh = () => window.location.reload(),
-} = {}) => {
+export const installPullToRefresh = () => {
   const dial = document.createElement('div');
   dial.className = 'pull-to-refresh';
   dial.setAttribute('aria-hidden', 'true');
@@ -118,7 +152,8 @@ export const installPullToRefresh = ({
 
   const start = (event) => {
     gesture = null;
-    if (busy || event.touches.length !== 1 || covered()) return;
+    if (busy || sources.size === 0) return;
+    if (event.touches.length !== 1 || covered()) return;
     if (!atTop(event.target)) return;
     const touch = event.touches[0];
     gesture = { distance: 0, own: null, x: touch.clientX, y: touch.clientY };
@@ -154,7 +189,7 @@ export const installPullToRefresh = ({
     }
 
     // if the compositor beat us to it the move is uncancelable; the dial still
-    // follows and the release still reloads, only the bounce underneath stays
+    // follows and the release still refreshes, only the bounce underneath stays
     if (event.cancelable) event.preventDefault();
     current.distance = damp(Math.max(0, dy - AXIS));
     paint(current.distance, false);
@@ -173,7 +208,22 @@ export const installPullToRefresh = ({
     busy = true;
     icon.classList.add('loading');
     paint(REST, true);
-    onRefresh();
+
+    (async () => {
+      const started = Date.now();
+      await refreshAll();
+
+      const left = MIN_SPIN_MS - (Date.now() - started);
+      if (left > 0) {
+        await new Promise((resolve) => {
+          setTimeout(resolve, left);
+        });
+      }
+
+      busy = false;
+      icon.classList.remove('loading');
+      paint(0, true);
+    })();
   };
 
   // on the document, so a pull that starts on the title bar counts as well;

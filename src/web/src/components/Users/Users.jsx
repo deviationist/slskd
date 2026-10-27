@@ -1,5 +1,6 @@
 import './Users.css';
 import { urlBase } from '../../config';
+import { usePullRefresh } from '../../lib/pullToRefresh';
 import * as users from '../../lib/users';
 import PlaceholderSegment from '../Shared/PlaceholderSegment';
 import User from './User';
@@ -94,48 +95,54 @@ const Users = () => {
     setInputText('');
   }, [selectedUsername]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => {
-    const fetchUser = async () => {
-      if (!selectedUsername) {
-        return;
-      }
+  // `quiet` for a pull: the user stays on screen while they are asked again,
+  // rather than the page dropping to a loader
+  const fetchUser = async ({ quiet = false } = {}) => {
+    if (!selectedUsername) {
+      return;
+    }
 
+    if (!quiet) {
       setStatus({ error: undefined, fetching: true });
       setNote(undefined);
+    }
 
-      /*
-       * Settled rather than all: the three requests do not fail together, and
-       * the two that fail for an offline user are the two the server cannot
-       * answer on their behalf. `Promise.all` threw away the one that
-       * succeeded -- the one that knew the user was offline -- and reported
-       * the lookup as broken.
-       */
-      const [info, status, endpoint] = await Promise.allSettled([
-        users.getInfo({ username: selectedUsername }),
-        users.getStatus({ username: selectedUsername }),
-        users.getEndpoint({ username: selectedUsername }),
-      ]);
+    /*
+     * Settled rather than all: the three requests do not fail together, and
+     * the two that fail for an offline user are the two the server cannot
+     * answer on their behalf. `Promise.all` threw away the one that
+     * succeeded -- the one that knew the user was offline -- and reported
+     * the lookup as broken.
+     */
+    const [info, status, endpoint] = await Promise.allSettled([
+      users.getInfo({ username: selectedUsername }),
+      users.getStatus({ username: selectedUsername }),
+      users.getEndpoint({ username: selectedUsername }),
+    ]);
 
-      const outcome = users.describeLookup({
-        endpoint: settled(endpoint),
-        info: settled(info),
-        status: settled(status),
-        username: selectedUsername,
-      });
+    const outcome = users.describeLookup({
+      endpoint: settled(endpoint),
+      info: settled(info),
+      status: settled(status),
+      username: selectedUsername,
+    });
 
-      if (outcome.error) {
-        setUser(undefined);
-        setStatus({ error: outcome.error, fetching: false });
-        return;
-      }
+    if (outcome.error) {
+      setUser(undefined);
+      setStatus({ error: outcome.error, fetching: false });
+      return;
+    }
 
-      setUser(outcome.user);
-      setNote(outcome.note);
-      setStatus({ error: undefined, fetching: false });
-    };
+    setUser(outcome.user);
+    setNote(outcome.note);
+    setStatus({ error: undefined, fetching: false });
+  };
 
+  useEffect(() => {
     fetchUser();
-  }, [selectedUsername]);
+  }, [selectedUsername]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  usePullRefresh(() => fetchUser({ quiet: true }));
 
   return (
     <div className="users-container">

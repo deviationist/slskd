@@ -1,3 +1,4 @@
+import { usePullRefresh } from '../../../lib/pullToRefresh';
 import {
   filterResponse,
   flattenResponses,
@@ -462,6 +463,15 @@ const SearchDetail = ({
   useEffect(() => {
     loadWatch();
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // the responses again, without the loader (a finished search can still gain
+  // late responses), and its watch; a search still running streams in by itself
+  usePullRefresh(async () => {
+    await Promise.all([
+      loadWatch(),
+      isComplete && getResponses({ id }).then(setResults),
+    ]);
+  });
 
   const loaded = !removing && !creating && !loading && results;
 

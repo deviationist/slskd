@@ -1,4 +1,5 @@
 import './ShareLinks.css';
+import { usePullRefresh } from '../../lib/pullToRefresh';
 import * as shareLinks from '../../lib/shareLinks';
 import { formatBytes, formatDate, formatDayMonth } from '../../lib/util';
 import AppContext from '../AppContext';
@@ -421,6 +422,8 @@ const ShareLinks = () => {
     const interval = setInterval(load, REFRESH_MILLISECONDS);
     return () => clearInterval(interval);
   }, [load]);
+
+  usePullRefresh(load);
 
   if (settings && !settings.enabled) {
     return (
