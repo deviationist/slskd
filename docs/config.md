@@ -199,6 +199,61 @@ Note that this is a grant to *every* caller the API accepts: anyone who can auth
 remote_file_retrieval: false
 ```
 
+## Player
+
+Finished downloads can be played in the browser, from a player docked at the bottom of the page (a mini bar above the menu on a phone, opening into a
+full-screen player). The player is on by default and needs `ffmpeg` and `ffprobe`, which the container image includes.
+
+Most finished downloads are AIFF, which Chrome and Firefox do not play, so the server **transcodes** what it plays: Opus by default, AAC for Safari (whose Web
+Audio analyser reads silence from Opus), and an MP3 of up to 25 MB is sent as it is. Each transcode is checked against its source's length before it is kept,
+in both directions, so a half-written one is never served. Transcodes and waveforms are cached, keyed by the file's path, size and modification time, and the
+least recently used are dropped past the cache's capacity.
+
+As with remote file retrieval, the file is identified by the **id of the download** and resolved from the path recorded when it was written; it must be inside
+the 'Downloads' directory, symbolic links followed, and be audio. The audio and the cover are fetched by `<audio>` and `<img>` elements, which cannot carry an
+authorization header, so they are authorized by a **stream ticket** in the query string: issued to an authenticated caller, admitting those two routes and
+nothing else, reusable (each seek is a request), and expiring after an hour unused or twelve hours in all. It is one per player rather than one per track
+because iOS starts sound only inside the tap that asked for it, and fetching a ticket between the tap and the play would lose it.
+
+| Command-Line       | Environment Variable     | Description                                        |
+| ------------------ | ------------------------ | -------------------------------------------------- |
+| `--player`         | `SLSKD_PLAYER`           | Determines whether the player is enabled           |
+| `--player-ffmpeg`  | `SLSKD_PLAYER_FFMPEG`    | The ffmpeg executable, by name or absolute path    |
+| `--player-ffprobe` | `SLSKD_PLAYER_FFPROBE`   | The ffprobe executable, by name or absolute path   |
+
+#### **YAML**
+```yaml
+player:
+  enabled: true
+  ffmpeg: ffmpeg
+  ffprobe: ffprobe
+  cache:
+    directory: ~      # default: player-cache under the application's data directory
+    capacity: 2048    # megabytes
+```
+
+### Analysis Provider
+
+The player can show what an external service found wrong with a track: a badge on the row, marks under the waveform where a problem sits, and a panel of
+findings. slskd does no analysis itself; it asks the provider, server to server, and draws the answer. With no provider URL none of this is shown. The contract a
+provider implements is in [player-analysis-provider.md](player-analysis-provider.md).
+
+A file is named to the provider as one of the `roots` below plus a path relative to it, never as an absolute path: the two services may see one folder under
+two different paths, and the provider holds the same names mapped to its own. Root names are plain words, and no root folder may be inside another.
+
+#### **YAML**
+```yaml
+player:
+  analysis:
+    provider:
+      url: http://10.99.0.2:36914/contract
+      token: <bearer token>
+      timeout: 60
+      concurrency: 2
+      roots:
+        downloads: /app/downloads
+```
+
 # Shares
 
 ## Directories

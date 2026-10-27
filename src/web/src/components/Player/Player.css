@@ -1,0 +1,1088 @@
+/*
+ * The player. Twin of media-bridge's web/slskd-preview.css (the bar, the
+ * tokens) and web/app/src/index.css (the mini bar and the drawer). Everything
+ * is `player-` prefixed.
+ *
+ * Stacking, against App.css's own: footer 1000, the menu's backdrop 1001, its
+ * panel 1002, the bottom menu 1003. The docked bar sits at the footer's level,
+ * so the More panel covers it; the drawer goes above the menu, as a full-screen
+ * player does; and a modal opened from the drawer is lifted above that.
+ */
+
+:root {
+  --player-surface: #fff;
+  --player-border: #d4d7dd;
+  --player-shadow: rgba(0, 0, 0, 0.12);
+  --player-text: #1b1c1d;
+  --player-dim: rgba(27, 28, 29, 0.6);
+  --player-raised: #edeff3;
+  --player-tint: rgba(0, 0, 0, 0.05);
+  --player-tint-hi: rgba(0, 0, 0, 0.11);
+  --player-accent: #2185d0;
+  --player-accent-hi: #1678c2;
+  --player-on-accent: #fff;
+  --player-accent-tint: rgba(33, 133, 208, 0.18);
+  /* a muted charcoal rather than the body's near-black: at #1b1c1d the line
+     read as a slot cut through the waveform */
+  --player-playhead: #454952;
+  --player-playhead-shadow: none;
+  --player-cursor: rgba(69, 73, 82, 0.55);
+  --player-wave-unplayed: #c2c8d1;
+  --player-art-bg: #e6e8ec;
+  --player-art-none: #9aa0a8;
+  --player-lane-tint: rgba(0, 0, 0, 0.05);
+  --player-veil: 255, 255, 255;
+  --player-ok: #14794f;
+  --player-warn: #8a6508;
+  --player-bad: #c02121;
+  --player-meter-bar: rgba(0, 0, 0, 0.13);
+  --player-meter-light: rgba(0, 0, 0, 0.1);
+  --player-meter-rule: rgba(255, 255, 255, 0.9);
+  --player-track: #d3d7dd;
+  --player-thumb: #5a6069;
+}
+
+:root.dark {
+  --player-surface: var(--slskd-secondary-background, #161b21);
+  --player-border: var(--slskd-tertiary-border-color, #2b2f38);
+  --player-shadow: rgba(0, 0, 0, 0.35);
+  --player-text: var(--slskd-color, #e8eaed);
+  --player-dim: var(--slskd-color-subtle, #8b949e);
+  --player-raised: var(--slskd-tertiary-background, #23262d);
+  --player-tint: rgba(255, 255, 255, 0.07);
+  --player-tint-hi: rgba(255, 255, 255, 0.16);
+  --player-playhead: #e8eaed;
+  --player-playhead-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
+  --player-cursor: rgba(232, 234, 237, 0.55);
+  --player-wave-unplayed: #4a515e;
+  --player-art-bg: #2a2d31;
+  --player-art-none: #6b7075;
+  --player-lane-tint: rgba(255, 255, 255, 0.045);
+  --player-veil: 22, 27, 33;
+  --player-ok: #199c66;
+  --player-warn: #c9930f;
+  --player-bad: #db2828;
+  --player-meter-bar: rgba(255, 255, 255, 0.06);
+  --player-meter-light: rgba(255, 255, 255, 0.07);
+  --player-meter-rule: rgba(22, 24, 29, 0.85);
+  --player-track: #3a4049;
+  --player-thumb: #e8eaed;
+}
+
+/* --- the layout makes room ------------------------------------------------- */
+
+/* A desktop scrolls the page inside `.pusher`, in a box ending where the
+   footer begins; the bar is docked on top of the footer, so the box ends above
+   the bar instead. --player-dock-h is the bar's measured height, set by the bar
+   and absent when there is none. */
+.player-wide {
+  bottom: var(--footer-height, 41px);
+}
+
+@media only screen and (min-width: 768px) and (min-height: 501px), only screen and (min-width: 768px) and (orientation: portrait) {
+  .pushable.app {
+    bottom: calc(var(--footer-height) + var(--player-dock-h, 0px)) !important;
+  }
+
+  .Toastify__toast-container--bottom-center {
+    bottom: calc(var(--footer-height) + var(--player-dock-h, 0px) + 8px) !important;
+  }
+}
+
+/* A phone: the mini bar joined to the top of the bottom menu, as one surface,
+   and what used to stand on the menu -- the selection's footer, the toasts --
+   standing on the mini bar instead. The page's end is padded by all of it. */
+@media only screen and (max-width: 767px), only screen and (max-height: 500px) and (orientation: landscape) {
+  .player-mini {
+    bottom: var(--mobile-nav-bottom);
+  }
+
+  .footer.ui.menu {
+    bottom: calc(var(--mobile-nav-bottom) + var(--player-dock-h, 0px)) !important;
+  }
+
+  .app-content-body {
+    padding-bottom: calc(var(--mobile-nav-bottom) + 41px + 16px + var(--player-dock-h, 0px)) !important;
+  }
+
+  .Toastify__toast-container--bottom-center {
+    bottom: calc(var(--mobile-nav-bottom) + var(--player-dock-h, 0px) + 8px) !important;
+  }
+}
+
+/* the page under a full-screen player does not scroll behind it */
+:root.player-full body,
+:root.player-full .pushable.app,
+:root.player-full .pushable > .pusher.app-content {
+  overflow: hidden !important;
+}
+
+/* a modal opened from the drawer goes above it */
+:root.player-full .ui.page.modals.dimmer {
+  z-index: 1010 !important;
+}
+
+/* --- the shared parts ------------------------------------------------------ */
+
+.player {
+  color: var(--player-text);
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.player button {
+  -webkit-tap-highlight-color: transparent;
+  font: inherit;
+  color: inherit;
+}
+
+.player button:focus {
+  outline: none;
+}
+
+.player button:focus-visible {
+  outline: 2px solid var(--player-accent);
+  outline-offset: 2px;
+}
+
+.player-icon-button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--player-dim) !important;
+  cursor: pointer;
+}
+
+@media (hover: hover) {
+  .player-icon-button:hover {
+    background: var(--player-raised);
+    color: var(--player-text) !important;
+  }
+}
+
+/* the transport, which also says when it is waiting: /audio transcodes on
+   demand, so a cold track is a couple of seconds between the press and sound */
+.player-play {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--player-accent);
+  color: var(--player-on-accent) !important;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.player-play .player-busy {
+  display: none;
+}
+
+.player-play.player-loading .player-glyph {
+  opacity: 0;
+}
+
+.player-play.player-loading .player-busy {
+  position: absolute;
+  display: inline-flex;
+}
+
+/* the spinner gives way to the pointer: a control that turns into a status is
+   one you have to wait out, and the thing you might want meanwhile is to
+   change your mind. only where there is a hover to give way to */
+@media (hover: hover) {
+  .player-play:hover {
+    background: var(--player-accent-hi);
+  }
+
+  .player-play.player-loading:hover .player-glyph {
+    opacity: 1;
+  }
+
+  .player-play.player-loading:hover .player-busy {
+    display: none;
+  }
+}
+
+.player-play.player-loading:focus-visible .player-glyph {
+  opacity: 1;
+}
+
+.player-play.player-loading:focus-visible .player-busy {
+  display: none;
+}
+
+.player-spin {
+  animation: player-spin 0.8s linear infinite;
+}
+
+@keyframes player-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.player-meta {
+  min-width: 0;
+}
+
+.player-meta-wide {
+  flex: 0 1 260px;
+}
+
+.player-meta-mini {
+  flex: 1 1 auto;
+}
+
+.player-title {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.player-sub {
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--player-dim);
+  font-size: 11px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.player-verdict {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.player-verdict-ok {
+  color: var(--player-ok) !important;
+}
+
+.player-verdict-warn {
+  color: var(--player-warn) !important;
+}
+
+.player-verdict-bad {
+  color: var(--player-bad) !important;
+}
+
+@media (hover: hover) {
+  .player-verdict:hover {
+    text-decoration: underline;
+  }
+}
+
+.player-failed {
+  color: var(--player-bad);
+}
+
+.player-dim {
+  color: var(--player-dim);
+}
+
+.player-cover {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--player-border);
+  border-radius: 4px;
+  background: var(--player-art-bg);
+  color: var(--player-art-none);
+}
+
+button.player-cover {
+  cursor: zoom-in;
+}
+
+.player-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* cover, not contain: a non-square sleeve cropped still reads as the sleeve,
+     where letterboxed it reads as a rendering fault */
+  object-fit: cover;
+}
+
+/* --- the waveform ---------------------------------------------------------- */
+
+.player-wave {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.player-wave-svg {
+  display: block;
+  width: 100%;
+  height: 56px;
+  cursor: pointer;
+  /* the drag is the player's, not the page's */
+  touch-action: none;
+}
+
+.player-wave-unplayed {
+  fill: var(--player-wave-unplayed);
+}
+
+.player-wave-played {
+  fill: var(--player-accent);
+}
+
+.player-playhead,
+.player-cursor {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  pointer-events: none;
+}
+
+.player-playhead {
+  background: var(--player-playhead);
+  box-shadow: var(--player-playhead-shadow);
+}
+
+.player-cursor {
+  background: var(--player-cursor);
+}
+
+/* dark in both themes: a tooltip riding on the waveform, whose colours do not
+   follow the page, has no edge as a light chip over a light waveform */
+.player-cursor-time {
+  position: absolute;
+  top: 0;
+  z-index: 2;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: rgba(20, 22, 27, 0.92);
+  color: #e8eaed;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  line-height: 15px;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+/* until the peaks arrive: a shimmer where they will be, at their size, so
+   nothing shifts when they land */
+.player-wave-wait {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  height: 56px;
+  pointer-events: none;
+}
+
+.player-wave-wait::before {
+  content: '';
+  width: 100%;
+  height: 36%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--player-wave-unplayed) 0%, var(--player-tint-hi) 50%, var(--player-wave-unplayed) 100%);
+  background-size: 200% 100%;
+  opacity: 0.7;
+  animation: player-wave-wait 1.3s linear infinite;
+}
+
+@keyframes player-wave-wait {
+  from {
+    background-position: 100% 0;
+  }
+
+  to {
+    background-position: -100% 0;
+  }
+}
+
+/* --- the problem lanes ------------------------------------------------------ */
+
+.player-lanes {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 5px;
+}
+
+.player-lane {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 11px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 2px;
+  background: var(--player-lane-tint);
+  cursor: pointer;
+}
+
+.player-lane-warn {
+  color: var(--player-warn) !important;
+}
+
+.player-lane-bad {
+  color: var(--player-bad) !important;
+}
+
+/* above the label, so a fault in the first seconds of a track is visible at
+   all: the label is a watermark, and the data is never hidden by it */
+.player-lane i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 2;
+  border-radius: 2px;
+  background: currentColor;
+}
+
+.player-lane-name {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  padding: 0 6px 0 5px;
+  border-radius: 2px 6px 6px 2px;
+  background: linear-gradient(90deg, rgba(var(--player-veil), 0.92) 60%, rgba(var(--player-veil), 0));
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.player-lane-name.player-at-end {
+  right: 0;
+  left: auto;
+  border-radius: 6px 2px 2px 6px;
+  background: linear-gradient(270deg, rgba(var(--player-veil), 0.92) 60%, rgba(var(--player-veil), 0));
+}
+
+/* --- clock, meter, volume ---------------------------------------------------- */
+
+/* tabular-nums is what holds it still: every digit the same width */
+.player-clock {
+  flex: none;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.player-meter {
+  display: block;
+  flex: none;
+  width: 34px;
+  height: 56px;
+}
+
+.player-volume {
+  display: flex;
+  flex: none;
+  gap: 6px;
+  align-items: center;
+}
+
+.player-range {
+  width: 90px;
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--player-thumb) var(--player-range-fill, 100%), var(--player-track) var(--player-range-fill, 100%));
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+}
+
+.player-range::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--player-thumb);
+  appearance: none;
+}
+
+.player-range::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--player-thumb);
+}
+
+/* --- the wide bar ------------------------------------------------------------ */
+
+.player-wide {
+  position: fixed;
+  right: 0;
+  left: 0;
+  z-index: 1000;
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  min-height: 84px;
+  padding: 14px max(16px, env(safe-area-inset-right, 0px)) 14px max(16px, env(safe-area-inset-left, 0px));
+  border-top: 1px solid var(--player-border);
+  background: var(--player-surface);
+  box-shadow: 0 -6px 24px var(--player-shadow);
+}
+
+.player-wide .player-cog {
+  margin-left: 6px;
+}
+
+/* a narrow window: the slider goes, the mute stays. losing fine control is
+   survivable; losing the ability to silence it is not */
+@media (max-width: 900px) {
+  .player-wide .player-range {
+    display: none;
+  }
+}
+
+/* a tablet is a touch screen at desktop width: the bar's controls are its
+   targets, so they get a finger's size there */
+@media (pointer: coarse) {
+  .player-wide .player-icon-button {
+    width: 44px;
+    height: 44px;
+  }
+
+  .player-wide .player-wave-svg {
+    height: 64px;
+  }
+}
+
+/* --- the mini bar ------------------------------------------------------------ */
+
+.player-mini {
+  position: fixed;
+  right: 0;
+  left: 0;
+  z-index: 1000;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 8px max(12px, env(safe-area-inset-right, 0px)) 8px max(12px, env(safe-area-inset-left, 0px));
+  border-top: 1px solid var(--player-border);
+  background: var(--player-surface);
+}
+
+/* the whole bar opens the player: this layer under everything, the buttons
+   above it, and the picture and the words letting a tap fall through */
+.player-expand {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.player-mini > :not(button):not(.player-progress) {
+  pointer-events: none;
+}
+
+.player-mini > button:not(.player-expand) {
+  position: relative;
+  z-index: 1;
+}
+
+.player-mini .player-close {
+  width: 44px;
+  height: 44px;
+}
+
+/* where you are, as a line along the top edge: the waveform's job, in the one
+   pixel row a mini bar can spare */
+.player-progress {
+  position: absolute;
+  top: -1px;
+  left: 0;
+  height: 2px;
+  background: var(--player-accent);
+  pointer-events: none;
+}
+
+/* --- the drawer -------------------------------------------------------------- */
+
+.player-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1004;
+  background: rgba(0, 0, 0, 0.45);
+  transition: opacity 0.2s;
+  animation: player-fade 0.2s ease-out;
+}
+
+.player-full {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1005;
+  display: grid;
+  grid-template-areas:
+    'grab  grab  grab  grab  grab'
+    'down  .     .     set   close'
+    'art   art   art   art   art'
+    'title title title title title'
+    'wave  wave  wave  wave  wave'
+    'clock clock clock clock clock'
+    'meter back  play  fwd   vol';
+  /* five columns so play sits dead centre between two equal 1fr ones */
+  grid-template-columns: minmax(2.5rem, auto) 1fr auto 1fr minmax(2.5rem, auto);
+  row-gap: 0.9rem;
+  column-gap: 0.5rem;
+  align-items: center;
+  /* a drawer, not a page: a strip of the page stays visible above it, which is
+     what says it can be put away */
+  max-height: calc(100dvh - 2.5rem);
+  padding: 0.4rem 1.25rem calc(1rem + env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-top: 1px solid var(--player-border);
+  border-radius: 16px 16px 0 0;
+  background: var(--player-surface);
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  animation: player-up 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.player-full.player-dragging {
+  transition: none;
+}
+
+.player-full.player-folding {
+  animation: player-down 0.2s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+.player-backdrop.player-folding {
+  animation: player-fade-out 0.2s ease-in forwards;
+}
+
+.player-grab {
+  position: relative;
+  grid-area: grab;
+  justify-self: center;
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--player-border);
+  cursor: grab;
+}
+
+/* what a pointer can hit: 4px is a line to look at, not a target */
+.player-grab::before {
+  content: '';
+  position: absolute;
+  inset: -9px -48px;
+}
+
+.player-full .player-collapse {
+  grid-area: down;
+}
+
+.player-full .player-cog {
+  grid-area: set;
+  justify-self: end;
+}
+
+.player-full .player-close {
+  grid-area: close;
+}
+
+.player-full .player-icon-button {
+  width: 44px;
+  height: 44px;
+}
+
+.player-bigcover {
+  grid-area: art;
+  justify-self: center;
+  line-height: 0;
+}
+
+.player-bigcover .player-cover {
+  width: min(280px, 70vw, 34dvh) !important;
+  height: min(280px, 70vw, 34dvh) !important;
+  border-radius: 0.5rem;
+}
+
+.player-full .player-meta {
+  grid-area: title;
+  text-align: center;
+}
+
+/* wrapped rather than ellipsised: a phone cannot hover to read the rest, and
+   the drawer has the height. capped, so an absurd title cannot push the
+   transport off the screen */
+.player-full .player-title,
+.player-full .player-sub {
+  display: -webkit-box;
+  overflow: hidden;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+}
+
+.player-full .player-title {
+  font-size: 16px;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+}
+
+.player-full .player-sub {
+  font-size: 13px;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.player-full .player-wave {
+  grid-area: wave;
+}
+
+.player-full .player-wave-svg,
+.player-full .player-wave-wait {
+  height: 84px;
+}
+
+.player-full .player-lane {
+  height: 16px;
+}
+
+.player-full .player-clock {
+  grid-area: clock;
+  justify-self: center;
+}
+
+.player-full .player-meter,
+.player-meter-space {
+  grid-area: meter;
+}
+
+.player-full .player-volume,
+.player-volume-space {
+  grid-area: vol;
+  justify-self: end;
+}
+
+.player-full .player-volume .player-range {
+  display: none;
+}
+
+.player-transport {
+  grid-area: play;
+  justify-self: center;
+}
+
+.player-skip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--player-text) !important;
+  cursor: pointer;
+}
+
+.player-skip:active {
+  background: var(--player-accent-tint);
+}
+
+.player-back {
+  grid-area: back;
+  justify-self: end;
+  margin-right: 0.75rem;
+}
+
+.player-forward {
+  grid-area: fwd;
+  justify-self: start;
+  margin-left: 0.75rem;
+}
+
+/* wider than a phone (a landscape one), the drawer is a column, not the whole
+   width */
+@media (min-width: 641px) {
+  .player-full {
+    width: min(100%, 560px);
+    margin-inline: auto;
+    border-right: 1px solid var(--player-border);
+    border-left: 1px solid var(--player-border);
+  }
+}
+
+@keyframes player-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes player-down {
+  to {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes player-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes player-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .player-full,
+  .player-full.player-folding,
+  .player-backdrop,
+  .player-backdrop.player-folding,
+  .player-wave-wait::before,
+  .player-spin {
+    animation: none;
+  }
+}
+
+/* --- on the rows --------------------------------------------------------------- */
+
+.player-row-play {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin-right: 10px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(128, 140, 160, 0.16);
+  color: inherit;
+  vertical-align: middle;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.player-row-play.player-active {
+  background: var(--player-accent);
+  color: var(--player-on-accent);
+}
+
+@media (hover: hover) {
+  .player-row-play:not(.player-active):hover {
+    background: var(--player-accent-tint);
+    color: var(--player-accent);
+  }
+}
+
+/* a finger's size on touch, without changing the row's height: the target
+   reaches past the drawn circle */
+@media (pointer: coarse) {
+  .player-row-play {
+    position: relative;
+    width: 30px;
+    height: 30px;
+  }
+
+  .player-row-play::after {
+    content: '';
+    position: absolute;
+    inset: -7px;
+  }
+}
+
+.flatlist-cell > .player-row-play,
+.flatlist-cell > .player-badge {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.player-badge {
+  display: inline-flex;
+  align-items: center;
+  max-width: 200px;
+  margin-left: 10px;
+  padding: 0 8px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 17px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  cursor: pointer;
+}
+
+.player-badge-pending {
+  padding: 0 6px;
+  background: rgba(128, 140, 160, 0.15);
+  opacity: 0.6;
+  cursor: default;
+}
+
+.player-badge-ok {
+  background: rgba(33, 168, 110, 0.16);
+  color: var(--player-ok);
+}
+
+.player-badge-warn {
+  background: rgba(224, 168, 38, 0.2);
+  color: var(--player-warn);
+}
+
+.player-badge-bad {
+  background: rgba(219, 40, 40, 0.15);
+  color: var(--player-bad);
+}
+
+/* --- the sheets ----------------------------------------------------------------- */
+
+.player-lightbox img {
+  display: block;
+  max-width: 100%;
+  max-height: 80vh;
+  margin: 0 auto;
+  border-radius: 6px;
+  object-fit: contain;
+}
+
+.player-findings-summary {
+  color: var(--player-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.player-finding {
+  margin-left: -3px;
+  padding: 8px 0 8px 12px;
+  border-top: 1px solid var(--player-tint-hi);
+  border-left: 3px solid transparent;
+}
+
+.player-finding-ok {
+  border-left-color: var(--player-ok);
+}
+
+.player-finding-warn {
+  border-left-color: var(--player-warn);
+}
+
+.player-finding-bad {
+  border-left-color: var(--player-bad);
+}
+
+.player-finding-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 10px;
+  justify-content: space-between;
+}
+
+.player-finding-label {
+  font-weight: 600;
+}
+
+.player-finding-value {
+  font-variant-numeric: tabular-nums;
+}
+
+.player-finding-ok .player-finding-value {
+  color: var(--player-ok);
+}
+
+.player-finding-warn .player-finding-value {
+  color: var(--player-warn);
+}
+
+.player-finding-bad .player-finding-value {
+  color: var(--player-bad);
+}
+
+.player-finding-note {
+  max-width: 70ch;
+  margin-top: 2px;
+  color: var(--player-dim);
+  font-size: 0.9em;
+  line-height: 1.5;
+}
+
+.player-findings-provider,
+.player-settings-note {
+  margin-top: 1em;
+  color: var(--player-dim);
+  font-size: 0.85em;
+}
+
+/* a time inside a finding: text that happens to be clickable, not a button
+   through the middle of a sentence */
+.player-seek {
+  padding: 0 2px;
+  border: 0;
+  border-radius: 3px;
+  background: var(--player-accent-tint);
+  color: var(--player-accent);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+
+@keyframes player-flash {
+  from {
+    background: rgba(33, 133, 208, 0.3);
+  }
+
+  to {
+    background: transparent;
+  }
+}
+
+.player-flash {
+  animation: player-flash 1.6s ease-out;
+}
+
+.player-setting + .player-setting {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--player-tint-hi);
+}
+
+.player-setting p {
+  margin: 4px 0 0 3.5rem;
+  color: var(--player-dim);
+  font-size: 0.9em;
+}

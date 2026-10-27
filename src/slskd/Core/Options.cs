@@ -352,6 +352,12 @@ namespace slskd
         public IntegrationsOptions Integrations { get; init; } = new IntegrationsOptions();
 
         /// <summary>
+        ///     Gets options for the player: auditioning finished downloads in the browser.
+        /// </summary>
+        [Validate]
+        public PlayerOptions Player { get; init; } = new PlayerOptions();
+
+        /// <summary>
         ///     Handles top-level validation that doesn't fit anywhere else.
         /// </summary>
         /// <param name="validationContext"></param>
@@ -383,6 +389,142 @@ namespace slskd
 #pragma warning restore CS0618 // Type or member is obsolete
 
             return results;
+        }
+
+        /// <summary>
+        ///     Player options: auditioning finished downloads in the browser.
+        /// </summary>
+        public class PlayerOptions
+        {
+            /// <summary>
+            ///     Gets a value indicating whether the player is enabled.
+            /// </summary>
+            [Argument(default, "player")]
+            [EnvironmentVariable("PLAYER")]
+            [Description("enable the player for finished downloads")]
+            public bool Enabled { get; init; } = true;
+
+            /// <summary>
+            ///     Gets the ffmpeg executable, by name on the PATH or by absolute path.
+            /// </summary>
+            [Argument(default, "player-ffmpeg")]
+            [EnvironmentVariable("PLAYER_FFMPEG")]
+            [Description("the ffmpeg executable the player transcodes with")]
+            [NotNullOrWhiteSpace]
+            public string Ffmpeg { get; init; } = "ffmpeg";
+
+            /// <summary>
+            ///     Gets the ffprobe executable, by name on the PATH or by absolute path.
+            /// </summary>
+            [Argument(default, "player-ffprobe")]
+            [EnvironmentVariable("PLAYER_FFPROBE")]
+            [Description("the ffprobe executable the player checks transcodes with")]
+            [NotNullOrWhiteSpace]
+            public string Ffprobe { get; init; } = "ffprobe";
+
+            /// <summary>
+            ///     Gets the cache options.
+            /// </summary>
+            [Validate]
+            public PlayerCacheOptions Cache { get; init; } = new PlayerCacheOptions();
+
+            /// <summary>
+            ///     Gets the analysis options.
+            /// </summary>
+            [Validate]
+            public PlayerAnalysisOptions Analysis { get; init; } = new PlayerAnalysisOptions();
+
+            /// <summary>
+            ///     Where transcodes and waveforms are kept.
+            /// </summary>
+            public class PlayerCacheOptions
+            {
+                /// <summary>
+                ///     Gets the cache directory. Empty means a folder under the application's data directory.
+                /// </summary>
+                public string Directory { get; init; } = null;
+
+                /// <summary>
+                ///     Gets the size, in megabytes, past which the least recently used entries are dropped.
+                /// </summary>
+                [Range(64, int.MaxValue)]
+                public int Capacity { get; init; } = 2048;
+            }
+
+            /// <summary>
+            ///     Analysis options.
+            /// </summary>
+            public class PlayerAnalysisOptions
+            {
+                /// <summary>
+                ///     Gets the external analysis provider. Without a URL there is no analysis.
+                /// </summary>
+                [Validate]
+                public PlayerAnalysisProviderOptions Provider { get; init; } = new PlayerAnalysisProviderOptions();
+            }
+
+            /// <summary>
+            ///     An external service that answers what is wrong with a track, under the contract in
+            ///     docs/player-analysis-provider.md.
+            /// </summary>
+            public class PlayerAnalysisProviderOptions : IValidatableObject
+            {
+                /// <summary>
+                ///     Gets the provider's base URL; slskd appends /v1/analysis. Empty turns analysis off.
+                /// </summary>
+                public string Url { get; init; } = null;
+
+                /// <summary>
+                ///     Gets the bearer token sent to the provider.
+                /// </summary>
+                [Secret]
+                public string Token { get; init; } = null;
+
+                /// <summary>
+                ///     Gets the time to wait for an answer, in seconds. A cold analysis decodes the whole file.
+                /// </summary>
+                [Range(1, 600)]
+                public int Timeout { get; init; } = 60;
+
+                /// <summary>
+                ///     Gets the number of requests in flight at once.
+                /// </summary>
+                [Range(1, 16)]
+                public int Concurrency { get; init; } = 2;
+
+                /// <summary>
+                ///     Gets the folders slskd will ask about, by the name the provider knows each one by.
+                /// </summary>
+                public Dictionary<string, string> Roots { get; init; } = [];
+
+                /// <summary>
+                ///     Gets a value indicating whether analysis is configured.
+                /// </summary>
+                public bool Configured => !string.IsNullOrWhiteSpace(Url);
+
+                public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+                {
+                    if (!Configured)
+                    {
+                        yield break;
+                    }
+
+                    if (!Url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && !Url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                    {
+                        yield return new ValidationResult($"The {nameof(Url)} field must contain a fully qualified URL, including protocol (e.g. http:// or https://)");
+                    }
+
+                    if (string.IsNullOrWhiteSpace(Token))
+                    {
+                        yield return new ValidationResult($"The {nameof(Token)} field is required when a provider URL is set");
+                    }
+
+                    foreach (var problem in slskd.Player.AnalysisRoots.Problems(Roots))
+                    {
+                        yield return new ValidationResult(problem);
+                    }
+                }
+            }
         }
 
         /// <summary>

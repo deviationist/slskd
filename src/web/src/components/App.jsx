@@ -20,6 +20,8 @@ import Chat from './Chat/Chat';
 import Dashboard from './Dashboard/Dashboard';
 import LoginForm from './LoginForm';
 import MobileNav from './MobileNav';
+import PlayerBar from './Player/PlayerBar';
+import { PlayerProvider } from './Player/PlayerContext';
 import Rooms from './Rooms/Rooms';
 import Searches from './Search/Searches';
 import ErrorSegment from './Shared/ErrorSegment';
@@ -602,7 +604,9 @@ class App extends Component {
     document.documentElement.classList.toggle('nav-open', navOpen);
 
     return (
-      <>
+      // the player wraps the app rather than one page, so a track keeps playing
+      // across a navigation: the answer to "what was that" is often elsewhere
+      <PlayerProvider enabled={!isAgent}>
         <Sidebar.Pushable
           as={Segment}
           className="app"
@@ -981,6 +985,7 @@ class App extends Component {
           onToggle={this.handleNavToggle}
           open={navOpen}
         />
+        <PlayerBar />
         <AppFooter
           server={server}
           transferMetrics={transferMetrics}
@@ -998,7 +1003,7 @@ class App extends Component {
           position="bottom-center"
           rtl={false}
         />
-      </>
+      </PlayerProvider>
     );
   }
 }

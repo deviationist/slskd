@@ -24,6 +24,7 @@ import {
   offsetWithin,
   scrollParentOf,
 } from '../../lib/util';
+import { RowBadge, RowPlay } from '../Player/Parts';
 import {
   ColumnPicker,
   EmptyTableRow,
@@ -646,7 +647,9 @@ const FlatTransferList = ({
             title={row.filename}
           >
             <div className="flatlist-cell">
+              <RowPlay file={row} />
               <span className="flatlist-name">{getFileName(row.filename)}</span>
+              <RowBadge file={row} />
             </div>
           </Table.Cell>
         );
@@ -929,6 +932,9 @@ const FlatTransferList = ({
                    * attaches to a file it cannot name.
                    */
                   data-filename={row.filename}
+                  // and its id, which is what slskd's own player is asked for
+                  // by (window.slskd.player)
+                  data-id={row.id}
                   data-index={virtual.index}
                   /*
                    * The state too, for the same reason: media-bridge decides
