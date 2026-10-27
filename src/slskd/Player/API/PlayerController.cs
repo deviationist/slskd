@@ -287,9 +287,14 @@ public class PlayerController : ControllerBase
 
         var (_, file, refusal) = Resolve(id);
 
+        // a file that has gone, or never was audio, has no analysis -- an answer, not an error. every list asks about
+        // each finished row it draws, and most finished downloads have long since been moved out, so as 404s these
+        // filled the console of every page with errors about nothing
         if (refusal is not null)
         {
-            return refusal;
+            return refusal is BadRequestObjectResult
+                ? refusal
+                : Ok(AnalysisResponse.From(new AnalysisAnswer(AnalysisState.None, Reason: "no playable file")));
         }
 
         return Ok(AnalysisResponse.From(await Analysis.GetAsync(file, wait, cancellationToken)));

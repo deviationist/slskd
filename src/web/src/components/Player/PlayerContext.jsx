@@ -1,3 +1,4 @@
+import http from '../../lib/api';
 import {
   artUrl,
   audioUrl,
@@ -487,19 +488,21 @@ export const PlayerProvider = ({ children, enabled = true }) => {
     window.slskd = window.slskd ?? {};
     // by id, or by the peer and the remote name -- what Compare in
     // slskd-ingest.js knows a copy by -- looked up in this user's downloads
-    const find = async ({ filename, id, username }) => {
-      if (id) {
-        return { filename, id, username };
+    const find = async ({ filename, id: known, username }) => {
+      if (known) {
+        return { filename, id: known, username };
       }
 
       if (!username || !filename) {
         return null;
       }
 
-      const { data } = await api.get(
+      const { data } = await http.get(
         `/transfers/downloads/${encodeURIComponent(username)}`,
       );
-      const files = (data?.directories ?? []).flatMap((directory) => directory.files ?? []);
+      const files = (data?.directories ?? []).flatMap(
+        (directory) => directory.files ?? [],
+      );
 
       return files.find((file) => file.filename === filename) ?? null;
     };
@@ -517,12 +520,6 @@ export const PlayerProvider = ({ children, enabled = true }) => {
         };
 
         if (found && isPlayable(row)) {
-          apiRef.current.toggle(trackOf(row));
-        }
-      },
-    };
-
-        if (isPlayable(row)) {
           apiRef.current.toggle(trackOf(row));
         }
       },

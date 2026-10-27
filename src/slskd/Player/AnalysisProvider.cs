@@ -114,7 +114,6 @@ public class AnalysisProvider
     private static readonly TimeSpan UnavailableFor = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan ConflictRetry = TimeSpan.FromSeconds(2);
 
-
     /// <summary>
     ///     Initializes a new instance of the <see cref="AnalysisProvider"/> class.
     /// </summary>
