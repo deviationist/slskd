@@ -391,9 +391,13 @@ const Bar = ({ player }) => {
       return undefined;
     }
 
-    document.documentElement.classList.add('player-full');
+    // not `player-full`: that is the drawer's own class, and on the root it
+    // matched the drawer's rules too -- position: fixed, its top offset and
+    // its padding -- so the whole page dropped 41px while the drawer was open
+    document.documentElement.classList.add('player-drawer-open');
 
-    return () => document.documentElement.classList.remove('player-full');
+    return () =>
+      document.documentElement.classList.remove('player-drawer-open');
   }, [mode]);
 
   // --- the dock ------------------------------------------------------------
