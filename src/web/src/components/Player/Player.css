@@ -111,14 +111,14 @@
 }
 
 /* the page under a full-screen player does not scroll behind it */
-:root.player-full body,
-:root.player-full .pushable.app,
-:root.player-full .pushable > .pusher.app-content {
+:root.player-drawer-open body,
+:root.player-drawer-open .pushable.app,
+:root.player-drawer-open .pushable > .pusher.app-content {
   overflow: hidden !important;
 }
 
 /* a modal opened from the drawer goes above it */
-:root.player-full .ui.page.modals.dimmer {
+:root.player-drawer-open .ui.page.modals.dimmer {
   z-index: 1010 !important;
 }
 
