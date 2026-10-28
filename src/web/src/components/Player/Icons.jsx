@@ -6,8 +6,12 @@ import React from 'react';
  *
  * Characters such as ▶ and ❚❚ sit where their font puts them: on iOS the bars
  * rode high in the circle while the triangle looked centred. Drawn, they are
- * centred by geometry -- the triangle's centroid, not its bounding box, at the
- * middle, which is what the old 1px nudge was correcting by hand.
+ * centred by geometry.
+ *
+ * Drawn at even sizes only, in even buttons: an odd glyph in an even box
+ * centres on a half pixel and smears every edge across two device pixels,
+ * which reads as off-centre and soft at once (media-bridge's
+ * tests/perf/icon-probe.mjs measures the same rule there).
  */
 
 const Stroked = ({ children, size }) => (
@@ -39,12 +43,14 @@ const Filled = ({ children, size }) => (
   </svg>
 );
 
+// media-bridge's triangle, as it is there. This used to be a rounded triangle
+// moved 2.3 left to centre its centroid; that put the centroid at 10.5, so it
+// read left of centre in every button. This one's centroid is at 11.7 and its
+// box's centre at 13.5, which is where a triangle looks centred: between the
+// two, just right of the middle.
 export const PlayIcon = ({ size = 14 }) => (
   <Filled size={size}>
-    <path
-      d="M8.5 4.8v14.4a1 1 0 0 0 1.5.86l11.3-7.2a1 1 0 0 0 0-1.72L10 3.94a1 1 0 0 0-1.5.86z"
-      transform="translate(-2.3 0)"
-    />
+    <path d="M8 5.5v13l11-6.5z" />
   </Filled>
 );
 

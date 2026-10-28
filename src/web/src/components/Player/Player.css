@@ -184,6 +184,13 @@
   transition: background 0.12s;
 }
 
+/* the glyph's own box, not a line of text: as a plain span it was blockified
+   to the line height (20px) with the 16px icon at its top, so the icon sat
+   2.5px above the circle's centre */
+.player-play .player-glyph {
+  display: inline-flex;
+}
+
 .player-play .player-busy {
   display: none;
 }
@@ -236,8 +243,26 @@
   min-width: 0;
 }
 
+/* as wide as its text, up to a cap, and the waveform takes the rest -- as in
+   media-bridge's bar. A 260px basis held that width for every title, so a
+   short one left a gap of a hundred pixels or more before the waveform */
 .player-meta-wide {
-  flex: 0 1 260px;
+  flex: 0 1 auto;
+  max-width: 180px;
+}
+
+@media (min-width: 1024px) {
+  .player-meta-wide {
+    max-width: 260px;
+  }
+}
+
+/* and the waveform starts from nothing, so it is the one that gives way: from
+   its content size it shared the shrinking with the title, which on a 900px
+   screen was squeezed to 77px with the waveform still at 443. media-bridge's is
+   `flex-1` (a zero basis) for the same reason */
+.player-wide .player-wave {
+  flex: 1 1 0;
 }
 
 .player-meta-mini {

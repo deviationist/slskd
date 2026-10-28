@@ -101,6 +101,13 @@ const usePhone = () => {
 const modalOpen = () =>
   Boolean(document.querySelector('.ui.modals.dimmer.active'));
 
+// a native <dialog> is open -- media-bridge's send and Compare dialogs, which
+// it injects into this page. Every key is its: they listen on document in the
+// capture phase, and this listens on window, which runs first, so without this
+// Escape cancelled the dialog *and* stopped the player, and an arrow or a
+// digit in one seeked the track
+const dialogOpen = () => Boolean(document.querySelector('dialog[open]'));
+
 // the meter's neutrals, read from the theme so an empty bar reads on a white
 // page as well as a black one
 const meterColours = () => {
@@ -499,7 +506,7 @@ const Bar = ({ player }) => {
 
   useEffect(() => {
     const onKey = (event) => {
-      if (event.defaultPrevented) {
+      if (event.defaultPrevented || dialogOpen()) {
         return;
       }
 
@@ -667,7 +674,7 @@ const Bar = ({ player }) => {
           src={art}
         />
       )}
-      {shape !== 'full' && transport(42, 15)}
+      {shape !== 'full' && transport(42, 16)}
       <div className={`player-meta player-meta-${shape}`}>
         <div
           className="player-title"
@@ -965,10 +972,16 @@ const Bar = ({ player }) => {
   return (
     <>
       {/* the mini bar, already in place under the drawer, so folding never shows
-          the page with no player for a beat. drawn from the same parts, inert */}
+          the page with no player for a beat. drawn from the same parts, inert.
+          keyed so React never reuses this element as the real mini bar: same
+          tag, same class, same place, so on folding it did, and `inert` --
+          set here by hand, so not React's to remove -- stayed on. the mini bar
+          then let every tap through to the page, and the player could not be
+          opened again */}
       <div
         aria-hidden="true"
         className="player player-mini"
+        key="player-mini-standin"
         ref={(element) => {
           dock.current = element;
           element?.setAttribute('inert', '');
