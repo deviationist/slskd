@@ -1570,6 +1570,12 @@ time {
        ride up the page with the content behind it. */
     .pushable.app {
         transform: none !important;
+        /* and no rubber band. This box is the page's scroller, so iOS bounced
+           it past either end, and the top menu inside it went with the pull
+           while the bottom one, fixed outside it, stayed put -- the two
+           menus visibly coming apart. Nothing is lost: an inner scroller has
+           no pull-to-refresh on iOS either way */
+        overscroll-behavior-y: none;
     }
 
     .pushable > .pusher.app-content {

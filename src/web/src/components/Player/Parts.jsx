@@ -284,9 +284,9 @@ export const RowPlay = ({ file }) => {
       {mine && player.loading ? (
         <SpinnerIcon size={12} />
       ) : mine && player.playing ? (
-        <PauseIcon size={11} />
+        <PauseIcon size={12} />
       ) : (
-        <PlayIcon size={11} />
+        <PlayIcon size={12} />
       )}
     </button>
   );
