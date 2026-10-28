@@ -24,10 +24,12 @@
   row-gap: 10px;
 }
 
+/* No vertical offsets. Upstream's header leaves its items at the top, and 5px
+   of padding plus 6px of margin brought the icon down into line there; this
+   fork centres them (`align-items: center` above), so the same 11px put the
+   icon 5.5px below the filter and the buttons beside it. */
 .transfers-segment-icon {
-  padding-top: 5px;
   padding-right: 1em;
-  margin-top: 6px;
 }
 
 .transfers-header-action-button {
