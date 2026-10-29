@@ -59,6 +59,27 @@ namespace slskd
         public ShareState Shares { get; init; } = new ShareState();
         public string[] Rooms { get; init; } = Array.Empty<string>();
         public User[] Users { get; init; } = Array.Empty<User>();
+        public ConversationsState Conversations { get; init; } = new ConversationsState();
+    }
+
+    /// <summary>
+    ///     What is unread in private chat, so that a page other than Chat can say a message has arrived.
+    /// </summary>
+    /// <remarks>
+    ///     In the state rather than asked for, because the state is pushed to every open page the moment it changes:
+    ///     the menu learns of a message as it arrives, with nothing polling for it.
+    /// </remarks>
+    public record ConversationsState
+    {
+        /// <summary>
+        ///     Gets the number of private messages not yet read, from anyone.
+        /// </summary>
+        public int UnAcknowledgedMessages { get; init; }
+
+        /// <summary>
+        ///     Gets the number of people those messages are from.
+        /// </summary>
+        public int UnAcknowledgedConversations { get; init; }
     }
 
     public record HealthState

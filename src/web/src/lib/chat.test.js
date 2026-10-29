@@ -57,3 +57,51 @@ describe('byRecency', () => {
     ]);
   });
 });
+
+describe('badgeOf', () => {
+  it('shows nothing when nothing is unread', () => {
+    expect(chat.badgeOf(0)).toBe('');
+    expect(chat.badgeOf(undefined)).toBe('');
+    expect(chat.badgeOf(-1)).toBe('');
+  });
+
+  it('shows the count, and stops counting where a badge runs out of room', () => {
+    expect(chat.badgeOf(1)).toBe('1');
+    expect(chat.badgeOf(22)).toBe('22');
+    expect(chat.badgeOf(99)).toBe('99');
+    expect(chat.badgeOf(100)).toBe('99+');
+  });
+});
+
+describe('describeUnread', () => {
+  it('says how many and from how many people, in words', () => {
+    expect(
+      chat.describeUnread({
+        unAcknowledgedConversations: 18,
+        unAcknowledgedMessages: 22,
+      }),
+    ).toBe('22 unread messages from 18 people');
+    expect(
+      chat.describeUnread({
+        unAcknowledgedConversations: 1,
+        unAcknowledgedMessages: 3,
+      }),
+    ).toBe('3 unread messages from 1 person');
+    expect(
+      chat.describeUnread({
+        unAcknowledgedConversations: 1,
+        unAcknowledgedMessages: 1,
+      }),
+    ).toBe('1 unread message');
+  });
+
+  it('says nothing when nothing is unread or the state has not arrived', () => {
+    expect(
+      chat.describeUnread({
+        unAcknowledgedConversations: 0,
+        unAcknowledgedMessages: 0,
+      }),
+    ).toBe('');
+    expect(chat.describeUnread(undefined)).toBe('');
+  });
+});

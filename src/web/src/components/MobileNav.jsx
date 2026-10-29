@@ -1,4 +1,5 @@
 import { urlBase } from '../config';
+import UnreadBadge from './Chat/UnreadBadge';
 import React, { useRef } from 'react';
 import { NavLink, useHistory } from 'react-router-dom';
 import { Icon } from 'semantic-ui-react';
@@ -16,7 +17,7 @@ const PRIMARY = [
   { icon: 'search', label: 'Search', path: 'searches' },
   { icon: 'download', label: 'Downloads', path: 'downloads' },
   { icon: 'upload', label: 'Uploads', path: 'uploads' },
-  { icon: 'comment', label: 'Chat', path: 'chat' },
+  { badge: true, icon: 'comment', label: 'Chat', path: 'chat' },
 ];
 
 /*
@@ -71,7 +72,7 @@ const useTap = (action) => {
   };
 };
 
-const NavItem = ({ icon, label, onClose, to }) => {
+const NavItem = ({ icon, label, onClose, to, unread }) => {
   const history = useHistory();
   const tap = useTap((event) => {
     onClose();
@@ -89,6 +90,7 @@ const NavItem = ({ icon, label, onClose, to }) => {
     >
       <Icon name={icon} />
       <span>{label}</span>
+      {unread && <UnreadBadge unread={unread} />}
     </NavLink>
   );
 };
@@ -145,9 +147,10 @@ const MoreButton = ({ alert, onToggle, open }) => {
  * @param {Function} params.onClose - Closes the menu.
  * @param {Function} params.onToggle - Opens or closes the menu.
  * @param {boolean} params.open - Whether the menu is open.
+ * @param {object} [params.unread] - What is unread in chat (`state.conversations`), for Chat's badge.
  * @returns {object} The bar, and the backdrop behind the menu while it is open.
  */
-const MobileNav = ({ agent, alert, onClose, onToggle, open }) => (
+const MobileNav = ({ agent, alert, onClose, onToggle, open, unread }) => (
   <>
     {open && (
       // a tap anywhere outside the panel closes it, as a sheet does; not a
@@ -166,13 +169,14 @@ const MobileNav = ({ agent, alert, onClose, onToggle, open }) => (
           the menu is open it stops short of More and turns down beside it */}
       {!agent && (
         <div className="mobile-nav-primary">
-          {PRIMARY.map(({ icon, label, path }) => (
+          {PRIMARY.map(({ badge, icon, label, path }) => (
             <NavItem
               icon={icon}
               key={path}
               label={label}
               onClose={onClose}
               to={`${urlBase}/${path}`}
+              unread={badge ? unread : undefined}
             />
           ))}
         </div>

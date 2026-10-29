@@ -69,7 +69,7 @@ public class ConversationListTests
             factory.Setup(f => f.CreateDbContext())
                 .Returns(() => new MessagingDbContext(options));
 
-            Service = new ConversationService(new Mock<ISoulseekClient>().Object, eventBus: null, factory.Object);
+            Service = new ConversationService(new Mock<ISoulseekClient>().Object, eventBus: null, factory.Object, new ManagedState<State>());
         }
 
         public ConversationService Service { get; }
