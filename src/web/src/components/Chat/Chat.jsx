@@ -6,6 +6,7 @@ import { userPath } from '../../lib/users';
 import PlaceholderSegment from '../Shared/PlaceholderSegment';
 import Timestamp from '../Shared/Timestamp';
 import ChatMenu from './ChatMenu';
+import ChatUnreadContext from './ChatUnreadContext';
 import React, { Component, createRef } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -74,11 +75,27 @@ class Chat extends Component {
     );
   }
 
+  // the open conversation is read the moment the server says it has anything
+  // unread: when it is opened, and when a message arrives while it is open.
+  // Before, that waited for the next poll, up to five seconds, and the menu's
+  // count waited with it
+  componentDidUpdate() {
+    const { active } = this.state;
+
+    if (active && this.context.countOf(active) > 0) {
+      this.context.acknowledge(active);
+    }
+  }
+
   componentWillUnmount() {
     this.unregisterPullRefresh?.();
     clearInterval(this.state.interval);
     this.setState({ interval: undefined });
   }
+
+  // what is unread comes from the server's pushed state, shared with the
+  // menu's badge: one count, not a second one polled for here
+  static contextType = ChatUnreadContext;
 
   // the list of conversations and the open one's messages, which otherwise
   // only change when a conversation is picked or a message is sent
@@ -130,11 +147,10 @@ class Chat extends Component {
     // check to see if the active chat is still active
     // this will happen whenever a chat is closed/removed
     if (activeConversation) {
-      console.log('active?', activeConversation);
-      // *before* fetching messages, ack any unacked messages
-      // for the active chat
+      // *before* fetching messages, ack any unacked messages for the active
+      // chat: a backstop for anything the pushed count has not caught yet
       if (activeConversation.hasUnAcknowledgedMessages === true) {
-        await this.acknowledgeMessages(active);
+        await this.context.acknowledge(active);
       }
 
       conversations = {
@@ -150,11 +166,6 @@ class Chat extends Component {
         this.selectConversation(this.getFirstConversation());
       }
     });
-  };
-
-  acknowledgeMessages = async (username) => {
-    if (!username || username === '') return;
-    await chat.acknowledge({ username });
   };
 
   sendReply = async () => {

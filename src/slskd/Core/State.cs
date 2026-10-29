@@ -80,7 +80,24 @@ namespace slskd
         ///     Gets the number of people those messages are from.
         /// </summary>
         public int UnAcknowledgedConversations { get; init; }
+
+        /// <summary>
+        ///     Gets the unread count per person, for everyone with any, so the page holds one count per conversation
+        ///     rather than polling for its own copy.
+        /// </summary>
+        /// <remarks>
+        ///     A list rather than a dictionary keyed by username: a dictionary's keys go through the serializer's
+        ///     naming policy, and a username must come out exactly as it went in.
+        /// </remarks>
+        public IReadOnlyList<UnreadConversationState> ByUser { get; init; } = [];
     }
+
+    /// <summary>
+    ///     What is unread from one person.
+    /// </summary>
+    /// <param name="Username">Who.</param>
+    /// <param name="Count">How many of their messages are unread.</param>
+    public record UnreadConversationState(string Username, int Count);
 
     public record HealthState
     {

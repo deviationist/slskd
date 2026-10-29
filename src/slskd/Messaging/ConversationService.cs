@@ -420,20 +420,25 @@ namespace slskd.Messaging
         /// <remarks>
         ///     Counted afresh from the database each time rather than kept as a running total: every change -- a
         ///     message, a replay of one, an acknowledgement, a removal -- goes through the database, so a count read
-        ///     back from it cannot drift from what the Chat page shows. Two small aggregates over one table, on events
-        ///     that happen at human speed.
+        ///     back from it cannot drift. One grouped count over one table, on events that happen at human speed.
         /// </remarks>
         private void CountUnread()
         {
-            int messages, conversations;
+            List<UnreadConversationState> byUser;
 
             try
             {
                 using var context = ContextFactory.CreateDbContext();
 
-                var unacked = context.PrivateMessages.AsNoTracking().Where(m => !m.IsAcknowledged);
-                messages = unacked.Count();
-                conversations = messages == 0 ? 0 : unacked.Select(m => m.Username).Distinct().Count();
+                byUser = context.PrivateMessages
+                    .AsNoTracking()
+                    .Where(m => !m.IsAcknowledged)
+                    .GroupBy(m => m.Username)
+                    .Select(g => new { Username = g.Key, Count = g.Count() })
+                    .AsEnumerable()
+                    .Select(g => new UnreadConversationState(g.Username, g.Count))
+                    .OrderBy(g => g.Username, StringComparer.Ordinal)
+                    .ToList();
             }
             catch (Exception ex)
             {
@@ -447,8 +452,9 @@ namespace slskd.Messaging
             {
                 Conversations = new ConversationsState
                 {
-                    UnAcknowledgedMessages = messages,
-                    UnAcknowledgedConversations = conversations,
+                    UnAcknowledgedMessages = byUser.Sum(u => u.Count),
+                    UnAcknowledgedConversations = byUser.Count,
+                    ByUser = byUser,
                 },
             });
         }

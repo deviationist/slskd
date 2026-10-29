@@ -17,6 +17,7 @@ import AppContext from './AppContext';
 import AppFooter from './AppFooter';
 import Browse from './Browse/Browse';
 import Chat from './Chat/Chat';
+import { ChatUnreadProvider } from './Chat/ChatUnreadContext';
 import UnreadBadge from './Chat/UnreadBadge';
 import Dashboard from './Dashboard/Dashboard';
 import LoginForm from './LoginForm';
@@ -608,404 +609,410 @@ class App extends Component {
       // the player wraps the app rather than one page, so a track keeps playing
       // across a navigation: the answer to "what was that" is often elsewhere
       <PlayerProvider enabled={!isAgent}>
-        <Sidebar.Pushable
-          as={Segment}
-          className="app"
-        >
-          <Sidebar
-            animation="overlay"
-            as={Menu}
-            className="navigation"
-            direction="top"
-            horizontal="true"
-            icon="labeled"
-            inverted
-            // on a phone this is the panel More opens, and a choice made in it
-            // is the end of wanting it open; elsewhere the menu is never open
-            // and this does nothing
-            onClick={this.handleNavClose}
-            visible
-            width="thin"
+        {/* what is unread in chat, from the server's pushed state, for the
+            menu's badge and the Chat page alike */}
+        <ChatUnreadProvider unread={applicationState.conversations}>
+          <Sidebar.Pushable
+            as={Segment}
+            className="app"
           >
-            {isAgent ? (
-              <Menu.Item>
-                <Icon name="detective" />
-                Agent Mode
-              </Menu.Item>
-            ) : (
-              <>
-                <NavLink to={`${urlBase}/dashboard`}>
-                  <Menu.Item>
-                    <Icon name="chart bar" />
-                    Dashboard
-                  </Menu.Item>
-                </NavLink>
-                <NavLink to={`${urlBase}/searches`}>
-                  <Menu.Item>
-                    <Icon name="search" />
-                    Search
-                  </Menu.Item>
-                </NavLink>
-                <NavLink to={`${urlBase}/downloads`}>
-                  <Menu.Item>
-                    <Icon name="download" />
-                    Downloads
-                  </Menu.Item>
-                </NavLink>
-                <NavLink to={`${urlBase}/uploads`}>
-                  <Menu.Item>
-                    <Icon name="upload" />
-                    Uploads
-                  </Menu.Item>
-                </NavLink>
-                {applicationOptions?.transfers?.shareLinks?.enabled && (
-                  <NavLink to={`${urlBase}/shared`}>
+            <Sidebar
+              animation="overlay"
+              as={Menu}
+              className="navigation"
+              direction="top"
+              horizontal="true"
+              icon="labeled"
+              inverted
+              // on a phone this is the panel More opens, and a choice made in it
+              // is the end of wanting it open; elsewhere the menu is never open
+              // and this does nothing
+              onClick={this.handleNavClose}
+              visible
+              width="thin"
+            >
+              {isAgent ? (
+                <Menu.Item>
+                  <Icon name="detective" />
+                  Agent Mode
+                </Menu.Item>
+              ) : (
+                <>
+                  <NavLink to={`${urlBase}/dashboard`}>
                     <Menu.Item>
-                      <Icon name="share alternate" />
-                      Shared
+                      <Icon name="chart bar" />
+                      Dashboard
                     </Menu.Item>
                   </NavLink>
-                )}
-                <NavLink to={`${urlBase}/rooms`}>
-                  <Menu.Item>
-                    <Icon name="comments" />
-                    Rooms
-                  </Menu.Item>
-                </NavLink>
-                <NavLink to={`${urlBase}/chat`}>
-                  <Menu.Item>
-                    <Icon name="comment" />
-                    Chat
-                    <UnreadBadge unread={applicationState.conversations} />
-                  </Menu.Item>
-                </NavLink>
-                <NavLink to={`${urlBase}/users`}>
-                  <Menu.Item>
-                    <Icon name="users" />
-                    Users
-                  </Menu.Item>
-                </NavLink>
-                <NavLink to={`${urlBase}/browse`}>
-                  <Menu.Item>
-                    <Icon name="folder open" />
-                    Browse
-                  </Menu.Item>
-                </NavLink>
-              </>
-            )}
-            <Menu
-              className="right"
-              inverted
-            >
-              <Menu.Item onClick={() => this.toggleTheme()}>
-                <Icon name="theme" />
-                Theme
-              </Menu.Item>
-              <Menu.Item
-                className="wide-toggle"
-                onClick={() => this.toggleWide()}
-                title={
-                  wide
-                    ? 'Hold the page to 1200px'
-                    : 'Let the page use the width of the window'
-                }
-              >
-                <Icon name={wide ? 'compress' : 'expand'} />
-                {wide ? 'Narrow' : 'Wide'}
-              </Menu.Item>
-              <ModeSpecificConnectButton
-                connectionWatchdog={connectionWatchdog}
-                controller={controller}
-                mode={mode}
-                pendingReconnect={pendingReconnect}
-                server={server}
-                user={user}
-              />
-              {(pendingReconnect || pendingRestart || pendingShareRescan) && (
-                <Menu.Item position="right">
-                  <Icon.Group className="menu-icon-group">
-                    <Link to={`${urlBase}/system/info`}>
-                      <Icon
-                        color="yellow"
-                        name="exclamation circle"
-                      />
-                    </Link>
-                  </Icon.Group>
-                  Pending Action
-                </Menu.Item>
+                  <NavLink to={`${urlBase}/searches`}>
+                    <Menu.Item>
+                      <Icon name="search" />
+                      Search
+                    </Menu.Item>
+                  </NavLink>
+                  <NavLink to={`${urlBase}/downloads`}>
+                    <Menu.Item>
+                      <Icon name="download" />
+                      Downloads
+                    </Menu.Item>
+                  </NavLink>
+                  <NavLink to={`${urlBase}/uploads`}>
+                    <Menu.Item>
+                      <Icon name="upload" />
+                      Uploads
+                    </Menu.Item>
+                  </NavLink>
+                  {applicationOptions?.transfers?.shareLinks?.enabled && (
+                    <NavLink to={`${urlBase}/shared`}>
+                      <Menu.Item>
+                        <Icon name="share alternate" />
+                        Shared
+                      </Menu.Item>
+                    </NavLink>
+                  )}
+                  <NavLink to={`${urlBase}/rooms`}>
+                    <Menu.Item>
+                      <Icon name="comments" />
+                      Rooms
+                    </Menu.Item>
+                  </NavLink>
+                  <NavLink to={`${urlBase}/chat`}>
+                    <Menu.Item>
+                      <Icon name="comment" />
+                      Chat
+                      <UnreadBadge />
+                    </Menu.Item>
+                  </NavLink>
+                  <NavLink to={`${urlBase}/users`}>
+                    <Menu.Item>
+                      <Icon name="users" />
+                      Users
+                    </Menu.Item>
+                  </NavLink>
+                  <NavLink to={`${urlBase}/browse`}>
+                    <Menu.Item>
+                      <Icon name="folder open" />
+                      Browse
+                    </Menu.Item>
+                  </NavLink>
+                </>
               )}
-              {isUpdateAvailable && (
-                <Modal
-                  centered
-                  closeIcon
-                  size="mini"
-                  trigger={
-                    <Menu.Item position="right">
-                      <Icon.Group className="menu-icon-group">
+              <Menu
+                className="right"
+                inverted
+              >
+                <Menu.Item onClick={() => this.toggleTheme()}>
+                  <Icon name="theme" />
+                  Theme
+                </Menu.Item>
+                <Menu.Item
+                  className="wide-toggle"
+                  onClick={() => this.toggleWide()}
+                  title={
+                    wide
+                      ? 'Hold the page to 1200px'
+                      : 'Let the page use the width of the window'
+                  }
+                >
+                  <Icon name={wide ? 'compress' : 'expand'} />
+                  {wide ? 'Narrow' : 'Wide'}
+                </Menu.Item>
+                <ModeSpecificConnectButton
+                  connectionWatchdog={connectionWatchdog}
+                  controller={controller}
+                  mode={mode}
+                  pendingReconnect={pendingReconnect}
+                  server={server}
+                  user={user}
+                />
+                {(pendingReconnect || pendingRestart || pendingShareRescan) && (
+                  <Menu.Item position="right">
+                    <Icon.Group className="menu-icon-group">
+                      <Link to={`${urlBase}/system/info`}>
                         <Icon
                           color="yellow"
-                          name="bullhorn"
+                          name="exclamation circle"
                         />
-                      </Icon.Group>
-                      New Version!
-                    </Menu.Item>
-                  }
-                >
-                  <Modal.Header>New Version!</Modal.Header>
-                  <Modal.Content>
-                    <p>
-                      You are currently running version{' '}
-                      <strong>{current}</strong> while version{' '}
-                      <strong>{latest}</strong> is available.
-                    </p>
-                  </Modal.Content>
-                  <Modal.Actions>
-                    <Button
-                      fluid
-                      href="https://github.com/slskd/slskd/releases"
-                      primary
-                      style={{ marginLeft: 0 }}
-                    >
-                      See Release Notes
-                    </Button>
-                  </Modal.Actions>
-                </Modal>
-              )}
-              {clientUpdate && (
-                <Menu.Item
-                  onClick={applyUpdate}
-                  title="A new version has been deployed; load it"
-                >
-                  <Icon
-                    color="green"
-                    name="arrow alternate circle up"
-                  />
-                  Update
-                </Menu.Item>
-              )}
-              <NavLink to={`${urlBase}/system`}>
-                <Menu.Item>
-                  <Icon name="cogs" />
-                  System
-                </Menu.Item>
-              </NavLink>
-              {session.isLoggedIn() && (
-                <Modal
-                  actions={[
-                    'Cancel',
-                    {
-                      content: 'Log Out',
-                      key: 'done',
-                      negative: true,
-                      onClick: this.logout,
-                    },
-                  ]}
-                  centered
-                  content="Are you sure you want to log out?"
-                  header={
-                    <Header
-                      content="Confirm Log Out"
-                      icon="sign-out"
-                    />
-                  }
-                  size="mini"
-                  trigger={
-                    <Menu.Item>
-                      <Icon name="sign-out" />
-                      Log Out
-                    </Menu.Item>
-                  }
-                />
-              )}
-            </Menu>
-          </Sidebar>
-          <Sidebar.Pusher className="app-content">
-            <div className="app-content-body">
-              <AppContext.Provider
-                // eslint-disable-next-line no-warning-comments
-                // TODO: needs useMemo, but class component. yolo for now.
-                // eslint-disable-next-line react/jsx-no-constructed-context-values
-                value={{ options: applicationOptions, state: applicationState }}
-              >
-                {isAgent ? (
-                  <Switch>
-                    <Route
-                      path={`${urlBase}/system/:tab?`}
-                      render={(props) =>
-                        this.withTokenCheck(
-                          <System
-                            {...props}
-                            options={applicationOptions}
-                            state={applicationState}
-                          />,
-                        )
-                      }
-                    />
-                    <Redirect
-                      from="*"
-                      to={`${urlBase}/system`}
-                    />
-                  </Switch>
-                ) : (
-                  <Switch>
-                    <Route
-                      path={`${urlBase}/dashboard`}
-                      render={(props) =>
-                        this.withTokenCheck(
-                          <div className="view">
-                            <Dashboard
-                              server={applicationState.server}
-                              {...props}
-                            />
-                          </div>,
-                        )
-                      }
-                    />
-                    <Route
-                      path={`${urlBase}/searches/:id?`}
-                      render={(props) =>
-                        this.withTokenCheck(
-                          <div className="view">
-                            <Searches
-                              server={applicationState.server}
-                              {...props}
-                            />
-                          </div>,
-                        )
-                      }
-                    />
-                    <Route
-                      // the username is in the route, so a user's files can be
-                      // linked to -- from a search result, or from anywhere
-                      // else holding a name. optional, because the page is
-                      // also reached from the menu with nobody in mind yet
-                      path={`${urlBase}/browse/:username?`}
-                      render={(props) =>
-                        this.withTokenCheck(<Browse {...props} />)
-                      }
-                    />
-                    <Route
-                      // the username is in the route, so a user can be linked
-                      // to -- from the User column of either table, or from
-                      // anywhere else. optional, because the page is also
-                      // reached from the menu with nobody in mind yet
-                      path={`${urlBase}/users/:username?`}
-                      render={(props) =>
-                        this.withTokenCheck(<Users {...props} />)
-                      }
-                    />
-                    <Route
-                      path={`${urlBase}/chat`}
-                      render={(props) =>
-                        this.withTokenCheck(
-                          <Chat
-                            {...props}
-                            state={applicationState}
-                          />,
-                        )
-                      }
-                    />
-                    <Route
-                      path={`${urlBase}/rooms`}
-                      render={(props) =>
-                        this.withTokenCheck(<Rooms {...props} />)
-                      }
-                    />
-                    <Route
-                      path={`${urlBase}/uploads`}
-                      render={(props) =>
-                        this.withTokenCheck(
-                          <div className="view">
-                            <Transfers
-                              {...props}
-                              direction="upload"
-                            />
-                          </div>,
-                        )
-                      }
-                    />
-                    <Route
-                      path={`${urlBase}/shared`}
-                      render={(props) =>
-                        this.withTokenCheck(
-                          <div className="view">
-                            <ShareLinks {...props} />
-                          </div>,
-                        )
-                      }
-                    />
-                    <Route
-                      path={`${urlBase}/downloads`}
-                      render={(props) =>
-                        this.withTokenCheck(
-                          <div className="view">
-                            <Transfers
-                              {...props}
-                              direction="download"
-                              server={applicationState.server}
-                            />
-                          </div>,
-                        )
-                      }
-                    />
-                    <Route
-                      path={`${urlBase}/system/:tab?`}
-                      render={(props) =>
-                        this.withTokenCheck(
-                          <System
-                            {...props}
-                            options={applicationOptions}
-                            state={applicationState}
-                            theme={theme}
-                          />,
-                        )
-                      }
-                    />
-                    <Redirect
-                      from="*"
-                      to={`${urlBase}/dashboard`}
-                    />
-                  </Switch>
+                      </Link>
+                    </Icon.Group>
+                    Pending Action
+                  </Menu.Item>
                 )}
-              </AppContext.Provider>
-            </div>
-          </Sidebar.Pusher>
-        </Sidebar.Pushable>
-        {isStandaloneIos() && <TopBar onNavigate={this.handleNavClose} />}
-        <MobileNav
-          agent={isAgent}
-          alert={navAlertOf({
-            clientUpdate,
-            isAgent,
-            isUpdateAvailable,
-            pendingReconnect,
-            pendingRestart,
-            pendingShareRescan,
-            server,
-          })}
-          onClose={this.handleNavClose}
-          onToggle={this.handleNavToggle}
-          open={navOpen}
-          unread={applicationState.conversations}
-        />
-        <PlayerBar />
-        <AppFooter
-          server={server}
-          transferMetrics={transferMetrics}
-          user={user}
-          version={version}
-        />
-        <ToastContainer
-          autoClose={5_000}
-          closeOnClick
-          draggable={false}
-          hideProgressBar={false}
-          newestOnTop
-          pauseOnFocusLoss
-          pauseOnHover
-          position="bottom-center"
-          rtl={false}
-        />
+                {isUpdateAvailable && (
+                  <Modal
+                    centered
+                    closeIcon
+                    size="mini"
+                    trigger={
+                      <Menu.Item position="right">
+                        <Icon.Group className="menu-icon-group">
+                          <Icon
+                            color="yellow"
+                            name="bullhorn"
+                          />
+                        </Icon.Group>
+                        New Version!
+                      </Menu.Item>
+                    }
+                  >
+                    <Modal.Header>New Version!</Modal.Header>
+                    <Modal.Content>
+                      <p>
+                        You are currently running version{' '}
+                        <strong>{current}</strong> while version{' '}
+                        <strong>{latest}</strong> is available.
+                      </p>
+                    </Modal.Content>
+                    <Modal.Actions>
+                      <Button
+                        fluid
+                        href="https://github.com/slskd/slskd/releases"
+                        primary
+                        style={{ marginLeft: 0 }}
+                      >
+                        See Release Notes
+                      </Button>
+                    </Modal.Actions>
+                  </Modal>
+                )}
+                {clientUpdate && (
+                  <Menu.Item
+                    onClick={applyUpdate}
+                    title="A new version has been deployed; load it"
+                  >
+                    <Icon
+                      color="green"
+                      name="arrow alternate circle up"
+                    />
+                    Update
+                  </Menu.Item>
+                )}
+                <NavLink to={`${urlBase}/system`}>
+                  <Menu.Item>
+                    <Icon name="cogs" />
+                    System
+                  </Menu.Item>
+                </NavLink>
+                {session.isLoggedIn() && (
+                  <Modal
+                    actions={[
+                      'Cancel',
+                      {
+                        content: 'Log Out',
+                        key: 'done',
+                        negative: true,
+                        onClick: this.logout,
+                      },
+                    ]}
+                    centered
+                    content="Are you sure you want to log out?"
+                    header={
+                      <Header
+                        content="Confirm Log Out"
+                        icon="sign-out"
+                      />
+                    }
+                    size="mini"
+                    trigger={
+                      <Menu.Item>
+                        <Icon name="sign-out" />
+                        Log Out
+                      </Menu.Item>
+                    }
+                  />
+                )}
+              </Menu>
+            </Sidebar>
+            <Sidebar.Pusher className="app-content">
+              <div className="app-content-body">
+                <AppContext.Provider
+                  // eslint-disable-next-line no-warning-comments
+                  // TODO: needs useMemo, but class component. yolo for now.
+                  // eslint-disable-next-line react/jsx-no-constructed-context-values
+                  value={{
+                    options: applicationOptions,
+                    state: applicationState,
+                  }}
+                >
+                  {isAgent ? (
+                    <Switch>
+                      <Route
+                        path={`${urlBase}/system/:tab?`}
+                        render={(props) =>
+                          this.withTokenCheck(
+                            <System
+                              {...props}
+                              options={applicationOptions}
+                              state={applicationState}
+                            />,
+                          )
+                        }
+                      />
+                      <Redirect
+                        from="*"
+                        to={`${urlBase}/system`}
+                      />
+                    </Switch>
+                  ) : (
+                    <Switch>
+                      <Route
+                        path={`${urlBase}/dashboard`}
+                        render={(props) =>
+                          this.withTokenCheck(
+                            <div className="view">
+                              <Dashboard
+                                server={applicationState.server}
+                                {...props}
+                              />
+                            </div>,
+                          )
+                        }
+                      />
+                      <Route
+                        path={`${urlBase}/searches/:id?`}
+                        render={(props) =>
+                          this.withTokenCheck(
+                            <div className="view">
+                              <Searches
+                                server={applicationState.server}
+                                {...props}
+                              />
+                            </div>,
+                          )
+                        }
+                      />
+                      <Route
+                        // the username is in the route, so a user's files can be
+                        // linked to -- from a search result, or from anywhere
+                        // else holding a name. optional, because the page is
+                        // also reached from the menu with nobody in mind yet
+                        path={`${urlBase}/browse/:username?`}
+                        render={(props) =>
+                          this.withTokenCheck(<Browse {...props} />)
+                        }
+                      />
+                      <Route
+                        // the username is in the route, so a user can be linked
+                        // to -- from the User column of either table, or from
+                        // anywhere else. optional, because the page is also
+                        // reached from the menu with nobody in mind yet
+                        path={`${urlBase}/users/:username?`}
+                        render={(props) =>
+                          this.withTokenCheck(<Users {...props} />)
+                        }
+                      />
+                      <Route
+                        path={`${urlBase}/chat`}
+                        render={(props) =>
+                          this.withTokenCheck(
+                            <Chat
+                              {...props}
+                              state={applicationState}
+                            />,
+                          )
+                        }
+                      />
+                      <Route
+                        path={`${urlBase}/rooms`}
+                        render={(props) =>
+                          this.withTokenCheck(<Rooms {...props} />)
+                        }
+                      />
+                      <Route
+                        path={`${urlBase}/uploads`}
+                        render={(props) =>
+                          this.withTokenCheck(
+                            <div className="view">
+                              <Transfers
+                                {...props}
+                                direction="upload"
+                              />
+                            </div>,
+                          )
+                        }
+                      />
+                      <Route
+                        path={`${urlBase}/shared`}
+                        render={(props) =>
+                          this.withTokenCheck(
+                            <div className="view">
+                              <ShareLinks {...props} />
+                            </div>,
+                          )
+                        }
+                      />
+                      <Route
+                        path={`${urlBase}/downloads`}
+                        render={(props) =>
+                          this.withTokenCheck(
+                            <div className="view">
+                              <Transfers
+                                {...props}
+                                direction="download"
+                                server={applicationState.server}
+                              />
+                            </div>,
+                          )
+                        }
+                      />
+                      <Route
+                        path={`${urlBase}/system/:tab?`}
+                        render={(props) =>
+                          this.withTokenCheck(
+                            <System
+                              {...props}
+                              options={applicationOptions}
+                              state={applicationState}
+                              theme={theme}
+                            />,
+                          )
+                        }
+                      />
+                      <Redirect
+                        from="*"
+                        to={`${urlBase}/dashboard`}
+                      />
+                    </Switch>
+                  )}
+                </AppContext.Provider>
+              </div>
+            </Sidebar.Pusher>
+          </Sidebar.Pushable>
+          {isStandaloneIos() && <TopBar onNavigate={this.handleNavClose} />}
+          <MobileNav
+            agent={isAgent}
+            alert={navAlertOf({
+              clientUpdate,
+              isAgent,
+              isUpdateAvailable,
+              pendingReconnect,
+              pendingRestart,
+              pendingShareRescan,
+              server,
+            })}
+            onClose={this.handleNavClose}
+            onToggle={this.handleNavToggle}
+            open={navOpen}
+          />
+          <PlayerBar />
+          <AppFooter
+            server={server}
+            transferMetrics={transferMetrics}
+            user={user}
+            version={version}
+          />
+          <ToastContainer
+            autoClose={5_000}
+            closeOnClick
+            draggable={false}
+            hideProgressBar={false}
+            newestOnTop
+            pauseOnFocusLoss
+            pauseOnHover
+            position="bottom-center"
+            rtl={false}
+          />
+        </ChatUnreadProvider>
       </PlayerProvider>
     );
   }
