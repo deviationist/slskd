@@ -142,11 +142,6 @@ public record Notification
     public NotificationPriority Priority { get; init; } = NotificationPriority.Default;
 
     /// <summary>
-    ///     Gets short words for a channel that shows them as tags or emoji.
-    /// </summary>
-    public IReadOnlyList<string> Tags { get; init; } = [];
-
-    /// <summary>
     ///     Gets the address to mail, when it is not the configured one: a watch's own.
     /// </summary>
     public string MailTo { get; init; }

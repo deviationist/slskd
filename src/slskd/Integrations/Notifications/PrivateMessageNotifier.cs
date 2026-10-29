@@ -186,7 +186,6 @@ public class PrivateMessageNotifier
             Title = unread == 1 ? $"Message from {username}" : $"{unread} messages from {username}",
             Text = preview,
             Url = string.IsNullOrWhiteSpace(baseUrl) ? null : $"{baseUrl.TrimEnd('/')}/chat",
-            Tags = ["speech_balloon"],
         };
     }
 

@@ -701,7 +701,6 @@ public class WatchService
                 ? $"{files.Count} new result{(files.Count == 1 ? string.Empty : "s")}; {enqueued} queued for download"
                 : $"{files.Count} new result{(files.Count == 1 ? string.Empty : "s")}",
             Url = string.IsNullOrWhiteSpace(options.BaseUrl) ? null : $"{options.BaseUrl.TrimEnd('/')}/searches/{watch.SearchId}",
-            Tags = ["mag"],
             MailTo = watch.NotifyEmail,
             MailText = composed.Text,
             MailHtml = composed.Html,

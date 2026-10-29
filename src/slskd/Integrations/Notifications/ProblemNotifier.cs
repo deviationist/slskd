@@ -116,7 +116,6 @@ public class ProblemNotifier
                         Title = "slskd lost its Soulseek connection",
                         Text = $"Not logged in for {(int)(now - DownSince.Value).TotalMinutes} minutes, and still trying to reconnect.",
                         Priority = NotificationPriority.High,
-                        Tags = ["warning"],
                     };
                 }
             }
@@ -130,7 +129,6 @@ public class ProblemNotifier
                         Title = "slskd is back on Soulseek",
                         Text = $"Logged in again after {(int)(now - DownSince.Value).TotalMinutes} minutes.",
                         Priority = NotificationPriority.Low,
-                        Tags = ["white_check_mark"],
                     };
                 }
 
@@ -146,7 +144,6 @@ public class ProblemNotifier
                     Title = "slskd's share scan failed",
                     Text = "The shares could not be scanned. Peers see what was shared before; the log says why.",
                     Priority = NotificationPriority.High,
-                    Tags = ["warning"],
                 };
             }
 

@@ -104,7 +104,6 @@ public class NtfyNotificationChannel : INotificationChannel
             title = notification.Title,
             message = notification.Text,
             priority = PriorityOf(notification.Priority),
-            tags = notification.Tags?.ToArray() ?? [],
             click = string.IsNullOrWhiteSpace(notification.Url) ? null : notification.Url,
         };
 

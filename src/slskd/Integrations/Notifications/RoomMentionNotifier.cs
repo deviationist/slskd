@@ -144,7 +144,6 @@ public class RoomMentionNotifier
                 Title = $"{message.Username} mentioned you in {room}",
                 Text = preview.Length > MaximumPreview ? preview[..MaximumPreview] + "…" : preview,
                 Url = string.IsNullOrWhiteSpace(baseUrl) ? null : $"{baseUrl.TrimEnd('/')}/rooms",
-                Tags = ["loudspeaker"],
             });
         }
         catch (Exception ex)
