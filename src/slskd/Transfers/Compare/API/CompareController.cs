@@ -186,7 +186,15 @@ public class CompareController : ControllerBase
             return NotFound();
         }
 
-        var ids = (request.Ids ?? []).Distinct().ToList();
+        // a body that did not bind -- not JSON, or ids that are not a list of ids -- arrives as null rather than as a
+        // model error, and dereferencing it answered 500. it is the caller's mistake, so it is a 400, in words that
+        // say what was wanted rather than what the parser choked on
+        if (request?.Ids is null)
+        {
+            return BadRequest("Send the downloads to compare as { \"ids\": [ ... ] }");
+        }
+
+        var ids = request.Ids.Distinct().ToList();
 
         if (!Provider.Enabled)
         {

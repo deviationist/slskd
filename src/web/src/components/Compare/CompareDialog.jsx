@@ -215,7 +215,7 @@ const CompareDialog = ({ onClose, picks }) => {
         {answer.state === 'ready' && (
           <CompareAnswer
             document={answer.compare}
-            picks={picks}
+            picks={compareLibrary.rowsOf(answer.ids, picks)}
           />
         )}
         {STATE_MESSAGES[answer.state] && (

@@ -5,6 +5,7 @@ import {
   isComparable,
   isEnabled,
   MAXIMUM_FILES,
+  rowsOf,
 } from './compare';
 
 const done = (name, extra = {}) => ({
@@ -158,5 +159,26 @@ describe('clock', () => {
     expect(clock(61.4)).toBe('1:01');
     expect(clock(null)).toBe('');
     expect(clock(0)).toBe('');
+  });
+});
+
+describe('rowsOf', () => {
+  const picks = [done('a.flac'), done('b.flac'), done('c.flac')];
+
+  it('follows the order the server answered in, not the order sent', () => {
+    expect(rowsOf(['c.flac', 'a.flac'], picks).map((row) => row.id)).toEqual([
+      'c.flac',
+      'a.flac',
+    ]);
+  });
+
+  it('drops what the server did not compare, so no index lands on the wrong row', () => {
+    expect(rowsOf(['a.flac', 'missing'], picks).map((row) => row.id)).toEqual([
+      'a.flac',
+    ]);
+  });
+
+  it('falls back to the rows sent when the answer carries no ids', () => {
+    expect(rowsOf(undefined, picks)).toBe(picks);
   });
 });
