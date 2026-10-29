@@ -41,9 +41,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
-using slskd.Integrations.Mail;
 using slskd.Transfers;
 using ISoulseekClient = Soulseek.ISoulseekClient;
+using Notifying = slskd.Integrations.Notifications;
 using SearchOptions = Soulseek.SearchOptions;
 using SearchQuery = Soulseek.SearchQuery;
 using SearchScope = Soulseek.SearchScope;
@@ -63,14 +63,14 @@ public class WatchService
         TransferService transferService,
         IDbContextFactory<SearchDbContext> contextFactory,
         ISoulseekClient soulseekClient,
-        MailService mailService,
+        Notifying.NotificationService notificationService,
         IOptionsMonitor<Options> optionsMonitor)
     {
         Searches = searchService;
         Transfers = transferService;
         ContextFactory = contextFactory;
         Client = soulseekClient;
-        Mail = mailService;
+        Notifications = notificationService;
         OptionsMonitor = optionsMonitor;
 
         Clock.EveryMinute += (_, _) => _ = RunDueAsync();
@@ -80,7 +80,7 @@ public class WatchService
     private TransferService Transfers { get; }
     private IDbContextFactory<SearchDbContext> ContextFactory { get; }
     private ISoulseekClient Client { get; }
-    private MailService Mail { get; }
+    private Notifying.NotificationService Notifications { get; }
     private IOptionsMonitor<Options> OptionsMonitor { get; }
     private ILogger Log { get; } = Serilog.Log.ForContext<WatchService>();
 
@@ -691,27 +691,36 @@ public class WatchService
 
         var subject = composed.Subject;
 
-        var mail = new Mail
+        // the mail is what it always was -- the table, the per-watch address -- and every other channel gets a line:
+        // a push cannot carry a table, and what the operator needs from one is that there is something to look at
+        var notification = new Notifying.Notification
         {
-            To = watch.NotifyEmail,
-            Subject = subject,
-            Text = composed.Text,
-            Html = composed.Html,
+            Event = Notifying.NotificationEvent.WatchResults,
+            Title = subject,
+            Text = enqueued > 0
+                ? $"{files.Count} new result{(files.Count == 1 ? string.Empty : "s")}; {enqueued} queued for download"
+                : $"{files.Count} new result{(files.Count == 1 ? string.Empty : "s")}",
+            Url = string.IsNullOrWhiteSpace(options.BaseUrl) ? null : $"{options.BaseUrl.TrimEnd('/')}/searches/{watch.SearchId}",
+            Tags = ["mag"],
+            MailTo = watch.NotifyEmail,
+            MailText = composed.Text,
+            MailHtml = composed.Html,
         };
 
-        string adapter = null;
-        string error = null;
+        // never throws: each channel's outcome comes back, and a watch whose notifications have been failing for a
+        // month says so on its own page, from what is recorded here
+        var results = await Notifications.NotifyAsync(notification);
+        var sent = results.Where(r => r.Sent).Select(r => r.Channel).ToList();
+        var failed = results.Where(r => !r.Sent).Select(r => $"{r.Channel}: {r.Error}").ToList();
 
-        try
+        string adapter = sent.Count > 0 ? string.Join(", ", sent) : null;
+        string error = results.Count == 0
+            ? "No notification channel is enabled for watch results"
+            : failed.Count > 0 ? string.Join("; ", failed) : null;
+
+        if (sent.Count == 0)
         {
-            adapter = await Mail.SendAsync(mail);
-        }
-        catch (Exception ex)
-        {
-            // recorded rather than thrown: a watch whose mail has been failing for a month should say so on its own
-            // page, and a send that failed must not lose the run that produced it
-            error = ex.Message;
-            Log.Error(ex, "Failed to notify for watch on search {SearchId}: {Message}", watch.SearchId, ex.Message);
+            Log.Error("Failed to notify for watch on search {SearchId}: {Message}", watch.SearchId, error);
         }
 
         using var context = ContextFactory.CreateDbContext();
@@ -724,7 +733,7 @@ public class WatchService
             Subject = subject,
             FileCount = files.Count,
             FilesJson = JsonSerializer.Serialize(files.Take(MaximumFilesRecorded), RecordedFileOptions),
-            Sent = error is null,
+            Sent = sent.Count > 0,
             Error = error,
         });
 

@@ -2964,6 +2964,12 @@ namespace slskd
             public MailOptions Mail { get; init; } = new MailOptions();
 
             /// <summary>
+            ///     Gets notification options.
+            /// </summary>
+            [Validate]
+            public NotificationsOptions Notifications { get; init; } = new NotificationsOptions();
+
+            /// <summary>
             ///     VPN options.
             /// </summary>
             public class VpnOptions : IValidatableObject
@@ -3679,6 +3685,152 @@ namespace slskd
                     [Description("path to a sendmail-compatible binary")]
                     public string Path { get; init; } = "/usr/sbin/sendmail";
                 }
+            }
+
+            /// <summary>
+            ///     Notification options: telling the operator something -- a chat message, watch results, a problem -- on
+            ///     the channels they choose, per event.
+            /// </summary>
+            public class NotificationsOptions
+            {
+                /// <summary>
+                ///     The channels a notification can be sent on.
+                /// </summary>
+                public static readonly string[] Channels = ["mail", "ntfy"];
+
+                /// <summary>
+                ///     Gets the ntfy channel. Mail needs nothing here: it sends through <c>integrations.mail</c> when
+                ///     that is enabled.
+                /// </summary>
+                [Validate]
+                public NtfyOptions Ntfy { get; init; } = new NtfyOptions();
+
+                /// <summary>
+                ///     Gets what to notify about, and where.
+                /// </summary>
+                [Validate]
+                public NotificationEventsOptions Events { get; init; } = new NotificationEventsOptions();
+            }
+
+            /// <summary>
+            ///     An ntfy server and topic to publish to.
+            /// </summary>
+            public class NtfyOptions : IValidatableObject
+            {
+                private static readonly System.Text.RegularExpressions.Regex TopicPattern = new("^[A-Za-z0-9_-]{1,64}$");
+
+                /// <summary>
+                ///     Gets the server's base URL, e.g. https://ntfy.sh. Empty turns the channel off.
+                /// </summary>
+                public string Url { get; init; } = null;
+
+                /// <summary>
+                ///     Gets the topic to publish to.
+                /// </summary>
+                public string Topic { get; init; } = null;
+
+                /// <summary>
+                ///     Gets the access token, for a server that requires one.
+                /// </summary>
+                [Secret]
+                public string Token { get; init; } = null;
+
+                /// <summary>
+                ///     Gets a value indicating whether the channel is configured.
+                /// </summary>
+                public bool Configured => !string.IsNullOrWhiteSpace(Url) && !string.IsNullOrWhiteSpace(Topic);
+
+                public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+                {
+                    if (string.IsNullOrWhiteSpace(Url) && string.IsNullOrWhiteSpace(Topic))
+                    {
+                        yield break;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(Url)
+                        || (!Url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && !Url.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        yield return new ValidationResult($"The {nameof(Url)} field must contain a fully qualified URL, including protocol (e.g. https://)");
+                    }
+
+                    if (string.IsNullOrWhiteSpace(Topic) || !TopicPattern.IsMatch(Topic))
+                    {
+                        yield return new ValidationResult($"The {nameof(Topic)} field must be 1 to 64 letters, digits, '-' or '_'");
+                    }
+                }
+            }
+
+            /// <summary>
+            ///     What to notify about. Every event is off unless enabled, except watch results, which are on so that
+            ///     existing watches keep mailing as they did before this existed.
+            /// </summary>
+            public class NotificationEventsOptions
+            {
+                [Validate]
+                public PrivateMessageNotificationOptions PrivateMessage { get; init; } = new PrivateMessageNotificationOptions();
+
+                [Validate]
+                public NotificationEventOptions RoomMention { get; init; } = new NotificationEventOptions();
+
+                [Validate]
+                public NotificationEventOptions WatchResults { get; init; } = new NotificationEventOptions { Enabled = true };
+
+                [Validate]
+                public ConnectionLostNotificationOptions ConnectionLost { get; init; } = new ConnectionLostNotificationOptions();
+
+                [Validate]
+                public NotificationEventOptions ShareScanFailed { get; init; } = new NotificationEventOptions();
+            }
+
+            /// <summary>
+            ///     One event: whether to notify about it, and on which channels.
+            /// </summary>
+            public class NotificationEventOptions : IValidatableObject
+            {
+                /// <summary>
+                ///     Gets a value indicating whether to notify about this event.
+                /// </summary>
+                public bool Enabled { get; init; } = false;
+
+                /// <summary>
+                ///     Gets the channels to notify on. None named means every channel that is enabled.
+                /// </summary>
+                public string[] Channels { get; init; } = [];
+
+                public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+                {
+                    foreach (var channel in Channels ?? [])
+                    {
+                        if (!NotificationsOptions.Channels.Contains(channel, StringComparer.OrdinalIgnoreCase))
+                        {
+                            yield return new ValidationResult($"'{channel}' is not a notification channel; the channels are {string.Join(", ", NotificationsOptions.Channels)}");
+                        }
+                    }
+                }
+            }
+
+            /// <summary>
+            ///     Private messages, which are notified only once they have gone unread for a while.
+            /// </summary>
+            public class PrivateMessageNotificationOptions : NotificationEventOptions
+            {
+                /// <summary>
+                ///     Gets how long, in seconds, a message must stay unread before it is notified.
+                /// </summary>
+                [Range(0, 86400)]
+                public int Delay { get; init; } = 60;
+            }
+
+            /// <summary>
+            ///     The Soulseek connection, which is notified only once it has been down for a while.
+            /// </summary>
+            public class ConnectionLostNotificationOptions : NotificationEventOptions
+            {
+                /// <summary>
+                ///     Gets how long, in minutes, the connection must be down before it is notified.
+                /// </summary>
+                [Range(1, 1440)]
+                public int After { get; init; } = 10;
             }
         }
     }

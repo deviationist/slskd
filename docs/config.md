@@ -1361,8 +1361,9 @@ searches:
 
 # Search Watches
 
-A **watch** turns a one-off search into a standing one: slskd re-runs it on a schedule and sends mail when a file
-appears that it has not reported before.  It exists for the rare track whose only holder is offline when you look.
+A **watch** turns a one-off search into a standing one: slskd re-runs it on a schedule and notifies you when a file
+appears that it has not reported before -- by mail, and on any other channel `watch_results` is routed to (see
+[Notifications](#notifications)).  It exists for the rare track whose only holder is offline when you look.
 
 A watch re-runs its search **in place** — same row, same id, same url.  That is not incidental: the set of files it
 has already reported is keyed on the search's id, so a run that created a new row would reset the memory every time.
@@ -1495,6 +1496,58 @@ integrations:
       api_key: ~
     sendmail:
       path: /usr/sbin/sendmail
+```
+
+## Notifications
+
+Notifications tell the operator something on the channels they choose: a private message gone unread, new results for a search watch, a
+mention in a room, or a problem. Each event is switched on and routed on its own. Two channels exist:
+
+* **`mail`**, through the [mail](#mail) settings above. It is on whenever mail is.
+* **`ntfy`**, a push to a phone or desktop through an [ntfy](https://ntfy.sh) server: `ntfy.sh` or one of your own. It is on when it has a
+  URL and a topic; a server that requires sign-in takes an access token with write access to the topic.
+
+An event's `channels` names the channels it goes to; an event that names none goes to every enabled channel.
+
+| Event | Notifies | Off by default? |
+| ----- | -------- | --------------- |
+| `private_message` | A private message still unread `delay` seconds after it arrived, at most once per conversation until it is read. Nothing is sent while you are in the conversation, since the Chat page reads it as it arrives. What was already unread when slskd started is not notified again when the server replays it | yes |
+| `room_mention` | A message in a joined room that names your username as a word of its own, at most once per room every 10 minutes | yes |
+| `watch_results` | A search watch's new results: the full table by mail, as before, and a line on other channels | no, so existing watches keep mailing |
+| `connection_lost` | The Soulseek connection down for `after` minutes while slskd is trying to reconnect, and again when it is back. A disconnect you asked for is not notified | yes |
+| `share_scan_failed` | A share scan that failed | yes |
+
+Links in a notification use `integrations.mail.base_url`, the address the UI is reached at; without it a notification says what happened
+but cannot link to it. `POST /api/v0/notifications/test`, with `{ "channel": "ntfy" }` or an empty body for every enabled channel, sends a
+test notification, so a configuration can be checked without waiting for something to happen.
+
+Pushbullet (`integrations.pushbullet`, below under system-defined integrations) is separate: it notifies private messages and room
+mentions on its own and knows nothing of these settings. With both configured, a message notifies on both.
+
+#### **YAML**
+```yaml
+integrations:
+  notifications:
+    ntfy:
+      url: https://ntfy.sh
+      topic: my-slskd
+      token: ~ # an access token, for a server that requires one
+    events:
+      private_message:
+        enabled: true
+        channels: [ntfy]
+        delay: 60 # seconds a message must stay unread
+      room_mention:
+        enabled: true
+        channels: [ntfy]
+      watch_results:
+        enabled: true
+        channels: [] # every enabled channel
+      connection_lost:
+        enabled: true
+        after: 10 # minutes
+      share_scan_failed:
+        enabled: true
 ```
 
 ## User-Defined
