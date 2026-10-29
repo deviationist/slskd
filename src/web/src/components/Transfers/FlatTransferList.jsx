@@ -285,8 +285,8 @@ const SelectionActions = ({
        * A Button.Group with the same dividers the card view uses, not
        * loose buttons. Three reasons, and the third is the one that
        * settles it: the actions read as one control rather than three;
-       * the two views look like the same page; and the ingress button
-       * media-bridge injects looks for a `.ui.buttons` to append itself
+       * the two views look like the same page; and an injected
+       * button can look for a `.ui.buttons` to append itself
        * to, with an `.or` before it.
        */}
       <Button.Group size="tiny">
@@ -484,8 +484,8 @@ const FlatTransferList = ({
 
   /*
    * Rows are measured, not assumed. Every row of ours is ROW_H tall, so the
-   * estimate is right and measuring moves nothing -- but media-bridge opens an
-   * analysis panel *inside* a row, making that one row hundreds of pixels
+   * estimate is right and measuring moves nothing -- but an injected script may
+   * open a panel *inside* a row, making that one row hundreds of pixels
    * taller. Positioned by arithmetic, the rows below it sat that far from where
    * the virtualiser thought, and the panel's row left the window early and came
    * back late. Keyed by the row rather than its index, so a measured height
@@ -527,7 +527,7 @@ const FlatTransferList = ({
   /*
    * Selects everything that came from a row's search, in place of the
    * selection there was. The point is the cleanup after auditioning: of the
-   * three candidates a search produced, the keeper goes to ingress and the
+   * three candidates a search produced, the keeper is kept and the
    * rest go -- and they are scattered through the list by any sort that is not
    * on the Search column, which is most of them. Replacing rather than adding
    * is what makes the Remove that follows safe: a selection that silently kept
@@ -939,8 +939,8 @@ const FlatTransferList = ({
                 <Table.Row
                   as={MeasuredRow}
                   /*
-                   * The row's identity, for the scripts media-bridge injects
-                   * into this page. They used to read the peer and the folder
+                   * The row's identity, for scripts injected into this
+                   * page. They used to read the peer and the folder
                    * out of the cells, which stopped being safe the moment a
                    * column could be hidden -- hide User and the play button
                    * attaches to a file it cannot name.
@@ -951,8 +951,8 @@ const FlatTransferList = ({
                   data-id={row.id}
                   data-index={virtual.index}
                   /*
-                   * The state too, for the same reason: media-bridge decides
-                   * from it whether a row can be sent into the ingress chain,
+                   * The state too, for the same reason: an injected script can
+                   * decide from it what a row offers,
                    * and reading it from the Progress cell would make that
                    * depend on a column the operator can switch off.
                    */

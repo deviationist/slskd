@@ -40,7 +40,7 @@ using System.Collections.Generic;
 /// </summary>
 /// <remarks>
 ///     Pure functions, kept apart from the process calls so they can be tested without ffmpeg. Each one is a rule
-///     media-bridge's <c>preview.py</c> learned in production.
+///     learned in production.
 /// </remarks>
 public static class Waveform
 {

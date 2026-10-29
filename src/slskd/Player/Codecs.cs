@@ -50,7 +50,7 @@ public record Codec(string Name, string Suffix, string ContentType, IReadOnlyLis
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Ported from media-bridge's <c>preview.py</c>, where each choice was measured. Most finished downloads here
+///         Each choice was measured. Many finished downloads
 ///         are AIFF, which Chrome and Firefox do not play, so the file is transcoded rather than served.
 ///     </para>
 ///     <para>

@@ -58,8 +58,7 @@ import {
  * differently shifts the list under the pointer as it is measured. A wrapped
  * filename would do that to every two-line row -- so the column truncates
  * instead, with the full remote path in the cell's title where it was already.
- * The one row allowed to differ is the one media-bridge opens an analysis
- * panel in, and that was asked for.
+ * The one row allowed to differ is one an injected script opens a panel in.
  *
  * Must match `.flatlist tbody td` in App.css. Changing one without the other
  * is a drift the eye catches only at the bottom of a long list.
@@ -322,8 +321,8 @@ const FlatFileList = ({
 
   /*
    * Rows are measured, not assumed. Every row of ours is ROW_H tall, so the
-   * estimate is right and measuring moves nothing -- but media-bridge opens an
-   * analysis panel *inside* a row, making that one row hundreds of pixels
+   * estimate is right and measuring moves nothing -- but an injected script may
+   * open a panel *inside* a row, making that one row hundreds of pixels
    * taller. Positioned by arithmetic, the rows below it sat that far from where
    * the virtualiser thought, and the panel's row left the window early and came
    * back late. Keyed by the row rather than its index, so a measured height
@@ -680,8 +679,8 @@ const FlatFileList = ({
                   active={mark?.row === 'active'}
                   as={MeasuredRow}
                   /*
-                   * The row's identity, for the scripts media-bridge injects
-                   * into this page. They used to read the peer and the folder
+                   * The row's identity, for scripts injected into this
+                   * page. They used to read the peer and the folder
                    * out of the cells, which stopped being safe the moment a
                    * column could be hidden -- hide User and the play button
                    * attaches to a file it cannot name.
@@ -713,7 +712,7 @@ const FlatFileList = ({
                       title={row.filename}
                     >
                       {/*
-                       * An inner element, and media-bridge injects its play
+                       * An inner element, and an injected script puts its play
                        * button and quality badge into *this* rather than into
                        * the cell. The layout has to be flex so the filename is
                        * the only thing that shrinks -- and a `<td>` that is not

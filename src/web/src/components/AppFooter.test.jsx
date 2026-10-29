@@ -2,7 +2,7 @@ import { shortVersion } from './AppFooter';
 
 describe('shortVersion', () => {
   it('keeps the release and drops the build and its suffix', () => {
-    expect(shortVersion('0.26.2.65534-homelab')).toBe('0.26.2');
+    expect(shortVersion('0.26.2.65534-fork')).toBe('0.26.2');
     expect(shortVersion('0.26.2')).toBe('0.26.2');
   });
 

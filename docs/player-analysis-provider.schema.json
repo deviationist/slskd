@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/deviationist/slskd/docs/player-analysis-provider.schema.json",
-  "$comment": "The analysis contract, v1. Kept identically in slskd (docs/player-analysis-provider.schema.json) and media-bridge (contracts/analysis-v1.schema.json); each repo's tests hold its side to its copy. Change both, and bump `contract` only for a change a caller cannot ignore. Unknown fields are allowed everywhere so a provider can add more without coordinating.",
+  "$comment": "The analysis contract, v1. A provider can validate its responses against this file. Bump `contract` only for a change a caller cannot ignore. Unknown fields are allowed everywhere so a provider can add more without coordinating.",
   "title": "Analysis provider response",
   "type": "object",
   "required": ["contract", "provider", "verdict", "summary", "findings", "lanes"],

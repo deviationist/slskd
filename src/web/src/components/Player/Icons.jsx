@@ -1,8 +1,7 @@
 import React from 'react';
 
 /*
- * Line icons, drawn rather than typed. Twin: media-bridge
- * web/app/src/components/icons.tsx.
+ * Line icons, drawn rather than typed.
  *
  * Characters such as ▶ and ❚❚ sit where their font puts them: on iOS the bars
  * rode high in the circle while the triangle looked centred. Drawn, they are
@@ -10,8 +9,7 @@ import React from 'react';
  *
  * Drawn at even sizes only, in even buttons: an odd glyph in an even box
  * centres on a half pixel and smears every edge across two device pixels,
- * which reads as off-centre and soft at once (media-bridge's
- * tests/perf/icon-probe.mjs measures the same rule there).
+ * which reads as off-centre and soft at once.
  */
 
 const Stroked = ({ children, size }) => (
@@ -43,7 +41,7 @@ const Filled = ({ children, size }) => (
   </svg>
 );
 
-// media-bridge's triangle, as it is there. This used to be a rounded triangle
+// This used to be a rounded triangle
 // moved 2.3 left to centre its centroid; that put the centroid at 10.5, so it
 // read left of centre in every button. This one's centroid is at 11.7 and its
 // box's centre at 13.5, which is where a triangle looks centred: between the

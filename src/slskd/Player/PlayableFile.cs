@@ -71,7 +71,7 @@ public enum Unplayable
 ///     <para>
 ///         By the transfer's recorded <see cref="Transfer.LocalFilename"/>, never by a name the browser sends. That path
 ///         is where the bytes went when the file was moved into place, so nothing here reconstructs it from the peer's
-///         remote name -- which media-bridge had to, and sometimes had to walk the tree for.
+///         remote name, which would sometimes mean walking the tree to find it.
 ///     </para>
 ///     <para>
 ///         Containment is checked twice, as it is everywhere a path is opened: lexically, before the filesystem is

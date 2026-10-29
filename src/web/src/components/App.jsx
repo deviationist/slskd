@@ -296,9 +296,9 @@ class App extends Component {
     /*
       Hand the toast API to whatever else is on this page.
 
-      This instance has scripts injected into it by a reverse proxy -- the
-      ingress button and the audio preview player, which live outside this
-      repo. They cannot import from the bundle, so until now they built their
+      A deployment may inject scripts into this page through a reverse proxy,
+      and they live outside this repo. They cannot import from the bundle, so
+      until now they built their
       own nodes wearing `Toastify__toast` classes and appended them to the
       container. That imitation works and is wrong in every detail that is not
       visible in a screenshot: no progress bar, no pause on hover, its own

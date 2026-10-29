@@ -28,8 +28,7 @@ import React, {
 /*
  * One player for the whole app, and the one <audio> it plays through.
  *
- * Twin: the provider half of media-bridge web/app/src/features/plex/player.tsx,
- * keyed by transfer id rather than by a path.
+ * Keyed by transfer id rather than by a path.
  *
  * The element belongs here rather than to the bar because more than one thing
  * commands it and needs to know what it is doing -- the bar's own button, the
@@ -478,9 +477,9 @@ export const PlayerProvider = ({ children, enabled = true }) => {
     ],
   );
 
-  // the hook the scripts injected into this page use: Compare in media-bridge's
-  // slskd-ingest.js plays a copy through here rather than through a player of
-  // its own. by row, so a caller needs nothing but what the row already says
+  // the hook the scripts injected into this page use, so an injected control
+  // plays a file through here rather than through a player of its own. by
+  // row, so a caller needs nothing but what the row already says
   const apiRef = useRef(api);
   apiRef.current = api;
 

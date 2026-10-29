@@ -57,7 +57,7 @@ public record WaveformPeaks(double Duration, double[] Peaks);
 /// </summary>
 /// <remarks>
 ///     <para>
-///         A port of media-bridge's <c>preview.py</c>. Cached under <c>player.cache.directory</c>, keyed on the file's
+///         Cached under <c>player.cache.directory</c>, keyed on the file's
 ///         identity -- resolved path, size and modification time -- so a re-download under the same name is never
 ///         served a stale entry.
 ///     </para>

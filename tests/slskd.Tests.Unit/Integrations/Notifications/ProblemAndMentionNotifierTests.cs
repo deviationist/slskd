@@ -77,24 +77,24 @@ namespace slskd.Tests.Unit.Integrations.Notifications
         }
 
         [Theory]
-        [InlineData("hey quim, got that track?", "Quim", true)]
-        [InlineData("QUIM!", "quim", true)]
-        [InlineData("quimby is here", "quim", false)]
-        [InlineData("ask dj.quim+ about it", "dj.quim+", true)]
-        [InlineData("nothing to see", "quim", false)]
+        [InlineData("hey kai, got that track?", "Kai", true)]
+        [InlineData("KAI!", "kai", true)]
+        [InlineData("kaiser is here", "kai", false)]
+        [InlineData("ask dj.kai+ about it", "dj.kai+", true)]
+        [InlineData("nothing to see", "kai", false)]
         public void A_mention_is_the_username_as_a_word_of_its_own(string text, string username, bool expected)
             => Assert.Equal(expected, RoomMentionNotifier.Mentions(text, username));
 
         [Fact]
         public async Task A_mention_is_notified_and_the_room_then_stays_quiet_for_a_while()
         {
-            State.SetValue(s => s with { User = new UserState { Username = "quim" } });
+            State.SetValue(s => s with { User = new UserState { Username = "kai" } });
             var notifier = Mentions();
 
-            await notifier.HandleAsync(Room("techno", "alice", "quim you around?"), T0);
-            await notifier.HandleAsync(Room("techno", "bob", "quim!!"), T0.AddMinutes(5));
-            await notifier.HandleAsync(Room("house", "carol", "hi quim"), T0.AddMinutes(5));
-            await notifier.HandleAsync(Room("techno", "dave", "quim?"), T0.AddMinutes(11));
+            await notifier.HandleAsync(Room("techno", "alice", "kai you around?"), T0);
+            await notifier.HandleAsync(Room("techno", "bob", "kai!!"), T0.AddMinutes(5));
+            await notifier.HandleAsync(Room("house", "carol", "hi kai"), T0.AddMinutes(5));
+            await notifier.HandleAsync(Room("techno", "dave", "kai?"), T0.AddMinutes(11));
 
             Assert.Equal(
                 ["alice mentioned you in techno", "carol mentioned you in house", "dave mentioned you in techno"],
@@ -104,10 +104,10 @@ namespace slskd.Tests.Unit.Integrations.Notifications
         [Fact]
         public async Task Our_own_messages_and_ones_that_do_not_mention_us_are_not_notified()
         {
-            State.SetValue(s => s with { User = new UserState { Username = "quim" } });
+            State.SetValue(s => s with { User = new UserState { Username = "kai" } });
             var notifier = Mentions();
 
-            await notifier.HandleAsync(Room("techno", "quim", "quim here"), T0);
+            await notifier.HandleAsync(Room("techno", "kai", "kai here"), T0);
             await notifier.HandleAsync(Room("techno", "alice", "anyone have this?"), T0);
 
             Assert.Empty(Ntfy.Sent);

@@ -16,7 +16,7 @@ which a provider can test itself against.
 player:
   analysis:
     provider:
-      url: http://10.99.0.2:36914/contract   # the provider's base; slskd appends /v1/analysis
+      url: http://analysis.example:8080/contract   # the provider's base; slskd appends /v1/analysis
       token: <bearer token>
       timeout: 60          # seconds; a cold analysis decodes the whole file
       concurrency: 2       # requests in flight at once
@@ -61,7 +61,7 @@ Authorization: Bearer <token>
 ```jsonc
 {
   "contract": 1,
-  "provider": { "name": "media-bridge", "version": "analysis-v5" },
+  "provider": { "name": "example-analyzer", "version": "1.4.0" },
   "verdict": { "level": "bad", "headline": "lossy? 18.9 kHz" },
   "summary": "MP3 · 44.1 kHz · stereo · 219 kbps · 7:12",
   "findings": [
@@ -92,9 +92,9 @@ Authorization: Bearer <token>
 ## What a provider must refuse
 
 A provider is reading its own disk on behalf of another service, so the path
-it is given must be treated as hostile. The reference implementation
-(media-bridge's `contract.py`) refuses, before touching the filesystem and with
-the same 403 every time so the answer reveals nothing about what exists:
+it is given must be treated as hostile. A provider should refuse, before
+touching the filesystem and with the same 403 every time so the answer reveals
+nothing about what exists:
 
 - a root name it does not hold;
 - an empty or absolute path, a drive letter, a backslash or a NUL;

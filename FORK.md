@@ -1,18 +1,16 @@
 # This fork
 
 `deviationist/slskd`, a fork of [`slskd/slskd`](https://github.com/slskd/slskd)
-kept for one reason: we run slskd as the front of a music ingress chain, and a
-couple of things that chain needs are not upstream yet. The fork exists to fit
-that setup first; contributing back is what happens once it does.
-
-Same shape as the [onetagger fork](https://github.com/deviationist/onetagger),
-deliberately — one convention across every fork on this fleet.
+with additions for running slskd as the front of a music collection: a table
+view, search watches, a built-in player, share links, notifications, a phone
+layout and a long list of fixes. Fixes and features that could stand on their
+own upstream are kept on branches that can be sent there as they are.
 
 ## Branches
 
 **`main` is this fork's version of slskd** — upstream plus everything below.
 Clone it, build it, and you get the additions; that is the point of the branch,
-and it is what our images are built from. It is never rewound to a plain copy
+and it is what images are built from. It is never rewound to a plain copy
 of upstream.
 
 | Branch | What it is |
@@ -50,49 +48,6 @@ nothing unrelated — and that still holds: the two together are one feature and
 answer one issue. A second `pr/` branch on top of a first is fine whenever it
 is the *same* piece of work; it is a base on `main` that is not.
 
-## How a change gets in
-
-**Through a pull request into `main`, merged when the operator says so.** Not
-by a local `git merge` that happens to have been run first — the PR is the
-gate, and a change that is already on `main` before it is reviewed has skipped
-the only step that was asked for.
-
-```sh
-git checkout -b pr/feat-thing upstream/master   # base: upstream, never main
-# ...build it, test it, commit...
-git push -u origin pr/feat-thing
-gh pr create --repo deviationist/slskd --base main --head pr/feat-thing --draft
-# ...operator reviews, says all good...
-gh pr ready  <n> --repo deviationist/slskd
-gh pr merge  <n> --repo deviationist/slskd --merge
-git checkout main && git pull                   # then build and deploy from main
-```
-
-**The base is `main`, not `master`.** `master` is the mirror; a PR merged there
-puts our commits on it and breaks `--ff-only` permanently. Basing the *branch*
-on `upstream/master` is what keeps its diff clean — and because the merge base
-is `upstream/master` either way, a PR into `main` still shows that feature
-alone even once `main` carries several others. There is no tradeoff to make
-here; an earlier PR on this fork was based on `master` for a diff it would have
-got anyway, and could then only be closed rather than merged.
-
-Deploying before the merge is fine and often necessary — the image has to be
-built to be tested. Merging before the review is not.
-
-## Taking upstream's changes
-
-```sh
-git fetch upstream --tags
-git checkout master && git merge --ff-only upstream/master && git push
-git checkout main   && git merge master
-```
-
-`master` is fast-forward only, so a merge that is not a fast-forward means
-something of ours was committed there by mistake — the failure is the point.
-Upstream comes into `main` by merging, never rebasing: nothing upstream is
-removed, so `main` stays a superset rather than a divergence, and the merge
-commits record when each upstream state was taken.
-
 ## What this fork adds
 
 | Branch | What it does | Upstream |
@@ -116,8 +71,7 @@ getting rid of a download and its file is two operations in two places.
 ### Search watches
 
 A search that re-runs on a schedule, keeps what is new since its last run, and
-mails it. Built over 2026-09-12/13; the plan and the reasons the shape changed
-while it was built are in `PLAN-search-watches.md`. Configured under
+mails it. Built over 2026-09-12/13. Configured under
 `searches.watches.*` — `enabled`, `minimum_interval`, `gap`, `limit`,
 `download_limit` and `timezone`.
 
@@ -186,7 +140,7 @@ design rather than a gap. Fold Results is hidden in table view for that reason.
 | `feature/wide-layout-and-folder` | A *Wide* toggle (`slskd-wide`) taking the view to 2400px, and the file's **full folder path** in a column renamed Path — the width is what makes the path affordable. | Ours. |
 | `feature/downloads-table-view`, `feature/row-state-attribute`, `feature/player-in-table-view` | The same table on the Downloads page: virtualised, sortable, filterable (space-separated AND terms, `-term` excludes, matching peer, full path and state), with the selection actions gated on the same `isStateRetryable`/`isStateCancellable`/`isStateRemovable`/`isRetrievable` rules the card view uses. Rows are tagged `data-filename`, `data-username` and `data-state` — **the scripts injected into this page must read identity from those attributes**, because the column picker can hide the cells they used to read. The bulk bar is portalled into `#footer-action-slot`: `.pushable.app` carries a transform, which breaks `position: fixed` for everything under it. | Ours. |
 | `feature/downloads-time-columns` | Four optional columns on the Downloads table, in the order the moments happen: **Requested**, **Waited** (in the peer's queue), **Took**, **Finished** — all off by default. Waited is the one nothing on the page answered before: here the median download starts 1.3 s after it is asked for, and the slowest tenth wait about five minutes. Each value is shown only where the timestamps behind it make sense, blank otherwise: a transfer that failed before any bytes moved comes back with `startedAt` *equal* to `endedAt`, to the tick, and believed it "took 0s" after "waiting" the whole time it sat before failing — on a finished row that equality is taken as no start. Durations never run backwards, and instants outside slskd's lifetime are refused. The same rows carry an `averageSpeed` of `-635672000`, which the Speed column showed as "0 B/s"; it is blank now too, and sorts last. Waited and Took count up live while a download is queued or receiving, in italics. `timingOf`, `instantOf` and `speedOf` in `lib/transfers.js`, with tests. | Ours — the table is this fork's. Depends on `pr/fix-transfer-timestamps-utc` for correct times against the database, but also reads a zoneless timestamp as UTC so it holds against a server without it. |
-| `fix/flatlist-measure-rows` | Both table views **measure** their rows (`measureElement`, keyed by `getItemKey`) instead of taking every row to be `ROW_H`, which is now only the estimate for rows not yet drawn. Needed because the media-bridge analysis panel opens *inside* its track's row on the Downloads page: with heights assumed, one tall row threw off the placement of everything after it, and scrolling past an open panel and back snapped the view by hundreds of pixels. Semantic's `Table.Row` passes no ref down, so the measuring ref reaches the `<tr>` through `Shared/MeasuredRow`. **media-bridge's in-row panel depends on this** — deploy this first. | Ours, though nothing in it is specific to this fork. |
+| `fix/flatlist-measure-rows` | Both table views **measure** their rows (`measureElement`, keyed by `getItemKey`) instead of taking every row to be `ROW_H`, which is now only the estimate for rows not yet drawn. Needed for anything that opens *inside* a row, such as an analysis panel injected into the Downloads page: with heights assumed, one tall row threw off the placement of everything after it, and scrolling past an open panel and back snapped the view by hundreds of pixels. Semantic's `Table.Row` passes no ref down, so the measuring ref reaches the `<tr>` through `Shared/MeasuredRow`. | Ours, though nothing in it is specific to this fork. |
 
 ### Time, locale, and the rest
 
@@ -196,27 +150,20 @@ design rather than a gap. Fold Results is hidden in table view for that reason.
 | `pr/fix-transfer-timestamps-utc` | Three of a transfer's five timestamps — `requestedAt`, `enqueuedAt`, `nextAttemptAt` — came out of the API with no zone, because SQLite keeps no `DateTimeKind` and `TransfersDbContext` stamped UTC back onto `StartedAt` and `EndedAt` only. A browser reads a zoneless time as local, so those three were off by the reader's offset, and so was any difference taken against the other two — a download's wait in the remote queue read two hours long in Oslo in summer. The kind is stamped, never converted, so no instant moves and no migration is needed. | Fixes upstream behaviour; the diff against `upstream/master` is exactly this. |
 | `feature/24-hour-timestamps`, `feature/day-first-dates` | Every clock in the UI reads 00-23 (`hourCycle: 'h23'`, which unlike `hour12: false` cannot produce a 24:07), and the locale is a setting — `web.locale`, `en-GB` by default. Date order is not a separate knob because Intl derives order, separators and month names together from the locale; blank follows the browser's *language*, which is how an operator on a 24-hour OS still gets AM/PM. | Ours, on top of the fix above. |
 | `feature/timestamp-component` | Every date in the UI is drawn by one `Timestamp` component: a `<time>` carrying the exact instant, with the full date and time as its tooltip. The default `short` variant scales with age — the time alone today, day and time earlier this year, the year as well before that — and `variant="full"` always gives the whole thing. Dates had been rendered six ways, two of them wrong: Searches' **Ended** never showed a date at all, so last week read like this morning, and **Events** printed the raw API string in UTC to seven decimal places. One parser, `parseInstant`, reads a zoneless ISO string as UTC — every endpoint sends a zone today, so it guards the next one that loses it. Graph axes and the watch panel's relative "next run" keep their own forms. | Ours, on top of `feature/24-hour-timestamps` and `feature/day-first-dates`. |
-| `feature/expose-toast-to-injected-scripts` | Hands the toast API to the scripts injected into the page, so an injected control reports the way the app does. | Ours — for `media-bridge`. |
+| `feature/expose-toast-to-injected-scripts` | Hands the toast API to the scripts injected into the page, so an injected control reports the way the app does. | Ours. |
 | `pr/fix-grouped-button-border`, `pr/fix-popup-dark-theme`, `pr/fix-footer-favicon-url-base`, `pr/fix-search-detail-header-height` | Four small upstream fixes: the first button of a group losing its left border in the dark theme, the popup unreadable in it, the footer logo resolved against the current route rather than the url base, and a search detail header that would not grow with its phrase. | All four fix upstream behaviour; each diff is exactly that. |
 | `feature/explain-hide-result`, `feature/confirm-removal-with-enter`, `feature/confirm-bulk-removal` | The red cross on a result card says what it does; a removal confirms with Enter as it already cancels with Escape; a selection asks before it deletes files, as a single row already did. | Ours, the last one because the prompt is worded from `delete_file_on_removal`. |
-| `feature/player` | A **player** for finished downloads, built into the app rather than injected over it: a bar docked above the footer on a desktop; on a phone a mini bar joined to the top of the bottom menu, opening into a drawer (swipe to fold) -- the layout makes room for it (`--player-dock-h`) and the selection footer and toasts stand on it. The server transcodes what it plays (most downloads are AIFF, which Chrome and Firefox do not play), draws the waveform and reads the cover, all cached and checked; ffmpeg is in the image. Audio and covers are authorised by a stream ticket, because an `<audio>` cannot send a header. Optionally, an **analysis provider** -- an external service answering what is wrong with a track, under the contract in `docs/player-analysis-provider.md` -- puts a verdict badge on each row, problem lanes under the waveform and a findings sheet. Ported from media-bridge's own player; see `PLAN-player.md`. | Ours. The player would stand alone upstream; the provider contract is general but has one implementation. |
+| `feature/player` | A **player** for finished downloads, built into the app rather than injected over it: a bar docked above the footer on a desktop; on a phone a mini bar joined to the top of the bottom menu, opening into a drawer (swipe to fold) -- the layout makes room for it (`--player-dock-h`) and the selection footer and toasts stand on it. The server transcodes what it plays (most downloads are AIFF, which Chrome and Firefox do not play), draws the waveform and reads the cover, all cached and checked; ffmpeg is in the image. Audio and covers are authorised by a stream ticket, because an `<audio>` cannot send a header. Optionally, an **analysis provider** -- an external service answering what is wrong with a track, under the contract in `docs/player-analysis-provider.md` -- puts a verdict badge on each row, problem lanes under the waveform and a findings sheet. Ported from an earlier player that was injected into the page. | Ours. The player would stand alone upstream; the provider contract is general but has one implementation. |
 
-## Our image
+## Building it
 
-Built from `main` and pushed to the homelab registry:
+The `Dockerfile` is upstream's, with `ffmpeg` added for the player:
 
 ```sh
-docker build --build-arg VERSION=<upstream version>.65534-homelab \
-  -t registry.ichiva.no/slskd:homelab .
-docker push registry.ichiva.no/slskd:homelab
+git clone https://github.com/deviationist/slskd && cd slskd
+docker build --build-arg VERSION=<upstream version>.65534-fork -t slskd:fork .
 ```
 
 The `.65534-` version suffix is upstream's own convention for a local build.
-The quim stack pulls that tag; see `~/docker-root/slskd/docker-compose.yml`.
-
-## Sending something upstream
-
-Open it as a **draft** (`gh pr create --draft`) and let the operator be the one
-who marks it ready. That is a fleet-wide rule for fork → upstream PRs, and it
-exists so the title, description and diff can be read as a unit before any
-maintainer is notified.
+Configuration is upstream's too, plus the options this fork adds, all
+documented in [`docs/config.md`](docs/config.md).

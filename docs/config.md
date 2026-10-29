@@ -246,7 +246,7 @@ two different paths, and the provider holds the same names mapped to its own. Ro
 player:
   analysis:
     provider:
-      url: http://10.99.0.2:36914/contract
+      url: http://analysis.example:8080/contract
       token: <bearer token>
       timeout: 60
       concurrency: 2
@@ -607,7 +607,7 @@ transfers:
   compare:
     enabled: false
     provider:
-      url: http://10.99.0.2:36914/contract
+      url: http://analysis.example:8080/contract
       token: <bearer token>
       timeout: 300
       roots:
