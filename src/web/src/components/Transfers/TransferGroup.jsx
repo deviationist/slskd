@@ -1,6 +1,7 @@
 import * as shareLinks from '../../lib/shareLinks';
 import * as transfers from '../../lib/transfers';
 import { getFileName } from '../../lib/util';
+import CompareButton from '../Compare/CompareButton';
 import TransferList, { ConfirmRemovalModal } from './TransferList';
 import withDividers from './withDividers';
 import React, { Component } from 'react';
@@ -74,6 +75,9 @@ const MissingFilesModal = ({
   />
 );
 
+// the rows' ids, as one string: what Compare's button depends on in other cards
+const idsOf = (files) => (files ?? []).map((file) => file.id).join(',');
+
 class TransferGroup extends Component {
   constructor(props) {
     super(props);
@@ -106,7 +110,9 @@ class TransferGroup extends Component {
    * render, but they close over nothing but `direction` and its own state
    * setters, both compared or stable, so a new one does the same as the old.
    * `onShareRequested` is the exception that is sometimes absent, so whether
-   * there is one is compared.
+   * there is one is compared. So is `onCompareRequested`, and Compare's
+   * button also depends on what is ticked in *other* cards, so that is
+   * compared too, by id.
    */
   shouldComponentUpdate(nextProps, nextState) {
     if (nextState !== this.state) return true;
@@ -117,7 +123,10 @@ class TransferGroup extends Component {
       nextProps.direction !== props.direction ||
       nextProps.deleteFileOnRemoval !== props.deleteFileOnRemoval ||
       nextProps.retrievalEnabled !== props.retrievalEnabled ||
-      Boolean(nextProps.onShareRequested) !== Boolean(props.onShareRequested)
+      Boolean(nextProps.onShareRequested) !== Boolean(props.onShareRequested) ||
+      Boolean(nextProps.onCompareRequested) !==
+        Boolean(props.onCompareRequested) ||
+      idsOf(nextProps.compareTicked) !== idsOf(props.compareTicked)
     ) {
       return true;
     }
@@ -131,6 +140,12 @@ class TransferGroup extends Component {
 
     this.drawn = next;
     return true;
+  }
+
+  // a card that goes -- filtered away, or the peer's last transfer removed --
+  // takes its ticks with it, and the page must not keep comparing them
+  componentWillUnmount() {
+    this.props.onSelectionReport?.(this.props.user.username, []);
   }
 
   /**
@@ -240,7 +255,15 @@ class TransferGroup extends Component {
       selections.delete(object);
     }
 
-    this.setState({ selections });
+    this.setState({ selections }, this.reportSelection);
+  };
+
+  // what is ticked here, for the page, which compares across cards
+  reportSelection = () => {
+    this.props.onSelectionReport?.(
+      this.props.user.username,
+      this.getSelectedFiles(),
+    );
   };
 
   isSelected = (directoryName, file) =>
@@ -270,7 +293,7 @@ class TransferGroup extends Component {
 
     if (match) {
       selections.delete(JSON.stringify(match));
-      this.setState({ selections });
+      this.setState({ selections }, this.reportSelection);
     }
   };
 
@@ -388,7 +411,14 @@ class TransferGroup extends Component {
    * function is more branching than is worth reading in one go.
    */
   renderSelectionActions(selected) {
-    const { direction, onShareRequested, retrievalEnabled, user } = this.props;
+    const {
+      compareTicked,
+      direction,
+      onCompareRequested,
+      onShareRequested,
+      retrievalEnabled,
+      user,
+    } = this.props;
     const { archiveBusy } = this.state;
 
     const all = selected.length > 1 ? ' Selected' : '';
@@ -476,6 +506,13 @@ class TransferGroup extends Component {
                 icon="share alternate"
                 key="share"
                 onClick={() => onShareRequested(selected)}
+              />
+            ),
+            onCompareRequested && (
+              <CompareButton
+                key="compare"
+                onCompareRequested={onCompareRequested}
+                ticked={compareTicked ?? selected}
               />
             ),
           ])}

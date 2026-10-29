@@ -24,6 +24,7 @@ import {
   offsetWithin,
   scrollParentOf,
 } from '../../lib/util';
+import CompareButton from '../Compare/CompareButton';
 import { RowBadge, RowPlay } from '../Player/Parts';
 import {
   ColumnPicker,
@@ -211,6 +212,7 @@ const timingCell = ({ key, now, row }) => {
  * here is one question asked four ways.
  * @param {object} params
  * @param {Function} params.onCancelAll - Cancels the selection.
+ * @param {Function} [params.onCompareRequested] - Opens the compare dialog; absent where Compare is off.
  * @param {Function} params.onRemoveAll - Removes the selection.
  * @param {Function} params.onRetryAll - Retries the selection.
  * @param {Function} [params.onShareRequested] - Opens the share dialog; absent where links cannot be made.
@@ -220,6 +222,7 @@ const timingCell = ({ key, now, row }) => {
  */
 const SelectionActions = ({
   onCancelAll,
+  onCompareRequested,
   onRemoveAll,
   onRetryAll,
   onShareRequested,
@@ -343,6 +346,14 @@ const SelectionActions = ({
               onClick={() => onShareRequested(rows)}
             />
           ),
+          // the selection here already crosses peers, so it is what is compared
+          onCompareRequested && (
+            <CompareButton
+              key="compare"
+              onCompareRequested={onCompareRequested}
+              ticked={rows}
+            />
+          ),
         ])}
       </Button.Group>
     </div>
@@ -368,6 +379,7 @@ const SelectionActions = ({
  * @param {Function} params.onCancelAll - Cancels a selection.
  * @param {Function} params.onRemoveAll - Removes a selection.
  * @param {Function} params.onRetryAll - Retries a selection.
+ * @param {Function} [params.onCompareRequested] - Opens the compare dialog for some rows; absent where Compare is off.
  * @param {Function} params.onPlaceInQueueRequested - Asks a peer where we are in its queue.
  * @param {Function} params.onRemoveRequested - Removes one transfer.
  * @param {Function} params.onRetryRequested - Retries one transfer.
@@ -382,6 +394,7 @@ const FlatTransferList = ({
   direction,
   filterQuery,
   onCancelAll,
+  onCompareRequested,
   onPlaceInQueueRequested,
   onRemoveAll,
   onRemoveRequested,
@@ -821,6 +834,7 @@ const FlatTransferList = ({
         createPortal(
           <SelectionActions
             onCancelAll={onCancelAll}
+            onCompareRequested={onCompareRequested}
             onRemoveAll={onRemoveAll}
             onRetryAll={onRetryAll}
             onShareRequested={onShareRequested}

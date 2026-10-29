@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/deviationist/slskd/docs/transfers-compare-provider.schema.json",
+  "$comment": "The compare contract, v1. Kept identically in slskd (docs/transfers-compare-provider.schema.json) and media-bridge (contracts/compare-v1.schema.json); each repo's tests hold its side to its copy. Change both, and bump `contract` only for a change a caller cannot ignore. Unknown fields are allowed everywhere so a provider can add more without coordinating. Every index is into `files`, which is in the order the caller sent.",
+  "title": "Compare provider response",
+  "type": "object",
+  "required": ["contract", "provider", "verdict", "files", "groups", "alone", "partly"],
+  "properties": {
+    "contract": { "const": 1 },
+    "provider": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "version": { "type": "string" }
+      }
+    },
+    "verdict": {
+      "description": "The answer, before the detail: the dialog's banner.",
+      "type": "object",
+      "required": ["level", "headline", "detail"],
+      "properties": {
+        "level": {
+          "description": "same: beyond doubt. likely: the same, a looser match. mixed: some are, some are not. partly: long stretches shared, then they part. different: none are. unknown: fewer than two could be read.",
+          "enum": ["same", "likely", "mixed", "partly", "different", "unknown"]
+        },
+        "headline": { "type": "string" },
+        "detail": { "type": "string" }
+      }
+    },
+    "files": {
+      "description": "One per file sent, in the order sent.",
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": ["readable"],
+        "properties": {
+          "readable": { "type": "boolean" },
+          "note": { "description": "Why not, for a file that is not readable. The same words whatever the reason.", "type": "string" },
+          "music_s": { "description": "The music's length, silence trimmed off both ends.", "type": "number", "minimum": 0 },
+          "lead_s": { "type": "number", "minimum": 0 },
+          "tail_s": { "type": "number", "minimum": 0 }
+        }
+      }
+    },
+    "groups": {
+      "description": "Files that are one track, largest first; each has two or more. `notes` is one per member, the first being the one the others are compared with.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["files", "notes"],
+        "properties": {
+          "files": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/index" } },
+          "notes": { "type": "array", "items": { "type": "string" } }
+        }
+      }
+    },
+    "alone": {
+      "description": "Readable files that are the same as nothing else sent.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/index" }
+    },
+    "partly": {
+      "description": "Pairs sharing long stretches and then parting: an edit, an extended mix, a mashup. A pair, not a group.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["a", "b", "note"],
+        "properties": {
+          "a": { "$ref": "#/$defs/index" },
+          "b": { "$ref": "#/$defs/index" },
+          "note": { "type": "string" }
+        }
+      }
+    },
+    "pairs": {
+      "description": "Optional: the measurements behind the words, every readable pair. A client drawing the answer does not need them.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["a", "b", "verdict", "match"],
+        "properties": {
+          "a": { "$ref": "#/$defs/index" },
+          "b": { "$ref": "#/$defs/index" },
+          "verdict": { "enum": ["same", "partly", "different"] },
+          "match": { "type": "number", "minimum": -1, "maximum": 1 },
+          "share": { "type": "number", "minimum": 0, "maximum": 1 },
+          "offset_s": { "type": "number" },
+          "drift_ms": { "type": "number" },
+          "gain_db": { "type": "number" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "index": { "type": "integer", "minimum": 0 }
+  }
+}

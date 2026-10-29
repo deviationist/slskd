@@ -1,14 +1,22 @@
 import './Transfers.css';
+import * as compareLibrary from '../../lib/compare';
 import { usePullRefresh } from '../../lib/pullToRefresh';
 import * as transfersLibrary from '../../lib/transfers';
 import AppContext from '../AppContext';
+import CompareDialog from '../Compare/CompareDialog';
 import { LoaderSegment, PlaceholderSegment } from '../Shared';
 import ShareDialog from '../ShareLinks/ShareDialog';
 import FlatTransferList from './FlatTransferList';
 import TransferGroup from './TransferGroup';
 import { ConfirmRemovalModal } from './TransferList';
 import TransfersHeader from './TransfersHeader';
-import React, { useContext, useEffect, useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { toast } from 'react-toastify';
 
 const sortStorageKey = (direction) => `slskd-transfers-${direction}-sort`;
@@ -202,6 +210,38 @@ const Transfers = ({ direction, server }) => {
     direction === 'download' && shareSettings?.enabled === true
       ? (files) => setSharing(files)
       : undefined;
+
+  // Compare, likewise: downloads only, and only where the server has it
+  // enabled with a provider. In the card view each card keeps its own
+  // selection, so each reports it here -- Compare takes ticked rows from every
+  // card, since copies of one track from different peers are what it is for
+  const [comparing, setComparing] = useState(null);
+  const [tickedByUser, setTickedByUser] = useState({});
+  const onCompareRequested =
+    direction === 'download' && compareLibrary.isEnabled(options)
+      ? (picks) => setComparing(picks)
+      : undefined;
+  const onSelectionReport = useCallback((username, files) => {
+    setTickedByUser((previous) => {
+      if ((previous[username]?.length ?? 0) === 0 && files.length === 0) {
+        return previous;
+      }
+
+      return { ...previous, [username]: files };
+    });
+  }, []);
+  // by id, against the transfers as they are now: a card reports its rows as
+  // they were when ticked, and one ticked while downloading has finished since
+  const ticked = useMemo(() => {
+    const current = new Map(
+      transfersLibrary.flattenTransfers(transfers).map((row) => [row.id, row]),
+    );
+
+    return Object.values(tickedByUser)
+      .flat()
+      .map((row) => current.get(row.id))
+      .filter(Boolean);
+  }, [tickedByUser, transfers]);
 
   /*
    * Filtered before grouped, so the cards and the table answer the same
@@ -436,6 +476,7 @@ const Transfers = ({ direction, server }) => {
           direction={direction}
           filterQuery={filter}
           onCancelAll={cancelAll}
+          onCompareRequested={onCompareRequested}
           onPlaceInQueueRequested={placeInQueue}
           onRemoveAll={askThenRemoveAll}
           // the table hands over the row itself; `remove` takes it wrapped, as
@@ -455,9 +496,12 @@ const Transfers = ({ direction, server }) => {
           <TransferGroup
             cancel={cancel}
             cancelAll={cancelAll}
+            compareTicked={onCompareRequested ? ticked : undefined}
             deleteFileOnRemoval={deleteFileOnRemoval}
             direction={direction}
             key={user.username}
+            onCompareRequested={onCompareRequested}
+            onSelectionReport={onSelectionReport}
             onShareRequested={onShareRequested}
             remove={remove}
             removeAll={removeAll}
@@ -467,6 +511,12 @@ const Transfers = ({ direction, server }) => {
             user={user}
           />
         ))
+      )}
+      {comparing && (
+        <CompareDialog
+          onClose={() => setComparing(null)}
+          picks={comparing}
+        />
       )}
       {sharing && (
         <ShareDialog
