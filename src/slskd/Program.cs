@@ -652,6 +652,11 @@ namespace slskd
 
                 // the same for share links, whose expiry sweep starts with the service
                 _ = app.Services.GetService<slskd.Transfers.ShareLinks.ShareLinkService>();
+
+                // and for the notifiers, which subscribe to the events they notify when they are constructed
+                _ = app.Services.GetService<slskd.Integrations.Notifications.PrivateMessageNotifier>();
+                _ = app.Services.GetService<slskd.Integrations.Notifications.RoomMentionNotifier>();
+                _ = app.Services.GetService<slskd.Integrations.Notifications.ProblemNotifier>();
                 _ = app.Services.GetService<VPNService>();
                 _ = app.Services.GetService<TelemetryService>();
 
@@ -784,6 +789,14 @@ namespace slskd
             services.AddSingleton<slskd.Integrations.Mail.IMailAdapter, slskd.Integrations.Mail.BrevoMailAdapter>();
             services.AddSingleton<slskd.Integrations.Mail.IMailAdapter, slskd.Integrations.Mail.SendmailMailAdapter>();
             services.AddSingleton<slskd.Integrations.Mail.MailService>();
+
+            // the operator's notifications: one service routing to channels, each registered here
+            services.AddSingleton<slskd.Integrations.Notifications.INotificationChannel, slskd.Integrations.Notifications.MailNotificationChannel>();
+            services.AddSingleton<slskd.Integrations.Notifications.INotificationChannel, slskd.Integrations.Notifications.NtfyNotificationChannel>();
+            services.AddSingleton<slskd.Integrations.Notifications.NotificationService>();
+            services.AddSingleton<slskd.Integrations.Notifications.PrivateMessageNotifier>();
+            services.AddSingleton<slskd.Integrations.Notifications.RoomMentionNotifier>();
+            services.AddSingleton<slskd.Integrations.Notifications.ProblemNotifier>();
 
             services.AddSingleton<slskd.Search.Watches.WatchService>();
             services.AddSingleton<slskd.Transfers.ShareLinks.ShareLinkService>();
