@@ -95,6 +95,22 @@ export const compare = async ({ ids, wait = false }) =>
   (await api.post(`/compare?wait=${wait}`, { ids })).data;
 
 /**
+ * The rows an answer is about, in the order its indices follow: the ids the
+ * server says it compared, not the list this page sent. The two agree
+ * today, but the server drops a repeated id, and indices read against the
+ * page's own list would then put one row's verdict on another.
+ * @param {string[]} [ids] - The ids from the server's answer.
+ * @param {object[]} picks - The rows the page sent.
+ * @returns {object[]} The rows, in the server's order.
+ */
+export const rowsOf = (ids, picks) => {
+  if (!Array.isArray(ids)) return picks;
+  const byId = new Map(picks.map((row) => [row.id, row]));
+
+  return ids.map((id) => byId.get(id)).filter(Boolean);
+};
+
+/**
  * The colour each verdict is drawn in. The provider's levels are words, so a
  * level this page does not know is drawn plainly rather than guessed at.
  */

@@ -135,16 +135,18 @@ namespace slskd.Tests.Unit.Transfers.Compare
         }
 
         [Fact]
-        public async Task A_refusal_carries_the_providers_reason_and_is_not_kept()
+        public async Task A_refusal_tells_the_browser_fixed_words_never_the_providers_and_is_not_kept()
         {
-            Responses.Enqueue(Json(HttpStatusCode.BadRequest, "{\"detail\":\"at most 8 files at a time\"}"));
+            // whatever the provider puts in its error stays in the log: here, a host path it should not have sent
+            Responses.Enqueue(Json(HttpStatusCode.BadRequest, "{\"detail\":\"cannot open /mnt/secret/.env\"}"));
             Responses.Enqueue(Json(HttpStatusCode.OK, Document));
             var provider = Provider();
 
             var first = await provider.GetAsync([A, B]);
             var second = await provider.GetAsync([A, B]);
 
-            Assert.Equal((CompareState.Refused, "at most 8 files at a time"), (first.State, first.Reason));
+            Assert.Equal((CompareState.Refused, CompareProvider.RefusedByProvider), (first.State, first.Reason));
+            Assert.DoesNotContain("/mnt", first.Reason);
             Assert.Equal(CompareState.Ready, second.State);
         }
 

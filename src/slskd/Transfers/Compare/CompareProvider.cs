@@ -118,6 +118,13 @@ public class CompareProvider
     /// </summary>
     public const int MaximumFiles = 10;
 
+    /// <summary>
+    ///     What the browser is told when the provider refuses a comparison. Fixed rather than the provider's own words,
+    ///     which go to the log: those are another service's text, and whatever it one day puts in an error -- a path, a
+    ///     setting -- would otherwise go straight to the page.
+    /// </summary>
+    public const string RefusedByProvider = "The compare provider will not compare these files; the server log says why";
+
     // how soon a caller that did not wait is told to ask again
     private const int PollAfter = 3;
 
@@ -324,9 +331,8 @@ public class CompareProvider
 
                 if (state == CompareState.Refused)
                 {
-                    var why = await ReasonOf(response);
-                    Log.Information("Compare provider refused {Count} file(s): {Reason}", files.Count, why);
-                    return (new CompareAnswer(state, Reason: why), keepFor);
+                    Log.Warning("Compare provider refused {Count} file(s): {Reason}", files.Count, await ReasonOf(response));
+                    return (new CompareAnswer(state, Reason: RefusedByProvider), keepFor);
                 }
 
                 if (state != CompareState.Ready)
