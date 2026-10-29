@@ -1,6 +1,7 @@
 import './Chat.css';
 import { byRecency, describeAgo } from '../../lib/chat';
 import { userPath } from '../../lib/users';
+import { useChatUnread } from './ChatUnreadContext';
 import SendMessageModal from './SendMessageModal';
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -22,8 +23,9 @@ const typesFirst = () =>
  * sibling rather than a link inside the row, which is already a button.
  */
 const ConversationRow = ({ active, conversation, now, onPick }) => {
-  const { lastMessage, unAcknowledgedMessageCount, username } = conversation;
-  const unread = unAcknowledgedMessageCount > 0;
+  const { lastMessage, username } = conversation;
+  const count = useChatUnread().countOf(username);
+  const unread = count > 0;
 
   return (
     <li className="conversation-row-item">
@@ -47,11 +49,7 @@ const ConversationRow = ({ active, conversation, now, onPick }) => {
               ? `${lastMessage.direction === 'Out' ? 'You: ' : ''}${lastMessage.message}`
               : 'No messages'}
           </span>
-          {unread && (
-            <span className="conversation-row-count">
-              {unAcknowledgedMessageCount}
-            </span>
-          )}
+          {unread && <span className="conversation-row-count">{count}</span>}
         </span>
       </button>
       <Link
@@ -181,10 +179,10 @@ const ConversationSheet = ({ active, conversations, onClose, onPick }) => {
 const ChatMenu = ({ active, conversations, onConversationChange, ...rest }) => {
   const [open, setOpen] = useState(false);
   const ordered = byRecency(conversations);
+  const { countOf, unread } = useChatUnread();
 
-  const unreadElsewhere = ordered
-    .filter((c) => c.username !== active)
-    .reduce((sum, c) => sum + (c.unAcknowledgedMessageCount || 0), 0);
+  const unreadElsewhere =
+    (unread?.unAcknowledgedMessages ?? 0) - (active ? countOf(active) : 0);
 
   return (
     <div className="conversation-menu">

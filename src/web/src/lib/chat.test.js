@@ -105,3 +105,23 @@ describe('describeUnread', () => {
     expect(chat.describeUnread(undefined)).toBe('');
   });
 });
+
+describe('unreadOf', () => {
+  const unread = {
+    byUser: [
+      { count: 2, username: 'alice' },
+      { count: 1, username: 'Alice_DJ' },
+    ],
+  };
+
+  it('reads one person’s count, exactly by name', () => {
+    expect(chat.unreadOf(unread, 'alice')).toBe(2);
+    expect(chat.unreadOf(unread, 'Alice_DJ')).toBe(1);
+    expect(chat.unreadOf(unread, 'ALICE')).toBe(0);
+  });
+
+  it('is 0 for anyone not listed, or before the state arrives', () => {
+    expect(chat.unreadOf(unread, 'bob')).toBe(0);
+    expect(chat.unreadOf(undefined, 'alice')).toBe(0);
+  });
+});

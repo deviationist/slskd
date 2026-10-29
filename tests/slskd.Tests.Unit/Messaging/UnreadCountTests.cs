@@ -61,6 +61,22 @@ public sealed class UnreadCountTests : IDisposable
         await service.HandleMessageAsync("bob", Message("bob", 3));
 
         Assert.Equal((3, 2), Unread());
+        Assert.Equal(
+            [new UnreadConversationState("alice", 1), new UnreadConversationState("bob", 2)],
+            State.CurrentValue.Conversations.ByUser);
+    }
+
+    [Fact]
+    public async Task A_username_comes_out_exactly_as_it_went_in()
+    {
+        // a dictionary keyed by username would have had its keys camel-cased by the serializer on the way out
+        var service = Service();
+        await service.HandleMessageAsync("Alice_DJ", Message("Alice_DJ", 1));
+
+        Assert.Equal("Alice_DJ", Assert.Single(State.CurrentValue.Conversations.ByUser).Username);
+        Assert.Contains("\"username\":\"Alice_DJ\"", System.Text.Json.JsonSerializer.Serialize(
+            State.CurrentValue.Conversations,
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web)));
     }
 
     [Fact]
@@ -87,6 +103,7 @@ public sealed class UnreadCountTests : IDisposable
         await service.AcknowledgeAsync("alice");
 
         Assert.Equal((1, 1), Unread());
+        Assert.Equal([new UnreadConversationState("bob", 1)], State.CurrentValue.Conversations.ByUser);
 
         await service.AcknowledgeAsync("bob");
 

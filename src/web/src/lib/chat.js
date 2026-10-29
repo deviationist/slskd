@@ -114,3 +114,13 @@ export const describeUnread = (unread) => {
     ? what
     : `${what} from ${people} ${people === 1 ? 'person' : 'people'}`;
 };
+
+/**
+ * How many of someone's messages are unread, from the server's
+ * `state.conversations`; 0 for anyone it does not list.
+ * @param {object} [unread] - `state.conversations` from the server.
+ * @param {string} username - Who.
+ * @returns {number} The count.
+ */
+export const unreadOf = (unread, username) =>
+  unread?.byUser?.find((entry) => entry.username === username)?.count ?? 0;
