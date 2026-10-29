@@ -1,6 +1,7 @@
 import * as shareLinks from '../../lib/shareLinks';
+import { formatDayMonth } from '../../lib/util';
 import pillKeys, { selectedIndices } from './pillKeys';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Icon, Label } from 'semantic-ui-react';
 
 // what ends an address as it is typed. Tab only when there is something to
@@ -43,20 +44,24 @@ const writeClipboard = async (text) => {
 };
 
 /**
- * Whether a dialog's close is an Escape that only meant to let go of a pill.
+ * Whether a dialog's close is an Escape that only meant to let go of a pill,
+ * or to put away the suggestions.
  *
  * Semantic's Modal closes on Escape from a listener on the document in the
  * capture phase, which runs before anything on the field can stop it. So the
  * field says on itself, as `data-pill-picked`, that a pill is picked out, and
  * a dialog holding one asks this before closing: with a pill picked, Escape
  * lets go of it and the dialog stays; with none, Escape closes as it always has.
+ * Suggestions on show are said the same way, as `data-suggesting`, and the
+ * first Escape puts them away.
  * @param {Event} [event] - What the dialog was asked to close by.
  * @returns {boolean} Whether to stay open.
  */
 export const isPickEscape = (event) =>
   event?.type === 'keydown' &&
   event.key === 'Escape' &&
-  event.target?.dataset?.pillPicked === 'true';
+  (event.target?.dataset?.pillPicked === 'true' ||
+    event.target?.dataset?.suggesting === 'true');
 
 /**
  * Addresses as pills: type one and press Enter (or a comma, a semicolon, a
@@ -74,6 +79,13 @@ export const isPickEscape = (event) =>
  * the second press. A click picks a pill out too, Shift+click stretches the
  * selection to it, and a double click edits it. The caret never leaves the
  * text, so typing carries on from wherever the selection was let go.
+ *
+ * As an address is typed, the addresses shares have been mailed to before
+ * that match it are offered under the field (see suggestRecipients). Up and
+ * Down move through them, Enter or Tab takes the highlighted one -- the first,
+ * until another is chosen -- and Escape puts them away. Shift+Delete, or the
+ * cross beside one, forgets an address so it is not offered again. A comma,
+ * a semicolon or a space still ends what was typed as typed.
  *
  * Controlled from both ends -- the pills and what is still being typed -- so
  * that the owner can count an address typed and not yet ended as one of the
@@ -99,6 +111,46 @@ const RecipientsInput = ({
 }) => {
   const input = useRef(null);
 
+  // every address mailed before, fetched once; a field that cannot be used
+  // does not ask. Suggestions are a convenience, so failing to get them
+  // leaves the field as it was without them rather than saying anything
+  const [history, setHistory] = useState([]);
+
+  useEffect(() => {
+    if (disabled) return undefined;
+
+    let current = true;
+
+    const load = async () => {
+      try {
+        const entries = await shareLinks.recipientHistory();
+        if (current) setHistory(entries ?? []);
+      } catch {
+        // without them, as before there were any
+      }
+    };
+
+    load();
+
+    return () => {
+      current = false;
+    };
+  }, [disabled]);
+
+  const [focused, setFocused] = useState(false);
+  // put away with Escape until the text changes again
+  const [dismissed, setDismissed] = useState(false);
+  const [highlight, setHighlight] = useState(0);
+
+  const suggestions = shareLinks.suggestRecipients({
+    draft,
+    history,
+    recipients,
+  });
+  const suggesting = focused && !dismissed && suggestions.length > 0;
+  const highlighted = Math.min(highlight, suggestions.length - 1);
+  const suggestionsId = `${id}-suggestions`;
+
   // the pills the keyboard or a click has picked out, as an anchor and a
   // focus as in text, or null; let go of if the pills have since changed
   // under it
@@ -115,6 +167,62 @@ const RecipientsInput = ({
       draft: '',
       recipients: shareLinks.addRecipients(recipients, text),
     });
+
+  // a suggestion taken stands for what was typed, which goes
+  const take = (entry) => {
+    setChosen(null);
+    setHighlight(0);
+    onChange({
+      draft: '',
+      recipients: shareLinks.addRecipients(recipients, entry.address),
+    });
+    input.current?.focus();
+  };
+
+  const forget = async (entry) => {
+    setHistory((entries) =>
+      entries.filter((candidate) => candidate.address !== entry.address),
+    );
+
+    try {
+      await shareLinks.forgetRecipient({ address: entry.address });
+    } catch {
+      // still not offered for as long as the field is open, which is what
+      // was asked for here; the next dialog will offer it again
+    }
+  };
+
+  // the suggestions' keys, ahead of the pills'. Whether one was used
+  const handleSuggestionKey = (event) => {
+    if (!suggesting) return false;
+
+    const count = suggestions.length;
+
+    switch (event.key) {
+      case 'ArrowDown':
+        setHighlight((highlighted + 1) % count);
+        break;
+      case 'ArrowUp':
+        setHighlight((highlighted - 1 + count) % count);
+        break;
+      case 'Enter':
+      case 'Tab':
+        take(suggestions[highlighted]);
+        break;
+      case 'Escape':
+        setDismissed(true);
+        break;
+      case 'Delete':
+        if (!event.shiftKey) return false;
+        forget(suggestions[highlighted]);
+        break;
+      default:
+        return false;
+    }
+
+    event.preventDefault();
+    return true;
+  };
 
   const handlePaste = (event) => {
     const text = event.clipboardData?.getData('text') ?? '';
@@ -168,6 +276,8 @@ const RecipientsInput = ({
   };
 
   const handleKeyDown = (event) => {
+    if (handleSuggestionKey(event)) return;
+
     const mod = event.ctrlKey || event.metaKey;
     const letter = event.key.toLowerCase();
 
@@ -295,11 +405,20 @@ const RecipientsInput = ({
         );
       })}
       <input
-        autoComplete="email"
+        aria-activedescendant={
+          suggesting ? `${suggestionsId}-${highlighted}` : undefined
+        }
+        aria-autocomplete="list"
+        aria-controls={suggestionsId}
+        aria-expanded={suggesting}
+        // the browser's own would draw over ours, and knows only the
+        // addresses typed into forms on this device
+        autoComplete="off"
         // eslint-disable-next-line jsx-a11y/no-autofocus -- only where the dialog opens for this field alone
         autoFocus={autoFocus}
         // read by isPickEscape, before this field's own handlers run
         data-pill-picked={selection ? 'true' : undefined}
+        data-suggesting={suggesting ? 'true' : undefined}
         disabled={disabled}
         id={id}
         // text with the email keyboard rather than type="email", which brings
@@ -308,20 +427,70 @@ const RecipientsInput = ({
         inputMode="email"
         onBlur={() => {
           setChosen(null);
+          setFocused(false);
           if (draft.trim()) commit();
         }}
-        onChange={(event) =>
-          onChange({ draft: event.target.value, recipients })
-        }
+        onChange={(event) => {
+          setDismissed(false);
+          setHighlight(0);
+          onChange({ draft: event.target.value, recipients });
+        }}
         onCopy={(event) => handleClipboard(event, false)}
         onCut={(event) => handleClipboard(event, true)}
+        onFocus={() => setFocused(true)}
         onKeyDown={handleKeyDown}
         onPaste={handlePaste}
         placeholder={recipients.length === 0 ? placeholder : undefined}
         ref={input}
+        role="combobox"
         type="text"
         value={draft}
       />
+      {suggesting && (
+        // pressed rather than clicked, and held from taking the focus, so the
+        // field is not left -- which would end the draft as typed -- first
+        <ul
+          className="recipients-input-suggestions"
+          id={suggestionsId}
+          onMouseDown={(event) => event.preventDefault()}
+          role="listbox"
+        >
+          {suggestions.map((entry, index) => (
+            // eslint-disable-next-line jsx-a11y/click-events-have-key-events -- the field's own keys choose, and the focus never leaves it
+            <li
+              aria-selected={index === highlighted}
+              className={index === highlighted ? 'highlighted' : undefined}
+              id={`${suggestionsId}-${index}`}
+              key={entry.address}
+              onClick={(event) => {
+                if (event.target.closest('button')) return;
+                take(entry);
+              }}
+              onMouseEnter={() => setHighlight(index)}
+              role="option"
+            >
+              <span className="recipients-input-address">{entry.address}</span>
+              {entry.lastSentAt && (
+                <span className="recipients-input-suggestion-when">
+                  {formatDayMonth(entry.lastSentAt)}
+                </span>
+              )}
+              <button
+                aria-label={`Forget ${entry.address}`}
+                onClick={() => forget(entry)}
+                tabIndex={-1}
+                title="Stop suggesting this address"
+                type="button"
+              >
+                <Icon
+                  fitted
+                  name="close"
+                />
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       {/* the pick is drawn, and the caret stays in the text, so a screen
           reader is told in words which pill the next key will act on */}
       <span

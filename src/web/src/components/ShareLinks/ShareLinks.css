@@ -243,3 +243,64 @@
 .recipients-input {
   position: relative;
 }
+
+/* earlier addresses, offered under the field as one is typed. Drawn like a
+   Semantic dropdown's menu, in either theme */
+.recipients-input {
+  position: relative;
+}
+
+.recipients-input-suggestions {
+  background: var(--slskd-overlay-background, #ffffff);
+  border: 1px solid var(--slskd-tertiary-border-color, rgba(34, 36, 38, 0.15));
+  border-radius: 0 0 0.28571429rem 0.28571429rem;
+  box-shadow: 0 2px 3px 0 rgba(34, 36, 38, 0.15);
+  left: -1px;
+  list-style: none;
+  margin: 0;
+  max-height: 16em;
+  overflow-y: auto;
+  padding: 0;
+  position: absolute;
+  right: -1px;
+  top: 100%;
+  z-index: 11;
+}
+
+.recipients-input-suggestions li {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  gap: 0.5em;
+  padding: 0.55em 0.75em;
+}
+
+.recipients-input-suggestions li .recipients-input-address {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.recipients-input-suggestions li.highlighted {
+  background: var(--slskd-hover-background, rgba(0, 0, 0, 0.05));
+}
+
+.recipients-input-suggestion-when {
+  color: var(--slskd-color-subtle, rgba(0, 0, 0, 0.6));
+  flex: none;
+  font-size: 0.9em;
+}
+
+.recipients-input-suggestions button {
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  flex: none;
+  line-height: 1;
+  opacity: 0.5;
+  padding: 0.2em;
+}
+
+.recipients-input-suggestions button:hover {
+  opacity: 1;
+}

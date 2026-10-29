@@ -50,6 +50,7 @@ namespace slskd.Transfers
         public DbSet<ShareLink> ShareLinks { get; set; }
         public DbSet<ShareLinkFile> ShareLinkFiles { get; set; }
         public DbSet<ShareLinkAccess> ShareLinkAccesses { get; set; }
+        public DbSet<ShareLinkRecipient> ShareLinkRecipients { get; set; }
 
         public override int SaveChanges(bool acceptAllChangesOnSuccess)
         {
@@ -146,6 +147,16 @@ namespace slskd.Transfers
                 .Entity<ShareLinkAccess>()
                 .HasIndex(a => a.ShareLinkId)
                 .HasDatabaseName("IDX_ShareLinkAccesses_ShareLinkId");
+
+            modelBuilder
+                .Entity<ShareLinkRecipient>()
+                .Property(e => e.FirstSentAt)
+                .HasConversion(v => v, v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
+
+            modelBuilder
+                .Entity<ShareLinkRecipient>()
+                .Property(e => e.LastSentAt)
+                .HasConversion(v => v, v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
         }
 
         private void ConfigureTransfers(ModelBuilder modelBuilder)

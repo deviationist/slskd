@@ -522,6 +522,7 @@ public class ShareLinkService
 
                 access.SentAt = DateTime.UtcNow;
                 access.MailError = null;
+                await RememberAsync(context, recipient, access.SentAt.Value);
                 results.Add(new ShareLinkMailResult(recipient, access.Id, true, null));
             }
             catch (Exception ex)
@@ -538,6 +539,44 @@ public class ShareLinkService
         }
 
         return results;
+    }
+
+    /// <summary>
+    ///     Lists the addresses shares have been mailed to, the most recently mailed first.
+    /// </summary>
+    /// <returns>The addresses.</returns>
+    public async Task<List<ShareLinkRecipient>> ListRecipientsAsync()
+    {
+        using var context = ContextFactory.CreateDbContext();
+
+        return await context.ShareLinkRecipients
+            .AsNoTracking()
+            .OrderByDescending(r => r.LastSentAt)
+            .ToListAsync();
+    }
+
+    /// <summary>
+    ///     Forgets an address, so that it is no longer suggested. Any link it has keeps working.
+    /// </summary>
+    /// <param name="address">The address, in any case.</param>
+    /// <returns>Whether it was remembered.</returns>
+    public async Task<bool> ForgetRecipientAsync(string address)
+    {
+        using var context = ContextFactory.CreateDbContext();
+
+        var recipient = await context.ShareLinkRecipients.FindAsync(KeyOf(address));
+
+        if (recipient is null)
+        {
+            return false;
+        }
+
+        context.ShareLinkRecipients.Remove(recipient);
+        await context.SaveChangesAsync();
+
+        Log.Information("Forgot share link recipient {Recipient}", recipient.Address);
+
+        return true;
     }
 
     /// <summary>
@@ -601,6 +640,34 @@ public class ShareLinkService
             .ToList();
 
         return folders.Count == 1 && folders[0].Length > 0 ? folders[0] : $"{names.Count} files";
+    }
+
+    private static string KeyOf(string address) => (address ?? string.Empty).Trim().ToLowerInvariant();
+
+    /// <summary>
+    ///     Notes that a mail went to an address, in the context the send is saved with.
+    /// </summary>
+    private static async Task RememberAsync(TransfersDbContext context, string address, DateTime sentAt)
+    {
+        var known = await context.ShareLinkRecipients.FindAsync(KeyOf(address));
+
+        if (known is null)
+        {
+            context.ShareLinkRecipients.Add(new ShareLinkRecipient
+            {
+                Key = KeyOf(address),
+                Address = address,
+                FirstSentAt = sentAt,
+                LastSentAt = sentAt,
+                SendCount = 1,
+            });
+
+            return;
+        }
+
+        known.Address = address;
+        known.LastSentAt = sentAt;
+        known.SendCount++;
     }
 
     private static ShareLinkAccess NewAccess(Guid id, string recipient) => new()
