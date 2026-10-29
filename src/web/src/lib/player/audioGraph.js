@@ -3,8 +3,6 @@ import { tapAudio } from './meter';
 /*
  * The one Web Audio graph the meter reads from, and when it may be built.
  *
- * Twin: media-bridge web/app/src/features/plex/audioGraph.ts.
- *
  * It is started inside the press, or not at all. iOS lets a page start an
  * AudioContext only during a user gesture, where desktop Chrome accepts any
  * time after the page was touched. Built in an effect once the element

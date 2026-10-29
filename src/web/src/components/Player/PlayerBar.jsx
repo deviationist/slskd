@@ -61,9 +61,6 @@ import React, {
 /*
  * The player bar, in its three shapes.
  *
- * Twin: PlayerBar in media-bridge web/app/src/features/plex/player.tsx, whose
- * shapes, gestures and timings these are. A fix to one belongs in the other.
- *
  * Wide is the bar as it always was, docked above the footer. A phone has no
  * room for a waveform beside a title beside a meter -- squeezed into one row
  * each came out a sliver -- so there it is a mini bar joined to the top of the
@@ -101,8 +98,8 @@ const usePhone = () => {
 const modalOpen = () =>
   Boolean(document.querySelector('.ui.modals.dimmer.active'));
 
-// a native <dialog> is open -- media-bridge's send and Compare dialogs, which
-// it injects into this page. Every key is its: they listen on document in the
+// a native <dialog> is open -- one injected into this page by a script. Every
+// key is its: they listen on document in the
 // capture phase, and this listens on window, which runs first, so without this
 // Escape cancelled the dialog *and* stopped the player, and an arrow or a
 // digit in one seeked the track
@@ -121,8 +118,7 @@ const meterColours = () => {
 };
 
 /*
- * What the lock screen, Control Centre and headphones see. Twin: media-bridge
- * mediaSession.ts. The handlers call the same functions the buttons do, so the
+ * What the lock screen, Control Centre and headphones see. The handlers call the same functions the buttons do, so the
  * lock screen cannot drift from the bar; they exist only while there is a
  * track, because iOS keeps its Now Playing panel up for as long as a page has
  * handlers, and an empty one with nothing to drive it reads as broken.
@@ -232,7 +228,7 @@ const PlayerBar = () => {
   return <Bar player={player} />;
 };
 
-// one component with three shapes, as in media-bridge: splitting it would put
+// one component with three shapes: splitting it would put
 // the same state behind three sets of props
 // eslint-disable-next-line complexity
 const Bar = ({ player }) => {

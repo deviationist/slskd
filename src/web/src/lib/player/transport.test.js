@@ -13,8 +13,6 @@ import {
   typingIn,
 } from './transport';
 
-// twin: the rules in media-bridge web/app/src/features/plex/player.tsx
-
 const element = (tagName, over = {}) => ({
   getAttribute: () => null,
   tagName,

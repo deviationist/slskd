@@ -92,7 +92,7 @@
 #   compare:
 #     enabled: false
 #     provider:
-#       url: ~ # e.g. http://localhost:36914/contract; slskd appends /v1/compare
+#       url: ~ # e.g. http://localhost:8080/contract; slskd appends /v1/compare
 #       token: ~
 #       timeout: 300
 #       roots:

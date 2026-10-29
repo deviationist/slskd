@@ -1,9 +1,6 @@
 /*
  * The output meter's arithmetic, its tap on the audio, and its drawing.
  *
- * Twin: media-bridge web/app/src/features/plex/meter.ts. A fix to one belongs
- * in the other.
- *
  * It must not decide whether the file clips. What it reads is the transcoded
  * stream, and a lossy decoder reconstructs a waveform that need not stay inside
  * the source's peak envelope: a file peaking at -0.21 dBFS with zero samples at

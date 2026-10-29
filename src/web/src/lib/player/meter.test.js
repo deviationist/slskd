@@ -15,8 +15,6 @@ import {
   meterY,
 } from './meter';
 
-// twin: media-bridge web/app/test/meter.test.ts
-
 const fakeContext = () => {
   const calls = [];
   let fill = '';

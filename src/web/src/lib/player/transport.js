@@ -1,9 +1,6 @@
 /*
  * The player's rules that do not need a DOM: the waveform's shape, the clock,
  * the keyboard, scrubbing, and which shape the player takes.
- *
- * Twin: media-bridge web/app/src/features/plex/player.tsx, where each of these
- * was learned. A fix to one belongs in the other.
  */
 
 // how far the arrow keys move; ten seconds is short enough to land on a

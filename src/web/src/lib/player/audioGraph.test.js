@@ -5,7 +5,7 @@ import {
   resetAudioGraph,
 } from './audioGraph';
 
-// twin: media-bridge web/app/test/audioGraph.test.ts. the two rules iOS makes:
+// the two rules iOS makes:
 // a context starts only inside the press, and an element handed to a suspended
 // graph goes silent -- so the tap waits for `running`
 

@@ -21,7 +21,7 @@ transfers:
   compare:
     enabled: true            # off unless set
     provider:
-      url: http://10.99.0.2:36914/contract   # the provider's base; slskd appends /v1/compare
+      url: http://analysis.example:8080/contract   # the provider's base; slskd appends /v1/compare
       token: <bearer token>
       timeout: 300           # seconds; a cold comparison decodes every file
       roots:
@@ -84,7 +84,7 @@ refused, missing or undecodable.
 ```jsonc
 {
   "contract": 1,
-  "provider": { "name": "media-bridge", "version": "sametrack-v1" },
+  "provider": { "name": "example-analyzer", "version": "1.4.0" },
   "verdict": {
     "level": "mixed",
     "headline": "2 of 3 are the same track",
@@ -133,7 +133,6 @@ Exactly what the analysis contract's provider refuses, file by file: a root name
 it does not hold; an empty or absolute path, a drive letter, a backslash or a
 NUL; any `.`, `..` or empty segment, or any segment starting with `.`; an
 extension that is not audio; a path that leaves the root, judged as written and
-again after following symlinks. The reference implementation (media-bridge's
-`/contract/v1/compare`) reuses `contract.resolve` for each file. It reports a
-refused file as `readable: false` rather than refusing the request, with the
-same note as a missing one.
+again after following symlinks. A provider should apply the same checks to
+each file, and report a refused file as `readable: false` rather than refusing
+the request, with the same note as a missing one.

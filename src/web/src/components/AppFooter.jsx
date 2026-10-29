@@ -17,7 +17,7 @@ const formatSpeed = (bytesPerSecond) => {
 
 /**
  * The release a version string names, without the build and the suffix after
- * it: 0.26.2 for 0.26.2.65534-homelab. The rest is in the version modal.
+ * it: 0.26.2 for 0.26.2.65534-fork. The rest is in the version modal.
  * @param {string} version - The full version.
  * @returns {string} The short version, or the full one if it has no such shape.
  */

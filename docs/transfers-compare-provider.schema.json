@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/deviationist/slskd/docs/transfers-compare-provider.schema.json",
-  "$comment": "The compare contract, v1. Kept identically in slskd (docs/transfers-compare-provider.schema.json) and media-bridge (contracts/compare-v1.schema.json); each repo's tests hold its side to its copy. Change both, and bump `contract` only for a change a caller cannot ignore. Unknown fields are allowed everywhere so a provider can add more without coordinating. Every index is into `files`, which is in the order the caller sent.",
+  "$comment": "The compare contract, v1. A provider can validate its responses against this file. Bump `contract` only for a change a caller cannot ignore. Unknown fields are allowed everywhere so a provider can add more without coordinating. Every index is into `files`, which is in the order the caller sent.",
   "title": "Compare provider response",
   "type": "object",
   "required": ["contract", "provider", "verdict", "files", "groups", "alone", "partly"],

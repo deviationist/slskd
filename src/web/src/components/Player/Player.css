@@ -1,7 +1,6 @@
 /*
- * The player. Twin of media-bridge's web/slskd-preview.css (the bar, the
- * tokens) and web/app/src/index.css (the mini bar and the drawer). Everything
- * is `player-` prefixed.
+ * The player: the bar, the mini bar and the drawer. Everything is `player-`
+ * prefixed.
  *
  * Stacking, against App.css's own: footer 1000, the menu's backdrop 1001, its
  * panel 1002, the bottom menu 1003. The docked bar sits at the footer's level,
@@ -243,8 +242,7 @@
   min-width: 0;
 }
 
-/* as wide as its text, up to a cap, and the waveform takes the rest -- as in
-   media-bridge's bar. A 260px basis held that width for every title, so a
+/* as wide as its text, up to a cap, and the waveform takes the rest. A 260px basis held that width for every title, so a
    short one left a gap of a hundred pixels or more before the waveform */
 .player-meta-wide {
   flex: 0 1 auto;
@@ -259,8 +257,8 @@
 
 /* and the waveform starts from nothing, so it is the one that gives way: from
    its content size it shared the shrinking with the title, which on a 900px
-   screen was squeezed to 77px with the waveform still at 443. media-bridge's is
-   `flex-1` (a zero basis) for the same reason */
+   screen was squeezed to 77px with the waveform still at 443, so it takes a
+   zero basis */
 .player-wide .player-wave {
   flex: 1 1 0;
 }

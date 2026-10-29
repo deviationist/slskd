@@ -1,8 +1,7 @@
 /*
  * Where a problem sits in the track, as marks on the waveform's own x-axis.
  *
- * Twin: media-bridge web/app/src/features/plex/lanes.ts. The rules are the
- * same; the input is the analysis contract's shape, where a lane names its
+ * The input is the analysis contract's shape, where a lane names its
  * finding by id rather than living under the finding's code.
  */
 

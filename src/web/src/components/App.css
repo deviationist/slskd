@@ -558,7 +558,7 @@ body {
     white-space: nowrap;
 }
 
-/* media-bridge injects a play button and a quality badge into `.flatlist-cell`,
+/* An injected script may add a play button and a quality badge to `.flatlist-cell`,
    and the filename has to be the only thing that gives way to them.
 
    The flex is on that inner element rather than on the cell, which is what the
@@ -808,7 +808,7 @@ body {
 /* The table views on a phone: a row is a small block, not a line of columns.
 
    As columns, a 390px screen gave File about 100px, and on a finished track
-   media-bridge's play button, copy icon and badge took all of it -- the row
+   an injected play button, copy icon and badge took all of it -- the row
    showed a chip cut down to "Cl" and no filename at all -- while User ran off
    the right-hand edge. Here the name has a line to itself and may wrap; the
    peer and the folder share the line under it, and whatever else the column
@@ -1552,8 +1552,7 @@ time {
            instead of stopping above a strip of the bar's own background.
            The items keep to the band above the home indicator, though: the
            inset is padding inside each item (see .mobile-nav-item). Centred
-           across the whole bar, as the homelab note on screen edges
-           recommends, the labels sat on top of the indicator and the bar
+           across the whole bar, the labels sat on top of the indicator and the bar
            read as too low. The floor is the bar where there is no inset. */
         --mobile-nav-band: 56px;
         --mobile-nav-floor: 56px;

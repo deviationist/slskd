@@ -1,7 +1,5 @@
 import { labelSide, laneOf, lanesFor, markOpacity, runs } from './lanes';
 
-// twin: media-bridge web/app/test/lanes.test.ts
-
 const finding = (id, over = {}) => ({
   id,
   label: id,
