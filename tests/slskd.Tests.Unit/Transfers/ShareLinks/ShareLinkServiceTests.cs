@@ -453,6 +453,66 @@ public sealed class ShareLinkServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task An_Address_Mailed_To_Is_Remembered_Past_Its_Share()
+    {
+        var a = Download("@@x\\Album\\a.flac", "a");
+        var link = await Service.CreateAsync([a.Id], days: 1, general: false);
+        await Service.SendAsync(link.Id, Url, ["kim@example.com"]);
+
+        Expire(link.Id);
+        await Service.SweepAsync();
+
+        Assert.Null(await Service.FindAsync(link.Id));
+        var recipient = Assert.Single(await Service.ListRecipientsAsync());
+        Assert.Equal("kim@example.com", recipient.Address);
+        Assert.Equal(1, recipient.SendCount);
+    }
+
+    [Fact]
+    public async Task Mailing_An_Address_Again_In_Another_Case_Is_The_Same_Address()
+    {
+        var a = Download("@@x\\Album\\a.flac", "a");
+        var first = await Service.CreateAsync([a.Id], days: 1, general: false);
+        var second = await Service.CreateAsync([a.Id], days: 1, general: false);
+        await Service.SendAsync(first.Id, Url, ["kim@example.com", "lee@example.com"]);
+        await Service.SendAsync(second.Id, Url, ["KIM@example.com"]);
+
+        var recipients = await Service.ListRecipientsAsync();
+
+        // the most recent first, as last spelled
+        Assert.Equal(["KIM@example.com", "lee@example.com"], recipients.Select(r => r.Address));
+        Assert.Equal(2, recipients[0].SendCount);
+        Assert.True(recipients[0].LastSentAt >= recipients[0].FirstSentAt);
+    }
+
+    [Fact]
+    public async Task An_Address_That_Was_Never_Reached_Is_Not_Remembered()
+    {
+        var a = Download("@@x\\Album\\a.flac", "a");
+        var link = await Service.CreateAsync([a.Id], days: 1, general: false);
+        Adapter.Fail = true;
+
+        await Service.SendAsync(link.Id, Url, ["kim@example.com"]);
+
+        Assert.Empty(await Service.ListRecipientsAsync());
+    }
+
+    [Fact]
+    public async Task Forgetting_An_Address_Leaves_Its_Link_Working()
+    {
+        var a = Download("@@x\\Album\\a.flac", "a");
+        var link = await Service.CreateAsync([a.Id], days: 1, general: false);
+        await Service.SendAsync(link.Id, Url, ["kim@example.com"]);
+
+        Assert.True(await Service.ForgetRecipientAsync("Kim@Example.com"));
+        Assert.False(await Service.ForgetRecipientAsync("kim@example.com"));
+
+        Assert.Empty(await Service.ListRecipientsAsync());
+        var access = Assert.Single((await Service.FindAsync(link.Id)).Accesses);
+        Assert.NotNull(await Service.FindByTokenAsync(access.Token));
+    }
+
+    [Fact]
     public async Task Withdrawing_A_Share_Ends_Every_Link_To_It()
     {
         var a = Download("@@x\\Album\\a.flac", "a");

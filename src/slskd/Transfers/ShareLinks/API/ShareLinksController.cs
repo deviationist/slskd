@@ -226,6 +226,36 @@ public class ShareLinksController : ControllerBase
     }
 
     /// <summary>
+    ///     Lists the addresses shares have been mailed to, for the recipients field to suggest.
+    /// </summary>
+    /// <returns>The addresses, the most recently mailed first.</returns>
+    /// <response code="200">The request completed successfully.</response>
+    [HttpGet("api/v{version:apiVersion}/links/recipients")]
+    [Authorize(Policy = AuthPolicy.Any)]
+    [Produces("application/json")]
+    [ProducesResponseType(typeof(List<ShareLinkRecipient>), 200)]
+    public async Task<IActionResult> ListRecipients()
+    {
+        return Ok(await Links.ListRecipientsAsync());
+    }
+
+    /// <summary>
+    ///     Forgets an address, so that it is no longer suggested. A link already mailed to it keeps working.
+    /// </summary>
+    /// <param name="address">The address.</param>
+    /// <returns>The operation context.</returns>
+    /// <response code="204">The address is forgotten.</response>
+    /// <response code="404">The address was not remembered.</response>
+    [HttpDelete("api/v{version:apiVersion}/links/recipients/{address}")]
+    [Authorize(Policy = AuthPolicy.Any)]
+    [ProducesResponseType(204)]
+    [ProducesResponseType(404)]
+    public async Task<IActionResult> ForgetRecipient([FromRoute] string address)
+    {
+        return await Links.ForgetRecipientAsync(address) ? NoContent() : NotFound();
+    }
+
+    /// <summary>
     ///     Creates a share link, and mails it if asked to.
     /// </summary>
     /// <param name="request">The link.</param>

@@ -8,6 +8,7 @@ import {
   isRecipient,
   isShareable,
   parseRecipients,
+  suggestRecipients,
   summarizeRecipients,
 } from './shareLinks';
 
@@ -218,5 +219,50 @@ describe('describeAccess', () => {
         lastDownloadedAt: '2026-10-25T12:00:00Z',
       }),
     ).toMatch(/^downloaded 2 times, last /u);
+  });
+});
+
+describe('suggestRecipients', () => {
+  // most recently mailed first, as the server lists them
+  const history = [
+    { address: 'kari@firma.no' },
+    { address: 'ola.nordmann@x.no' },
+    { address: 'Oline@example.com' },
+    { address: 'per+music@firma.no' },
+  ];
+
+  const suggest = (draft, recipients = []) =>
+    suggestRecipients({ draft, history, recipients }).map(
+      (entry) => entry.address,
+    );
+
+  it('offers nothing before something is typed', () => {
+    expect(suggest('')).toEqual([]);
+    expect(suggest('  ')).toEqual([]);
+  });
+
+  it('offers addresses that start with what is typed, ignoring case', () => {
+    expect(suggest('OL')).toEqual(['ola.nordmann@x.no', 'Oline@example.com']);
+  });
+
+  it('offers those with a word that starts with it after those that start with it', () => {
+    expect(suggest('nord')).toEqual(['ola.nordmann@x.no']);
+    expect(suggest('firma')).toEqual(['kari@firma.no', 'per+music@firma.no']);
+    expect(suggest('mus')).toEqual(['per+music@firma.no']);
+    expect(suggest('k')).toEqual(['kari@firma.no']);
+  });
+
+  it('does not match on the top-level domain', () => {
+    expect(suggest('com')).toEqual([]);
+  });
+
+  it('leaves out addresses that are already pills', () => {
+    expect(suggest('ol', ['OLA.nordmann@x.no'])).toEqual(['Oline@example.com']);
+  });
+
+  it('offers at most the limit', () => {
+    expect(
+      suggestRecipients({ draft: 'f', history, limit: 1, recipients: [] }),
+    ).toHaveLength(1);
   });
 });

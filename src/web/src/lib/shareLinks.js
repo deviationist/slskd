@@ -56,6 +56,20 @@ export const mail = async ({ id, recipients }) =>
 export const revoke = async ({ id }) =>
   api.delete(`/links/${encodeURIComponent(id)}`);
 
+/**
+ * The addresses shares have been mailed to, the most recently mailed first:
+ * `{ address, firstSentAt, lastSentAt, sendCount }`. The server keeps them
+ * past the shares themselves, for the recipients field to suggest.
+ */
+export const recipientHistory = async () =>
+  (await api.get('/links/recipients')).data;
+
+/**
+ * Stops suggesting an address. Links already mailed to it keep working.
+ */
+export const forgetRecipient = async ({ address }) =>
+  api.delete(`/links/recipients/${encodeURIComponent(address)}`);
+
 export const createGeneral = async ({ id }) =>
   (await api.post(`/links/${encodeURIComponent(id)}/general`)).data;
 
@@ -173,6 +187,61 @@ export const addRecipients = (recipients, text) => {
     ...recipients,
     ...parseRecipients(text).filter((value) => !taken.has(value.toLowerCase())),
   ];
+};
+
+/**
+ * How many earlier addresses the recipients field offers at once.
+ */
+export const MAXIMUM_SUGGESTIONS = 6;
+
+// where a word starts inside an address: `ola` finds ola.nordmann@x.no, and
+// so do `nord` and `x`. Not `no`: the top-level domain is shared by too many
+// addresses to tell any of them apart
+const WORD_BREAK = /[._+@-]/u;
+
+const wordsOf = (address) => address.split(WORD_BREAK).slice(1, -1);
+
+/**
+ * The earlier addresses to offer for what is being typed: those that start
+ * with it, then those with a word that does, each in the order the history
+ * has them (the most recently mailed first). An address already a pill is
+ * not offered again, and nothing is offered before something is typed.
+ * @param {object} params
+ * @param {string} params.draft - What is being typed.
+ * @param {object[]} params.history - From {@link recipientHistory}.
+ * @param {string[]} params.recipients - The pills.
+ * @param {number} [params.limit] - The most to offer.
+ * @returns {object[]} The entries of the history to offer.
+ */
+export const suggestRecipients = ({
+  draft,
+  history,
+  limit = MAXIMUM_SUGGESTIONS,
+  recipients,
+}) => {
+  const query = (draft ?? '').trim().toLowerCase();
+
+  if (!query || !history?.length) {
+    return [];
+  }
+
+  const taken = new Set(recipients.map((value) => value.toLowerCase()));
+  const starts = [];
+  const words = [];
+
+  for (const entry of history) {
+    const address = entry.address.toLowerCase();
+
+    if (taken.has(address)) continue;
+
+    if (address.startsWith(query)) {
+      starts.push(entry);
+    } else if (wordsOf(address).some((word) => word.startsWith(query))) {
+      words.push(entry);
+    }
+  }
+
+  return [...starts, ...words].slice(0, limit);
 };
 
 /**

@@ -209,3 +209,43 @@ public class ShareLinkFile
     /// </summary>
     public string Username { get; set; }
 }
+
+/// <summary>
+///     An address a share has been mailed to, remembered so that the next one can be offered it as it is typed.
+/// </summary>
+/// <remarks>
+///     Kept apart from <see cref="ShareLinkAccess"/> because those go with their share when it expires, and the point
+///     of this is to remember who was shared with long after what was shared is gone. Only an address a mail actually
+///     went to is kept: a typo that bounced at the relay is not worth suggesting again.
+/// </remarks>
+public class ShareLinkRecipient
+{
+    /// <summary>
+    ///     Gets or sets the address in lower case, which is what makes two spellings of it one address -- as the
+    ///     server compares recipients everywhere else.
+    /// </summary>
+    [Key]
+    [JsonIgnore]
+    public string Key { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the address as it was last typed.
+    /// </summary>
+    [Required]
+    public string Address { get; set; }
+
+    /// <summary>
+    ///     Gets or sets when a share was first mailed to it.
+    /// </summary>
+    public DateTime FirstSentAt { get; set; }
+
+    /// <summary>
+    ///     Gets or sets when a share was last mailed to it.
+    /// </summary>
+    public DateTime LastSentAt { get; set; }
+
+    /// <summary>
+    ///     Gets or sets how many mails have gone to it.
+    /// </summary>
+    public int SendCount { get; set; }
+}
