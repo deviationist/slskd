@@ -37,19 +37,42 @@ export const isComparable = (file) =>
   PLAYABLE.has(extensionOf(file.filename));
 
 /**
+ * Why a ticked row cannot be compared, in words that follow its name; null
+ * when it can.
+ */
+export const whyLeftOut = (file) => {
+  if (!transfers.isFinishedDownload(file))
+    return 'has not finished downloading';
+  if (!transfers.isRetrievable(file) || file.localFileExists === false) {
+    return 'no longer has its file';
+  }
+
+  if (!PLAYABLE.has(extensionOf(file.filename))) return 'is not an audio file';
+
+  return null;
+};
+
+/**
  * Whether the button would do something, and its tooltip either way.
  *
  * Counted, because "off" with two rows ticked is a puzzle: the rows are
- * ticked, so which of them does not count is the whole answer.
+ * ticked, so which of them does not count is the whole answer. And when it is
+ * on with some of the ticked rows left out, it says so: comparing two of
+ * three in silence reads as the third having been compared and lost -- or as
+ * Compare ignoring the new tick, which is how it was reported.
  * @param {object[]} ticked - Every row ticked, across every card.
- * @returns {object} `on`, `tip`, and the `picks` it would compare.
+ * @returns {object} `on`, `tip`, the `picks` it would compare, and the rows `left` out with why.
  */
 export const compareWhy = (ticked) => {
   const done = ticked.filter(transfers.isFinishedDownload);
   const picks = ticked.filter(isComparable);
+  const left = ticked
+    .map((file) => ({ file, reason: whyLeftOut(file) }))
+    .filter(({ reason }) => reason !== null);
 
   if (ticked.length < 2) {
     return {
+      left,
       on: false,
       picks,
       tip: 'Tick two or more finished downloads, in any card, to check whether they are the same track',
@@ -58,6 +81,7 @@ export const compareWhy = (ticked) => {
 
   if (done.length < 2) {
     return {
+      left,
       on: false,
       picks,
       tip: `${ticked.length} ticked, but only ${done.length} ${done.length === 1 ? 'has' : 'have'} finished downloading — only finished downloads can be compared`,
@@ -66,6 +90,7 @@ export const compareWhy = (ticked) => {
 
   if (picks.length < 2) {
     return {
+      left,
       on: false,
       picks,
       tip: `${done.length} finished, but only ${picks.length} ${picks.length === 1 ? 'is' : 'are'} an audio file still on disk`,
@@ -74,16 +99,25 @@ export const compareWhy = (ticked) => {
 
   if (picks.length > MAXIMUM_FILES) {
     return {
+      left,
       on: false,
       picks,
       tip: `At most ${MAXIMUM_FILES} at a time — ${picks.length} are ticked`,
     };
   }
 
+  const leftOut =
+    left.length === 0
+      ? ''
+      : left.length === 1
+        ? ` — 1 more ticked is left out: it ${left[0].reason}`
+        : ` — ${left.length} more ticked are left out`;
+
   return {
+    left,
     on: true,
     picks,
-    tip: `Check whether these ${picks.length} are the same track`,
+    tip: `Check whether these ${picks.length} are the same track${leftOut}`,
   };
 };
 

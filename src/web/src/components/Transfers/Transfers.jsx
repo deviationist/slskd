@@ -219,7 +219,7 @@ const Transfers = ({ direction, server }) => {
   const [tickedByUser, setTickedByUser] = useState({});
   const onCompareRequested =
     direction === 'download' && compareLibrary.isEnabled(options)
-      ? (picks) => setComparing(picks)
+      ? (picks, left) => setComparing({ left, picks })
       : undefined;
   const onSelectionReport = useCallback((username, files) => {
     setTickedByUser((previous) => {
@@ -514,8 +514,9 @@ const Transfers = ({ direction, server }) => {
       )}
       {comparing && (
         <CompareDialog
+          left={comparing.left}
           onClose={() => setComparing(null)}
-          picks={comparing}
+          picks={comparing.picks}
         />
       )}
       {sharing && (

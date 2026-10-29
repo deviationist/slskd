@@ -1,4 +1,4 @@
-import { CompareAnswer } from './CompareDialog';
+import { CompareAnswer, LeftOut } from './CompareDialog';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
@@ -114,5 +114,30 @@ describe('CompareAnswer', () => {
 
     expect(html).toContain('Hm');
     expect(html).not.toMatch(/ui (red|green|yellow|orange)[^"]*message/u);
+  });
+});
+
+describe('LeftOut', () => {
+  it('names each ticked row that was not compared, and why', () => {
+    const html = renderToStaticMarkup(
+      <LeftOut
+        left={[
+          {
+            file: row('q', 'Queue', "06 Aurora's Embrace.flac"),
+            reason: 'has not finished downloading',
+          },
+        ]}
+      />,
+    );
+
+    expect(html).toContain('Not compared: 1 ticked track');
+    expect(html).toMatch(/ui warning message/u);
+    expect(html).toContain(
+      '06 Aurora&#x27;s Embrace.flac has not finished downloading.',
+    );
+  });
+
+  it('draws nothing when nothing was left out', () => {
+    expect(renderToStaticMarkup(<LeftOut left={[]} />)).toBe('');
   });
 });

@@ -88,12 +88,57 @@ describe('compareWhy', () => {
     });
   });
 
+  it('says what it leaves out rather than comparing fewer in silence', () => {
+    // the case that was reported: two compared, a third ticked that is still
+    // queued, and Compare pressed again -- which compared the same two, and
+    // said nothing about the third
+    const queued = done('c.flac', {
+      localFilename: null,
+      state: 'Queued, Remotely',
+    });
+    const why = compareWhy([done('a.flac'), done('b.flac'), queued]);
+
+    expect(why.on).toBe(true);
+    expect(why.picks.map((f) => f.id)).toEqual(['a.flac', 'b.flac']);
+    expect(why.left).toEqual([
+      { file: queued, reason: 'has not finished downloading' },
+    ]);
+    expect(why.tip).toBe(
+      'Check whether these 2 are the same track — 1 more ticked is left out: it has not finished downloading',
+    );
+  });
+
+  it('names each reason a row is left out', () => {
+    const why = compareWhy([
+      done('a.flac'),
+      done('b.flac'),
+      done('gone.flac', { localFileExists: false }),
+      done('cover.jpg'),
+      done('c.flac', { state: 'InProgress' }),
+    ]);
+
+    expect(why.left.map((l) => l.reason)).toEqual([
+      'no longer has its file',
+      'is not an audio file',
+      'has not finished downloading',
+    ]);
+    expect(why.tip).toBe(
+      'Check whether these 2 are the same track — 3 more ticked are left out',
+    );
+  });
+
+  it('leaves nothing out when everything ticked can be compared', () => {
+    expect(compareWhy([done('a.flac'), done('b.flac')]).left).toEqual([]);
+  });
+
   it('compares only the rows it can, in the order ticked', () => {
     const why = compareWhy([done('b.flac'), done('cover.jpg'), done('a.flac')]);
 
     expect(why.on).toBe(true);
     expect(why.picks.map((f) => f.id)).toEqual(['b.flac', 'a.flac']);
-    expect(why.tip).toBe('Check whether these 2 are the same track');
+    expect(why.tip).toBe(
+      'Check whether these 2 are the same track — 1 more ticked is left out: it is not an audio file',
+    );
   });
 });
 
