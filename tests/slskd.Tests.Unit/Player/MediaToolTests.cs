@@ -25,6 +25,47 @@ namespace slskd.Tests.Unit.Player
         public void Dispose() => Directory.Delete(Temp, recursive: true);
 
         [Fact]
+        public void The_input_guard_names_one_protocol_and_no_format_that_reads_other_files()
+        {
+            var guard = MediaTool.InputGuard;
+            var protocols = guard[guard.ToList().IndexOf("-protocol_whitelist") + 1];
+            var formats = guard[guard.ToList().IndexOf("-format_whitelist") + 1].Split(',');
+
+            Assert.Equal("file", protocols);
+            Assert.DoesNotContain(formats, f => f is "dash" or "hls" or "concat" or "image2" or "data" or "tee");
+        }
+
+        [Fact]
+        public async Task A_file_named_as_audio_that_is_really_a_manifest_is_not_followed()
+        {
+            if (!Has("ffmpeg") || !Has("ffprobe"))
+            {
+                return;
+            }
+
+            // a DASH manifest under an audio name, its BaseURL a real track somewhere else: ffmpeg left to detect the
+            // format itself decodes that other file, which the player would then stream
+            var elsewhere = Path.Combine(Temp, "elsewhere.m4a");
+            Run("ffmpeg", "-v", "error", "-f", "lavfi", "-i", "sine=frequency=440:duration=3", "-c:a", "aac", elsewhere);
+            var manifest = Path.Combine(Temp, "innocent.mp3");
+            File.WriteAllText(manifest,
+                "<?xml version=\"1.0\"?><MPD xmlns=\"urn:mpeg:dash:schema:mpd:2011\" type=\"static\" mediaPresentationDuration=\"PT3S\""
+                + " minBufferTime=\"PT1S\" profiles=\"urn:mpeg:dash:profile:isoff-on-demand:2011\"><Period><AdaptationSet mimeType=\"audio/mp4\">"
+                + $"<Representation id=\"a\" bandwidth=\"128000\" codecs=\"mp4a.40.2\"><BaseURL>{elsewhere}</BaseURL></Representation>"
+                + "</AdaptationSet></Period></MPD>");
+
+            var options = new slskd.Options();
+            var tool = new MediaTool(new TestOptionsMonitor<slskd.Options>(options));
+
+            await Assert.ThrowsAnyAsync<Exception>(() => tool.DecodeAsync(manifest));
+            await Assert.ThrowsAnyAsync<Exception>(() => tool.TranscodeAsync(manifest, Path.Combine(Temp, "out.webm"), Codecs.Find("opus")));
+            Assert.Null(await tool.ProbeDurationAsync(manifest));
+
+            // and the real file it pointed at still decodes, so the guard shut out the trick and not the format
+            Assert.NotEmpty(await tool.DecodeAsync(elsewhere));
+        }
+
+        [Fact]
         public async Task An_aiff_with_a_cover_becomes_a_checked_opus_and_aac_and_a_waveform()
         {
             if (!Has("ffmpeg") || !Has("ffprobe"))

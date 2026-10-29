@@ -104,6 +104,55 @@ namespace slskd.Tests.Unit.Player
         }
 
         [Fact]
+        public void A_folder_link_inside_the_downloads_directory_pointing_out_of_it_is_refused()
+        {
+            // the link is a folder on the way, not the file itself: following only the last component would see a
+            // path that is, as written, inside the downloads directory
+            Write(Path.Combine(Outside, "secret.flac"));
+            Directory.CreateSymbolicLink(Path.Combine(Downloads, "User", "linked"), Outside);
+
+            var download = Finished(Path.Combine(Downloads, "User", "linked", "secret.flac"));
+
+            Assert.Null(PlayableFile.Resolve(download, Downloads, Files, out var reason));
+            Assert.Equal(Unplayable.Refused, reason);
+        }
+
+        [Fact]
+        public void A_link_that_stays_inside_the_downloads_directory_still_plays()
+        {
+            var target = Write(Path.Combine(Downloads, "User", "Album", "01.flac"));
+            Directory.CreateSymbolicLink(Path.Combine(Downloads, "Shortcut"), Path.Combine(Downloads, "User", "Album"));
+
+            var file = PlayableFile.Resolve(Finished(Path.Combine(Downloads, "Shortcut", "01.flac")), Downloads, Files, out _);
+
+            Assert.Equal(target, file?.FullName);
+        }
+
+        [Fact]
+        public void A_downloads_directory_that_is_itself_a_link_still_holds_its_own_files()
+        {
+            var linked = Path.Combine(Temp, "linked-downloads");
+            Directory.CreateSymbolicLink(linked, Downloads);
+            Write(Path.Combine(Downloads, "User", "Album", "01.flac"));
+
+            var file = PlayableFile.Resolve(Finished(Path.Combine(linked, "User", "Album", "01.flac")), linked, Files, out _);
+
+            Assert.NotNull(file);
+        }
+
+        [Fact]
+        public void A_loop_of_links_is_gone_rather_than_hanging()
+        {
+            var a = Path.Combine(Downloads, "a");
+            var b = Path.Combine(Downloads, "b");
+            Directory.CreateSymbolicLink(a, b);
+            Directory.CreateSymbolicLink(b, a);
+
+            Assert.Null(PlayableFile.Resolve(Finished(Path.Combine(a, "x.flac")), Downloads, Files, out var reason));
+            Assert.Equal(Unplayable.Gone, reason);
+        }
+
+        [Fact]
         public void A_recorded_path_with_traversal_segments_is_refused()
         {
             Write(Path.Combine(Outside, "x.flac"));

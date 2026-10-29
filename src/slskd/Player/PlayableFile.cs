@@ -76,7 +76,8 @@ public enum Unplayable
 ///     <para>
 ///         Containment is checked twice, as it is everywhere a path is opened: lexically, before the filesystem is
 ///         asked, and again after symlinks are followed, which is the only check that catches a link inside the
-///         downloads directory pointing out of it.
+///         downloads directory pointing out of it. Followed at every level of the path (<see cref="RealPath"/>), not
+///         only the last: a link to a folder on the way leaves the path as written inside the directory.
 ///     </para>
 /// </remarks>
 public static class PlayableFile
@@ -133,7 +134,8 @@ public static class PlayableFile
 
         try
         {
-            resolved = files.ResolveFileInfo(filename);
+            // every link on the way followed first; what is left for the file service to translate is its errors
+            resolved = files.ResolveFileInfo(RealPath(filename));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or UnauthorizedException or ArgumentException)
         {
@@ -147,8 +149,19 @@ public static class PlayableFile
             return null;
         }
 
-        // the root resolved too, so a downloads directory that is itself a link still contains its own files
-        var realRoot = ResolveDirectory(root);
+        // the root resolved the same way, so a downloads directory that is itself a link, or reached through one,
+        // still contains its own files
+        string realRoot;
+
+        try
+        {
+            realRoot = Path.TrimEndingDirectorySeparator(RealPath(root));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            reason = Unplayable.Gone;
+            return null;
+        }
 
         if (!Within(resolved.FullName, realRoot) || !Codecs.Playable.Contains(resolved.Extension))
         {
@@ -159,18 +172,45 @@ public static class PlayableFile
         return resolved;
     }
 
-    private static string ResolveDirectory(string directory)
+    /// <summary>
+    ///     The path with every symlink on it followed, at every level, as realpath(3) gives it.
+    /// </summary>
+    /// <remarks>
+    ///     .NET's own link resolution reads the link at the path's last component only, which is the file, so a
+    ///     folder link on the way was never followed -- <c>downloads/d -> /etc</c> made <c>downloads/d/x.flac</c> a
+    ///     path that read as inside. A component that does not exist is kept as written, and the caller's existence
+    ///     check says so.
+    /// </remarks>
+    /// <param name="path">An absolute path.</param>
+    /// <param name="depth">How many links have been followed to get here.</param>
+    /// <returns>The resolved path.</returns>
+    /// <exception cref="IOException">Thrown when links loop, or nest more deeply than the kernel itself allows.</exception>
+    internal static string RealPath(string path, int depth = 0)
     {
-        try
+        // the kernel's own limit (MAXSYMLINKS) on following links in one lookup
+        if (depth > 40)
         {
-            var info = new DirectoryInfo(directory);
-            var target = info.ResolveLinkTarget(returnFinalTarget: true);
-            return Path.TrimEndingDirectorySeparator(target?.FullName ?? info.FullName);
+            throw new IOException("Too many levels of symbolic links");
         }
-        catch (IOException)
+
+        var full = Path.GetFullPath(path);
+        var current = Path.GetPathRoot(full) ?? string.Empty;
+
+        foreach (var part in full[current.Length..].Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries))
         {
-            return directory;
+            var next = Path.Combine(current, part);
+            var link = new FileInfo(next).LinkTarget;
+
+            if (link is not null)
+            {
+                // relative to the folder the link sits in, and possibly through further links of its own
+                next = RealPath(Path.IsPathRooted(link) ? link : Path.Combine(current, link), depth + 1);
+            }
+
+            current = next;
         }
+
+        return current;
     }
 
     private static bool Within(string path, string root)
