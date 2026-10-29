@@ -1,0 +1,81 @@
+/* the Compare dialog: the verdict, then the files grouped by track */
+
+.compare-why {
+  color: var(--slskd-color-subtle, rgba(0, 0, 0, 0.6));
+}
+
+.compare-waiting {
+  align-items: center;
+  display: flex;
+  gap: 0.75em;
+  margin: 1.5em 0;
+}
+
+.compare-section {
+  margin-top: 1.25em;
+}
+
+.compare-section h4 {
+  margin-bottom: 0.4em;
+}
+
+.compare-count {
+  color: var(--slskd-color-subtle, rgba(0, 0, 0, 0.6));
+  font-weight: normal;
+}
+
+.compare-members {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.compare-member {
+  align-items: center;
+  border-top: 1px solid var(--slskd-divider-color, rgba(34, 36, 38, 0.15));
+  display: flex;
+  gap: 0.6em;
+  padding: 0.5em 0;
+}
+
+.compare-member:first-child {
+  border-top: none;
+}
+
+.compare-member-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.compare-member-name,
+.compare-member-note {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compare-member-note {
+  color: var(--slskd-color-subtle, rgba(0, 0, 0, 0.6));
+  font-size: 0.9em;
+}
+
+.compare-member-length {
+  color: var(--slskd-color-subtle, rgba(0, 0, 0, 0.6));
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.compare-line {
+  margin: 0.3em 0;
+}
+
+/* a verdict level this page does not know, or `unknown`: no colour of its own */
+.compare-verdict-unknown {
+  opacity: 0.9;
+}
+
+/* off, but still hoverable: dimmed the way Semantic dims a disabled button */
+.ui.button.compare-off {
+  cursor: default;
+  opacity: 0.45;
+}
