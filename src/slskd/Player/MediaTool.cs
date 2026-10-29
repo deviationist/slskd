@@ -92,6 +92,30 @@ public class MediaTool : IMediaTool
     public static readonly TimeSpan ProbeTimeout = TimeSpan.FromSeconds(30);
 
     /// <summary>
+    ///     Input options for every ffmpeg and ffprobe that opens a file, placed before it.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Everything before this -- <see cref="PlayableFile"/>, the extension in <see cref="Codecs.Playable"/> -- is
+    ///         about the file's name; ffmpeg judges its bytes. A file called <c>X.mp3</c> that is really a DASH manifest is
+    ///         opened by the <c>dash</c> demuxer, and its BaseURL sends ffmpeg to any local media file, outside the
+    ///         downloads directory -- and the player then streams it. Reproduced on 2026-10-29 with this image's ffmpeg
+    ///         6.1.1. A peer chooses both the name and the bytes, so the name alone settles nothing.
+    ///     </para>
+    ///     <para>
+    ///         Pinned to the demuxers for <see cref="Codecs.Playable"/> (<c>mov</c> covers m4a and ALAC, <c>asf</c> is
+    ///         WMA, <c>w64</c> a large WAV), plus <c>matroska</c> for the player's own WebM transcodes, which
+    ///         <see cref="ProbeDurationAsync"/> checks; and to the <c>file</c> protocol, so nothing a file names can reach
+    ///         anything else. A file in none of these formats is refused rather than interpreted.
+    ///     </para>
+    /// </remarks>
+    public static readonly IReadOnlyList<string> InputGuard =
+    [
+        "-protocol_whitelist", "file",
+        "-format_whitelist", "mp3,flac,aiff,wav,w64,mov,aac,ogg,ape,asf,wv,matroska",
+    ];
+
+    /// <summary>
     ///     Initializes a new instance of the <see cref="MediaTool"/> class.
     /// </summary>
     /// <param name="optionsMonitor">The options monitor.</param>
@@ -110,10 +134,12 @@ public class MediaTool : IMediaTool
         var (_, stdout) = await RunAsync(Ffmpeg, new[]
         {
             "-v", "error", "-nostdin",
+        }.Concat(InputGuard).Concat(new[]
+        {
             "-i", source,
             "-t", Codecs.MaxSeconds.ToString(CultureInfo.InvariantCulture),
             "-vn", "-ac", "1", "-ar", Waveform.PeakRate.ToString(CultureInfo.InvariantCulture), "-f", "s16le", "-",
-        }, Timeout, capture: true, cancellationToken);
+        }), Timeout, capture: true, cancellationToken);
 
         return stdout;
     }
@@ -123,12 +149,14 @@ public class MediaTool : IMediaTool
         => RunAsync(Ffmpeg, new[]
         {
             "-v", "error", "-nostdin", "-y",
+        }.Concat(InputGuard).Concat(new[]
+        {
             "-i", source,
             "-t", Codecs.MaxSeconds.ToString(CultureInfo.InvariantCulture),
 
             // no video: these files carry cover art, and the WebM muxer will not take it
             "-vn",
-        }.Concat(codec.Arguments).Append(destination), Timeout, capture: false, cancellationToken);
+        }).Concat(codec.Arguments).Append(destination), Timeout, capture: false, cancellationToken);
 
     /// <inheritdoc/>
     public async Task<double?> ProbeDurationAsync(string path, CancellationToken cancellationToken = default)
@@ -137,8 +165,11 @@ public class MediaTool : IMediaTool
         {
             var (_, stdout) = await RunAsync(Ffprobe, new[]
             {
-                "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", path,
-            }, ProbeTimeout, capture: true, cancellationToken);
+                "-v", "error",
+            }.Concat(InputGuard).Concat(new[]
+            {
+                "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", path,
+            }), ProbeTimeout, capture: true, cancellationToken);
 
             var text = System.Text.Encoding.UTF8.GetString(stdout).Trim();
             return double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var seconds) && seconds > 0 ? seconds : null;
