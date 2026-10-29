@@ -155,6 +155,91 @@ design rather than a gap. Fold Results is hidden in table view for that reason.
 | `feature/explain-hide-result`, `feature/confirm-removal-with-enter`, `feature/confirm-bulk-removal` | The red cross on a result card says what it does; a removal confirms with Enter as it already cancels with Escape; a selection asks before it deletes files, as a single row already did. | Ours, the last one because the prompt is worded from `delete_file_on_removal`. |
 | `feature/player` | A **player** for finished downloads, built into the app rather than injected over it: a bar docked above the footer on a desktop; on a phone a mini bar joined to the top of the bottom menu, opening into a drawer (swipe to fold) -- the layout makes room for it (`--player-dock-h`) and the selection footer and toasts stand on it. The server transcodes what it plays (most downloads are AIFF, which Chrome and Firefox do not play), draws the waveform and reads the cover, all cached and checked; ffmpeg is in the image. Audio and covers are authorised by a stream ticket, because an `<audio>` cannot send a header. Optionally, an **analysis provider** -- an external service answering what is wrong with a track, under the contract in `docs/player-analysis-provider.md` -- puts a verdict badge on each row, problem lanes under the waveform and a findings sheet. Ported from an earlier player that was injected into the page. | Ours. The player would stand alone upstream; the provider contract is general but has one implementation. |
 
+### Compare
+
+Tick some finished downloads, press Compare, and be told which are the same
+recording, judged from the audio rather than the names. As with the player's
+analysis, slskd judges nothing itself: it asks a **compare provider** over
+HTTP under the contract in `docs/transfers-compare-provider.md`, and draws the
+answer. Off unless `transfers.compare.enabled` is set and a provider is
+configured; otherwise the button is not drawn.
+
+| Branch | What it does | Upstream |
+|---|---|---|
+| `feature/compare` | The contract and its JSON Schema, the backend and the dialog. `POST /api/v0/compare` takes download ids and resolves each to the file it recorded, through the same `PlayableFile.Resolve` the player uses, so the browser never names a path. `?wait=false` answers `pending` at once and the browser polls, rather than holding a connection open while a dozen files are decoded. The provider's answer describes itself -- a verdict, a headline, a note per copy -- so slskd needs no thresholds of its own. The button sits beside Share in both views. | Ours. The contract is general; Compare reads this fork's `Transfer.LocalFilename`. |
+| `fix/compare-says-what-it-left-out` | A ticked download with no file yet -- still queued, say -- was left out in silence, and the request that remained was the same as the last one, so it was answered from the cache and looked exactly like Compare ignoring the new tick. The dialog now names what it left out and why. | Ours. |
+| `fix/compare-error-handling`, `fix/player-input-hardening` | From a security pass over Compare: a body that does not bind is a 400, refusals are fixed words that reveal nothing, ffmpeg opens only the file it is asked to play, and symlinks are followed all the way before containment is judged. | Ours. |
+
+### Share links
+
+A finished download handed to someone without an account: a link to a page
+listing the files, each downloadable on its own and as one zip, that works
+until it expires. Configured under `transfers.share_links.*` -- `enabled`,
+`directory`, `base_url`, `default_days` and `max_days`. The link page is served
+at `/l/{token}`, outside the API's versioning.
+
+| Branch | What it does | Upstream |
+|---|---|---|
+| `feature/share-links` | Shares, their page and their mail. A share has a general link to hand out by any means and one link per address it was mailed to, each with its own token, so one person's access can be revoked without stopping anyone else's; the revoked link stays listed as the record of who was given it. Each link counts its downloads and records whether its mail arrived, and the download can be removed from the list in the same step as sharing it. | Ours. |
+| `fix/share-link-hardening` | A share's files are served only if neither the file nor any folder between it and the share's own is a symlink. slskd never makes one -- every copy is a new file in a new folder -- so one found there was put there by someone else, and following it would hand a stranger whatever it names. The page is served under a strict content security policy. | Ours. |
+| `fix/archive-entry-names-windows-safe` | Zip entry names follow Windows' rules whatever the server runs, because an archive is unpacked by whoever downloads it. On Linux only `/` and NUL are invalid, so a peer's folder named `C:` arrived as the entry `C:/name.flac`, which a naive extractor on Windows reads as a drive. | Ours, though it applies to every archive this fork builds. |
+| `feature/share-link-recipient-pills`, `feature/share-link-recipient-suggestions`, `feature/recipients-keyboard-nav`, `feature/recipients-range-select`, `fix/recipients-input-polish`, `fix/paste-pill-and-dark-checkbox` | The recipients field works as a mail client's To field. An address becomes a pill when it is ended, and one that is not an address is marked red on its own. Addresses mailed before are suggested as one is typed, most recent first. The pills can be walked, selected as a range, copied, cut and edited from the keyboard, and a pasted address becomes its pill at once, display name and all. | Ours. |
+| `feature/share-link-longer-durations` | Two and three months as presets beside the shorter ones, in the dialog and in Extend; a preset above the server's `max_days` is not shown. | Ours. |
+| `fix/shared-page-dark-text` | The Shared page's sizes, expiries and mail log were black on near-black in the dark theme. | Ours. |
+
+### Notifications
+
+One way to tell the operator something, on one or more channels, per event.
+Configured under `integrations.notifications.*`. Channels are mail (through the
+fork's mail integration, so it is on whenever mail is) and ntfy (published as
+JSON so any title survives, with a bearer token for a server that needs one).
+An event that names no channels goes to every enabled one. Upstream's
+Pushbullet and webhooks are left as they are.
+
+| Branch | What it does | Upstream |
+|---|---|---|
+| `feature/notifications` | Four events. A **private message** still unread after `delay` seconds, at most once per conversation until it is read, so nothing is sent while the conversation is open and a burst of five lines is one notification; what was already unread at startup counts as notified, or the server's replay on login would announce every conversation at once. A **room mention** of the operator as a word of its own, at most once per room every ten minutes. **Search watch results**, moved onto this from direct mail: the mail is the same table, other channels get a line, and the watch's history records which channels sent it. The **Soulseek connection** down for `after` minutes while the watchdog is trying, and again when it is back, and a **share scan** that failed. A channel failing never fails the message or the watch run that caused it, and one failing does not stop the others. | Ours. |
+| `fix/notifications-no-emoji` | No tags, so ntfy draws no emoji in front of a title. Removed from the notification itself rather than only from what is sent, so nothing can put one back by passing a tag. | Ours. |
+
+### Chat
+
+| Branch | What it does | Upstream |
+|---|---|---|
+| `feature/chat-conversation-picker`, `feature/chat-picker-sheet` | Conversations are picked from a searchable list, newest first, instead of a row of tabs in alphabetical order that ran off the side once there were more than a handful. On a phone the list is a sheet, because the dropdown raised the keyboard over most of itself and would not scroll by touch. | Ours. |
+| `feature/chat-unread-indicator`, `feature/chat-unread-shared-state` | An unread count on the Chat menu item, so a message arriving is visible from any page. There is one count, the server's, shared through a context; the Chat page used to keep a second one from its own poll, so opening a conversation cleared the badge up to five seconds late. | Ours. |
+| `feature/chat-user-links` | The peer's name in a conversation's header, and an icon beside each conversation in the picker, link to their Users page. Also fixes Rooms' User Profile. | Ours. |
+
+### Phone and the installed app
+
+At 390px the top menu showed four of its thirteen items and clipped the rest,
+System and the theme among them, and most pages ran off the right-hand edge.
+These make the UI a phone app, and installable as one.
+
+| Branch | What it does | Upstream |
+|---|---|---|
+| `feature/pwa-manifest` | A manifest, launcher icons and the head tags iOS and Android read, so the UI can be added to a home screen and opened standalone. | Would stand alone upstream. |
+| `feature/pwa-offline-page` | Opened away from the network slskd is on, the installed app shows slskd's own page rather than the browser's bare error. A service worker holds that one page and does nothing else: nothing of the app or the API is cached, so there is no stale UI to fall into. | Would stand alone upstream. |
+| `feature/client-update-prompt`, `fix/update-check-on-open` | Offers to load a new build once one has been deployed. An installed app is resumed far more often than reopened, so it went on running the old build for days; it now checks at start, on focus, on becoming visible and on a page restored from the back-forward cache, as well as every five minutes. | Ours. |
+| `feature/mobile-navigation`, `feature/mobile-nav-close-tab`, `fix/mobile-nav-*`, `fix/nav-hover-underline`, `fix/menu-highlights-current-page`, `fix/menu-waits-for-options` | A bottom bar on phones, with the rest of the menu under More, which becomes Close while the menu is open. The bar runs to the bottom of the glass while its items keep clear of the home indicator. The open page is marked in the menu, and the menu is drawn once, with what the server's options add to it, rather than redrawn a moment later. | Ours. |
+| `feature/standalone-back-button`, `feature/standalone-top-bar`, `feature/top-bar-back-up-only` | The installed iPhone app has no back button and no swipe back, so it gets a title bar with Back at the top left, where iOS keeps it. Back is *up*, not history: it shows only on a page that is one item out of a list -- a search's results, a user, a browse -- and goes to that list. | Ours. |
+| `feature/pull-to-refresh`, `feature/pull-to-refresh-in-place` | Pull down to refresh in the installed app, which otherwise has no way to reload. Each page says what refreshing it means, and a pull refetches that in place instead of reloading the bundle, the hub connections and the scroll position. | Ours. |
+| `fix/phone-no-zoom` | No zooming on a touch screen. On a phone a zoom only ever happens by accident: a double tap on a button, a pinch while scrolling, or Safari enlarging the page when a small field is focused and leaving it enlarged. | Ours. |
+| `fix/phone-layout-pass`, `fix/search-result-files-on-phone`, `fix/searches-list-phone`, `fix/search-detail-phone`, `fix/search-header-actions-phone`, `fix/mobile-stats-and-transfer-rows`, `fix/mobile-leaderboard-padding`, `fix/phone-chart-badge-caret` | Every page measured at 390x844 and 844x390 and given a phone layout of its own rather than the desktop one squeezed: the table views as small blocks per row, a search result's files and the searches list likewise, the Transfers header on two lines instead of four, Chat and Rooms keeping their header in view, the dashboard's figures and history chart fitting. | Ours, though most of the pages are upstream's. |
+| `fix/transfers-poll-no-pileup`, `fix/transfers-card-view-responsive` | Leaving Uploads on a phone could take seconds. The page started a new fetch of a megabyte-sized list every second whatever the last one was doing, so requests piled up and filled the connection; transfers are now polled one request at a time and aborted on leaving. The card view also redrew all of its cards on every poll; each card now skips a render when nothing it shows has changed, cards are drawn in batches, and those off screen skip layout and paint. | Ours, though both problems are in upstream's pages. |
+
+### Smaller additions and fixes
+
+| Branch | What it does | Upstream |
+|---|---|---|
+| `feature/downloads-length-column` | How long a finished download plays for, as a Downloads column: an edit and an extended mix of the same title differ by minutes, and a truncated file by whatever it is missing. | Ours -- the table is this fork's. |
+| `feature/select-from-same-search` | Select every download a row's search produced, from that row, in place of the selection there was -- the cleanup after auditioning a few candidates. Searches whose text differs only by invisible format characters, as a title copied off a store page carries, are grouped as one. | Ours. |
+| `feature/search-double-enter-opens` | Enter starts a search and stays on the list; Enter again within a second, on the field it just cleared, opens the search it started. On a phone the keyboard's key is where the thumb already is. | Ours. |
+| `feature/compact-footer`, `fix/footer-speed-padding`, `fix/footer-download-blue`, `fix/canary-in-footer`, `fix/canary-flask-in-modal` | The footer leaves its room to a page's actions: slskd's own items took 930 of 1280px. The version is shortened, with the rest a click away, and a canary build is marked by a flask there rather than by a menu item on every page. | Ours. |
+| `fix/confirm-header-remove-all`, `fix/confirm-table-view-bulk-removal` | With `delete_file_on_removal` on, *Remove All Succeeded* and a table-view selection now ask before deleting files, as a single row and a card's selection already did. | Ours. |
+| `fix/desktop-navbar-full-width`, `fix/hide-wide-toggle-when-moot`, `fix/search-focus-on-menu`, `fix/modal-loses-focus-to-search-input`, `fix/swap-view-toggles`, `fix/transfers-*`, `fix/table-sidescroll-always`, `fix/column-arrows-vertical`, `fix/modal-close-and-checkbox-glyphs`, `fix/player-glyphs-and-width`, `fix/player-root-class`, `feature/column-ordering-ui` | Layout and focus fixes: the page scrolls under the menu rather than with it, Wide is hidden where it can change nothing, the searches page no longer pulls focus out of an open modal or the phone menu, tables scroll sideways at any width, the Transfers header breaks before its filter has to give, the player's glyphs are centred and its drawer reopens after folding. | Ours. |
+| `pr/fix-dark-checkbox-hover`, `pr/fix-dark-form-labels` | Two more dark-theme gaps in upstream's theme patch: a checkbox's label vanished under the pointer and its box turned white once focused, and form labels and a selection dropdown's value were black on a near-black modal. | Fixes upstream behaviour; each diff is exactly that. |
+| `fix/sweep-composites-alpha`, `fix/sweep-waits-for-live-pages` | The dark-theme contrast sweep composites translucent backgrounds before judging a contrast, and no longer stops at the pages that hold a live connection open. | Ours. |
+
 ## Building it
 
 The `Dockerfile` is upstream's, with `ffmpeg` added for the player:
