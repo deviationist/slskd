@@ -117,7 +117,7 @@ public static class ArchiveNaming
             return $"{folders[0]}.zip";
         }
 
-        var who = FileSafety.SanitizePathSegment(username ?? string.Empty);
+        var who = EntrySegment(username ?? string.Empty);
 
         if (string.IsNullOrWhiteSpace(who))
         {
@@ -136,7 +136,7 @@ public static class ArchiveNaming
     {
         var segments = Segments(remoteFilename);
 
-        var file = segments.Length > 0 ? FileSafety.SanitizePathSegment(segments[^1]) : string.Empty;
+        var file = segments.Length > 0 ? EntrySegment(segments[^1]) : string.Empty;
 
         if (string.IsNullOrWhiteSpace(file))
         {
@@ -145,11 +145,26 @@ public static class ArchiveNaming
             file = "file";
         }
 
-        var folder = segments.Length > 1 ? FileSafety.SanitizePathSegment(segments[^2]) : string.Empty;
+        var folder = segments.Length > 1 ? EntrySegment(segments[^2]) : string.Empty;
 
         // zip entry names are separated with a forward slash on every platform, by specification
         return string.IsNullOrWhiteSpace(folder) ? file : $"{folder}/{file}";
     }
+
+    /// <summary>
+    ///     Sanitizes one segment of an entry name by Windows' rules, whatever this server runs.
+    /// </summary>
+    /// <remarks>
+    ///     The archive is unpacked by whoever downloads it, on whatever they run -- for a share link, someone outside
+    ///     this server altogether. The local OS's rules are the wrong ones: on Linux only <c>/</c> and NUL are
+    ///     invalid, so a peer's folder named <c>C:</c> arrived as the entry <c>C:/...</c>, which a naive extractor on
+    ///     Windows reads as a drive, and <c>&lt;&gt;:"|?*</c> arrived intact. Windows' set is the strict one, and
+    ///     contains Unix's.
+    /// </remarks>
+    /// <param name="segment">The segment.</param>
+    /// <returns>The sanitized segment.</returns>
+    private static string EntrySegment(string segment)
+        => FileSafety.SanitizePathSegment(segment, os: slskd.OperatingSystem.Windows);
 
     /// <summary>
     ///     Returns the sanitized name of the folder the specified <paramref name="remoteFilename"/> sits in.
@@ -160,7 +175,7 @@ public static class ArchiveNaming
     {
         var segments = Segments(remoteFilename);
 
-        return segments.Length > 1 ? FileSafety.SanitizePathSegment(segments[^2]) : string.Empty;
+        return segments.Length > 1 ? EntrySegment(segments[^2]) : string.Empty;
     }
 
     /// <summary>
