@@ -12,7 +12,7 @@ import { Button, Popup } from 'semantic-ui-react';
  * never be seen. Off, it is dimmed and a press does nothing.
  * @param {object} params
  * @param {string} [params.content] - The label.
- * @param {Function} params.onCompareRequested - Opens the dialog with the rows to compare.
+ * @param {Function} params.onCompareRequested - Opens the dialog with the rows to compare, and the ticked rows left out.
  * @param {object[]} params.ticked - Every row ticked on the page.
  * @returns {object} The button.
  */
@@ -31,7 +31,7 @@ const CompareButton = ({ content = 'Compare', onCompareRequested, ticked }) => {
           content={content}
           icon="clone outline"
           onClick={() => {
-            if (why.on) onCompareRequested(why.picks);
+            if (why.on) onCompareRequested(why.picks, why.left);
           }}
         />
       }

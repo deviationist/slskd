@@ -128,6 +128,36 @@ export const CompareAnswer = ({ document, picks }) => {
 };
 
 /**
+ * The ticked rows that were not compared, and why: a warning above the
+ * answer, so it is read before the answer is. Said here as well as in the
+ * button's tooltip, because a tooltip is easy to miss and "where did my third
+ * track go" is a question asked of the dialog.
+ * @param {object} params
+ * @param {object[]} params.left - The rows, each `{ file, reason }`.
+ * @returns {object} The warning, or nothing.
+ */
+export const LeftOut = ({ left }) =>
+  left.length === 0 ? null : (
+    <Message
+      className="compare-left-out"
+      warning
+    >
+      <Message.Header>
+        {left.length === 1
+          ? 'Not compared: 1 ticked track'
+          : `Not compared: ${left.length} ticked tracks`}
+      </Message.Header>
+      <Message.List>
+        {left.map(({ file, reason }) => (
+          <Message.Item key={file?.id}>
+            {fileNameOf(file?.filename)} {reason}.
+          </Message.Item>
+        ))}
+      </Message.List>
+    </Message>
+  );
+
+/**
  * Asks the server about `picks` until it has an answer: `pending` is asked
  * again after the seconds it gives, everything else is final.
  */
@@ -180,12 +210,14 @@ const STATE_MESSAGES = {
  * in when the answer lands: a first comparison decodes every file, and a
  * button saying "Checking…" for half a minute reads as stuck.
  * @param {object} params
+ * @param {object[]} [params.left] - Ticked rows that cannot be compared, with why.
  * @param {Function} params.onClose - Closes the dialog.
  * @param {object[]} params.picks - The rows to compare, in order.
  * @returns {object} The dialog.
  */
-const CompareDialog = ({ onClose, picks }) => {
+const CompareDialog = ({ left = [], onClose, picks }) => {
   const answer = useComparison(picks);
+  const ticked = picks.length + left.length;
 
   return (
     <Modal
@@ -194,12 +226,17 @@ const CompareDialog = ({ onClose, picks }) => {
       open
       size="small"
     >
-      <Modal.Header>Comparing {picks.length} tracks</Modal.Header>
+      <Modal.Header>
+        {left.length > 0
+          ? `Comparing ${picks.length} of ${ticked} ticked tracks`
+          : `Comparing ${picks.length} tracks`}
+      </Modal.Header>
       <Modal.Content scrolling>
         <p className="compare-why">
           Whether these are the same recording, from the audio rather than the
           name — a renamed copy, a different rip, or a different mix.
         </p>
+        <LeftOut left={left} />
         {answer.state === 'pending' && (
           <div className="compare-waiting">
             <Loader
