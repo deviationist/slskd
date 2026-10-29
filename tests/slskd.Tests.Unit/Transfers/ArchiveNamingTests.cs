@@ -68,6 +68,19 @@ namespace slskd.Tests.Unit.Transfers
         }
 
         [Fact]
+        public void EntryNames_Are_Safe_On_Windows_Whatever_The_Server_Runs()
+        {
+            // the archive is unpacked by whoever the link was given to, on whatever they run. a peer's folder named
+            // like a drive would otherwise arrive as `C:/...`, which a naive extractor on Windows treats as absolute;
+            // and the characters Windows forbids would arrive intact on a Linux server, where they are legal
+            var names = ArchiveNaming.EntryNamesFor([@"@@peer\C:\evil.flac", @"@@peer\a<b>c\what?*|.flac"]);
+
+            Assert.Equal("C_/evil.flac", names[0]);
+            Assert.Equal("a_b_c/what___.flac", names[1]);
+            Assert.All(names, n => Assert.DoesNotContain(':', n));
+        }
+
+        [Fact]
         public void EntryNames_Strip_Traversal_Segments()
         {
             // these names come from a remote peer, and an entry name that traverses is a trap for whatever unpacks
