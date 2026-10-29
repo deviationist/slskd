@@ -127,7 +127,6 @@ namespace slskd.Tests.Unit.Integrations.Notifications
                 Text = "hei på deg",
                 Url = "https://slskd.example/chat",
                 Priority = NotificationPriority.High,
-                Tags = ["speech_balloon"],
             });
 
             Assert.Equal(HttpMethod.Post, request.Method);
@@ -139,7 +138,8 @@ namespace slskd.Tests.Unit.Integrations.Notifications
             Assert.Equal("Aurora's Embrace — 2 copies", json.GetProperty("title").GetString());
             Assert.Equal("hei på deg", json.GetProperty("message").GetString());
             Assert.Equal(4, json.GetProperty("priority").GetInt32());
-            Assert.Equal("speech_balloon", json.GetProperty("tags")[0].GetString());
+            // no emoji: ntfy draws a tag it knows as one, so none are sent
+            Assert.False(json.TryGetProperty("tags", out _));
             Assert.Equal("https://slskd.example/chat", json.GetProperty("click").GetString());
         }
 

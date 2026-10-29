@@ -66,13 +66,14 @@ integrations:
 
 - `Integrations/Notifications/`:
   - `Notification`: event, title, a short plain text, an optional click URL,
-    priority, tags, and for mail an optional HTML body and recipient. A sender
+    priority, and for mail an optional HTML body and recipient. No tags: ntfy
+    draws a tag it knows as an emoji, and notifications are plain text. A sender
     composes one and does not know which channels carry it.
   - `INotificationChannel`: `Name`, `IsEnabled`, `SendAsync`. Two in v1:
     - `MailNotificationChannel` sends through `MailService`. The recipient is the
       notification's own (a watch's address) or `integrations.mail.to`.
     - `NtfyNotificationChannel` publishes as JSON (`POST {url}` with topic,
-      title, message, priority, tags, click), with a bearer token. JSON rather
+      title, message, priority, click), with a bearer token. JSON rather
       than headers, because headers cannot carry a title like "Bliss Inc Remix —
       2 copies" safely.
   - `NotificationService.NotifyAsync(notification)` routes to the event's
