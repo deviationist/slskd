@@ -584,6 +584,36 @@ transfers:
     max_days: 90
 ```
 
+## Compare
+
+*Compare* on the Downloads page says which of the ticked finished downloads are the same track, judged from the audio rather than the names: two copies
+called "Mix" and "Remix" may be one recording renamed, or two different things.  slskd does no comparing itself; it asks an external provider, server to
+server, and draws the answer.  The contract a provider implements is in [transfers-compare-provider.md](transfers-compare-provider.md).
+
+Off by default, because every comparison hands the provider several files to decode.  The button is shown only when `enabled` is set *and* a provider URL is
+configured.  At most 10 downloads are compared at once.
+
+`roots` work as the [analysis provider](#analysis-provider)'s do: a file is named to the provider as one of these names plus a path relative to it, and the
+provider holds the same names mapped to its own mounts.  The two are configured separately, so either can be on without the other, but one provider may serve
+both with the same values.
+
+| Command-Line | Environment Variable | Description                                                       |
+| ------------ | -------------------- | ----------------------------------------------------------------- |
+| `--compare`  | `SLSKD_COMPARE`      | Offer Compare on finished downloads, judged by the compare provider |
+
+#### **YAML**
+```yaml
+transfers:
+  compare:
+    enabled: false
+    provider:
+      url: http://10.99.0.2:36914/contract
+      token: <bearer token>
+      timeout: 300
+      roots:
+        downloads: /app/downloads
+```
+
 ## Global Upload Limits
 
 Global upload limits define the number of queued, daily, and weekly uploads on a _per user_ basis.  These limits behave as defaults and are applied if limits for a user's group have not been set.

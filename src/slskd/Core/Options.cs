@@ -1094,6 +1094,12 @@ namespace slskd
             public ShareLinksOptions ShareLinks { get; init; } = new ShareLinksOptions();
 
             /// <summary>
+            ///     Gets compare options.
+            /// </summary>
+            [Validate]
+            public CompareOptions Compare { get; init; } = new CompareOptions();
+
+            /// <summary>
             ///     Share link options: links that let someone without an account download copies of finished downloads
             ///     until they expire.
             /// </summary>
@@ -1159,6 +1165,87 @@ namespace slskd
                 [Description("the most days a share link may last")]
                 [Range(1, 3650)]
                 public int MaxDays { get; init; } = 90;
+            }
+
+            /// <summary>
+            ///     Compare options: which of several finished downloads are the same track, judged by an external
+            ///     provider from the audio.
+            /// </summary>
+            public class CompareOptions
+            {
+                /// <summary>
+                ///     Gets a value indicating whether Compare is offered. It also needs a provider.
+                /// </summary>
+                /// <remarks>
+                ///     Off by default: every comparison hands the provider several files to decode.
+                /// </remarks>
+                [Argument(default, "compare")]
+                [EnvironmentVariable("COMPARE")]
+                [Description("offer Compare on finished downloads, judged by the configured compare provider")]
+                public bool Enabled { get; init; } = false;
+
+                /// <summary>
+                ///     Gets the external compare provider. Without a URL there is no Compare.
+                /// </summary>
+                [Validate]
+                public CompareProviderOptions Provider { get; init; } = new CompareProviderOptions();
+            }
+
+            /// <summary>
+            ///     An external service that answers which of several files are the same track, under the contract in
+            ///     docs/transfers-compare-provider.md.
+            /// </summary>
+            public class CompareProviderOptions : IValidatableObject
+            {
+                /// <summary>
+                ///     Gets the provider's base URL; slskd appends /v1/compare. Empty turns Compare off.
+                /// </summary>
+                public string Url { get; init; } = null;
+
+                /// <summary>
+                ///     Gets the bearer token sent to the provider.
+                /// </summary>
+                [Secret]
+                public string Token { get; init; } = null;
+
+                /// <summary>
+                ///     Gets the time to wait for an answer, in seconds. A cold comparison decodes every file it is sent.
+                /// </summary>
+                [Range(1, 900)]
+                public int Timeout { get; init; } = 300;
+
+                /// <summary>
+                ///     Gets the folders slskd will ask about, by the name the provider knows each one by.
+                /// </summary>
+                public Dictionary<string, string> Roots { get; init; } = [];
+
+                /// <summary>
+                ///     Gets a value indicating whether a provider is configured.
+                /// </summary>
+                public bool Configured => !string.IsNullOrWhiteSpace(Url);
+
+                public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+                {
+                    if (!Configured)
+                    {
+                        yield break;
+                    }
+
+                    if (!Url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && !Url.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+                    {
+                        yield return new ValidationResult($"The {nameof(Url)} field must contain a fully qualified URL, including protocol (e.g. http:// or https://)");
+                    }
+
+                    if (string.IsNullOrWhiteSpace(Token))
+                    {
+                        yield return new ValidationResult($"The {nameof(Token)} field is required when a provider URL is set");
+                    }
+
+                    foreach (var problem in slskd.Player.AnalysisRoots.Problems(Roots))
+                    {
+                        yield return new ValidationResult(problem);
+                    }
+                }
             }
 
             /// <summary>

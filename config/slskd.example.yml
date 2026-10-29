@@ -89,6 +89,14 @@
 #     base_url: ~ # e.g. https://share.example.com; blank uses the UI's address
 #     default_days: 7
 #     max_days: 90
+#   compare:
+#     enabled: false
+#     provider:
+#       url: ~ # e.g. http://localhost:36914/contract; slskd appends /v1/compare
+#       token: ~
+#       timeout: 300
+#       roots:
+#         downloads: /app/downloads
 #   groups:
 #     default:
 #       upload:
