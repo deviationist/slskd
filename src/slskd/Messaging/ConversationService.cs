@@ -129,13 +129,19 @@ namespace slskd.Messaging
         public ConversationService(
             ISoulseekClient soulseekClient,
             EventBus eventBus,
-            IDbContextFactory<MessagingDbContext> contextFactory)
+            IDbContextFactory<MessagingDbContext> contextFactory,
+            IStateMutator<State> stateMutator)
         {
             SoulseekClient = soulseekClient;
             EventBus = eventBus;
             ContextFactory = contextFactory;
+            StateMutator = stateMutator;
+
+            // what was left unread when the application last stopped is unread now, before anything arrives
+            CountUnread();
         }
 
+        private IStateMutator<State> StateMutator { get; }
         private EventBus EventBus { get; }
         private IDbContextFactory<MessagingDbContext> ContextFactory { get; }
         private ILogger Log { get; } = Serilog.Log.ForContext<ConversationService>();
@@ -160,6 +166,7 @@ namespace slskd.Messaging
             }
 
             context.SaveChanges();
+            CountUnread();
         }
 
         /// <summary>
@@ -178,6 +185,7 @@ namespace slskd.Messaging
                 await SoulseekClient.AcknowledgePrivateMessageAsync(message.Id);
                 message.IsAcknowledged = true;
                 context.SaveChanges();
+                CountUnread();
             }
             else
             {
@@ -343,6 +351,7 @@ namespace slskd.Messaging
             }
 
             context.SaveChanges();
+            CountUnread();
 
             EventBus.Raise(new PrivateMessageReceivedEvent
             {
@@ -403,6 +412,45 @@ namespace slskd.Messaging
             });
 
             context.SaveChanges();
+        }
+
+        /// <summary>
+        ///     Counts what is unread, from everyone, into the application state.
+        /// </summary>
+        /// <remarks>
+        ///     Counted afresh from the database each time rather than kept as a running total: every change -- a
+        ///     message, a replay of one, an acknowledgement, a removal -- goes through the database, so a count read
+        ///     back from it cannot drift from what the Chat page shows. Two small aggregates over one table, on events
+        ///     that happen at human speed.
+        /// </remarks>
+        private void CountUnread()
+        {
+            int messages, conversations;
+
+            try
+            {
+                using var context = ContextFactory.CreateDbContext();
+
+                var unacked = context.PrivateMessages.AsNoTracking().Where(m => !m.IsAcknowledged);
+                messages = unacked.Count();
+                conversations = messages == 0 ? 0 : unacked.Select(m => m.Username).Distinct().Count();
+            }
+            catch (Exception ex)
+            {
+                // a count that cannot be taken must not cost chat itself -- this runs in the constructor, and on every
+                // message -- so the menu goes on showing the last count it had
+                Log.Warning(ex, "Failed to count unread private messages: {Message}", ex.Message);
+                return;
+            }
+
+            StateMutator.SetValue(state => state with
+            {
+                Conversations = new ConversationsState
+                {
+                    UnAcknowledgedMessages = messages,
+                    UnAcknowledgedConversations = conversations,
+                },
+            });
         }
 
         private void ActivateConversation(string username)

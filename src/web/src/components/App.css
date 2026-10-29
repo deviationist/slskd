@@ -2024,3 +2024,40 @@ html {
     margin: 0;
     height: auto;
 }
+
+/* ---------------------------------------------------------------------------
+ * The unread count on Chat, in the menu and on the phone's bar: a small red
+ * pill at the top right of the item's icon. Placed absolutely against the item
+ * (a Semantic menu item, and the bar's link, are both positioned), so neither
+ * layout moves to make room for it -- it appears and goes without the menu
+ * shifting under a pointer or a thumb.
+ */
+.mobile-nav-item {
+    position: relative;
+}
+
+.unread-badge {
+    background: #db2828;
+    border-radius: 8px;
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: 700;
+    height: 16px;
+    left: calc(50% + 4px);
+    line-height: 16px;
+    min-width: 16px;
+    padding: 0 4px;
+    pointer-events: none;
+    position: absolute;
+    text-align: center;
+    top: 6px;
+}
+
+/* the bar's items set icon and label in a row on a phone held sideways: the
+   same query that lays them out that way, above */
+@media only screen and (max-height: 500px) and (orientation: landscape) {
+    .mobile-nav-item .unread-badge {
+        left: 18px;
+        top: 2px;
+    }
+}

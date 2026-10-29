@@ -83,3 +83,34 @@ export const byRecency = (conversations) => {
       a.username.localeCompare(b.username),
   );
 };
+
+/**
+ * What the unread badge on the Chat menu item says: the count, or nothing
+ * when there is nothing unread. Two digits is what a badge has room for.
+ * @param {number} [count] - Unread messages, from everyone.
+ * @returns {string} The badge's text.
+ */
+export const badgeOf = (count) => {
+  if (!Number.isFinite(count) || count <= 0) return '';
+
+  return count > 99 ? '99+' : String(count);
+};
+
+/**
+ * The same, in words, for a screen reader and a tooltip: the badge's number
+ * says how much, and this says from how many.
+ * @param {object} [unread] - `state.conversations` from the server.
+ * @returns {string} The description, or '' when nothing is unread.
+ */
+export const describeUnread = (unread) => {
+  const messages = unread?.unAcknowledgedMessages ?? 0;
+  const people = unread?.unAcknowledgedConversations ?? 0;
+
+  if (messages <= 0) return '';
+
+  const what = `${messages} unread message${messages === 1 ? '' : 's'}`;
+
+  return messages === 1 || people <= 0
+    ? what
+    : `${what} from ${people} ${people === 1 ? 'person' : 'people'}`;
+};

@@ -17,6 +17,7 @@ import AppContext from './AppContext';
 import AppFooter from './AppFooter';
 import Browse from './Browse/Browse';
 import Chat from './Chat/Chat';
+import UnreadBadge from './Chat/UnreadBadge';
 import Dashboard from './Dashboard/Dashboard';
 import LoginForm from './LoginForm';
 import MobileNav from './MobileNav';
@@ -675,6 +676,7 @@ class App extends Component {
                   <Menu.Item>
                     <Icon name="comment" />
                     Chat
+                    <UnreadBadge unread={applicationState.conversations} />
                   </Menu.Item>
                 </NavLink>
                 <NavLink to={`${urlBase}/users`}>
@@ -984,6 +986,7 @@ class App extends Component {
           onClose={this.handleNavClose}
           onToggle={this.handleNavToggle}
           open={navOpen}
+          unread={applicationState.conversations}
         />
         <PlayerBar />
         <AppFooter
