@@ -62,7 +62,7 @@ public partial class BuiltinAnalyser
     /// <remarks>
     ///     <b>Bump it whenever any answer could differ for the same audio</b> -- a new check, a retired one, a rewritten
     ///     threshold, a number measured differently, a change of wording. Everything kept under another version is then
-    ///     dropped (see <see cref="AnalysisCache"/>), so no answer made by the old rules is shown as this one's: the
+    ///     dropped (see <see cref="AnalysisStore"/>), so no answer made by the old rules is shown as this one's: the
     ///     operator would otherwise see the new findings on new downloads and the old ones on everything already there.
     /// </remarks>
     public const string Version = "slskd-v1";

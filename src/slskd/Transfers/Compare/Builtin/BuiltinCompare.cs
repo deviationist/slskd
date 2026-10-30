@@ -40,7 +40,6 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Caching.Memory;
 using Serilog;
 using slskd.Player;
 
@@ -58,8 +57,8 @@ public class BuiltinCompare
     /// </summary>
     /// <remarks>
     ///     <b>Bump it whenever any answer could differ for the same files</b> -- a new threshold, a feature computed
-    ///     differently, a change of wording. Comparisons are kept in memory only, so a new version takes effect with the
-    ///     restart that deploys it, and the features kept with them are keyed by it as well.
+    ///     differently, a change of wording. Nothing about a comparison is stored -- an answer is held
+    ///     only minutes, for the dialog to collect -- so a new version takes effect with the restart that deploys it.
     /// </remarks>
     public const string Version = "slskd-compare-v1";
 
@@ -75,9 +74,6 @@ public class BuiltinCompare
     private IMediaTool MediaTool { get; }
     private ILogger Log { get; } = Serilog.Log.ForContext<BuiltinCompare>();
 
-    // a file compared again -- the same copies looked at twice, one added to the set -- is not decoded again. by the
-    // file as it is, and few: ten minutes of features is a couple of megabytes
-    private IMemoryCache Kept { get; } = new MemoryCache(new MemoryCacheOptions { SizeLimit = 32 });
 
     /// <summary>
     ///     Compares <paramref name="files"/>.
@@ -160,14 +156,6 @@ public class BuiltinCompare
 
     private async Task<Features> FeaturesAsync(FileInfo file, CancellationToken cancellationToken)
     {
-        file.Refresh();
-        var key = $"{Version}|{file.FullName}|{file.Length}|{file.LastWriteTimeUtc.Ticks}";
-
-        if (Kept.TryGetValue(key, out Features kept))
-        {
-            return kept;
-        }
-
         var builder = new SameTrack.Builder();
 
         using (var sink = new MonoSink(builder))
@@ -175,9 +163,7 @@ public class BuiltinCompare
             await MediaTool.DecodeToAsync(file.FullName, SameTrack.Rate, 1, "f32le", sink, cancellationToken);
         }
 
-        var features = builder.Finish();
-        Kept.Set(key, features, new MemoryCacheEntryOptions { Size = 1, SlidingExpiration = TimeSpan.FromHours(1) });
-        return features;
+        return builder.Finish();
     }
 
     /// <summary>

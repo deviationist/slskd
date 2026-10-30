@@ -30,13 +30,13 @@ export const getAnalysis = async (id, { signal, wait = true } = {}) =>
     })
   ).data;
 
-// what is kept of every analysis, for good: { configured, downloads }
-export const getAnalysisCache = async () =>
-  (await api.get('/player/analysis/cache')).data;
+// how many downloads have an analysis saved, for good: { configured, downloads }
+export const getSavedAnalyses = async () =>
+  (await api.get('/player/analyses')).data;
 
-// drop it all, so each download is analysed again when next shown
-export const clearAnalysisCache = async () =>
-  (await api.delete('/player/analysis/cache')).data;
+// delete them all, so each download is analysed again when next shown
+export const deleteSavedAnalyses = async () =>
+  (await api.delete('/player/analyses')).data;
 
 // absolute, because an element fetches it outside axios. `original` asks for
 // the file as it is, where the browser has said it plays it; the server falls

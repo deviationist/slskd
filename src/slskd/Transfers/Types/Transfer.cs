@@ -221,7 +221,7 @@ public class Transfer
     ///     kept.
     /// </summary>
     /// <remarks>
-    ///     Not persisted here: the analysis is the <see cref="slskd.Player.AnalysisCache"/>'s, and this is its verdict
+    ///     Not persisted here: the analysis is the <see cref="slskd.Player.AnalysisStore"/>'s, and this is its verdict
     ///     read back. Filled in when a list is served, so a row draws its badge without asking for it.
     /// </remarks>
     [NotMapped]

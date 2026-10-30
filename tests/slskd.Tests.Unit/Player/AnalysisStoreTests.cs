@@ -17,13 +17,13 @@ using Xunit;
 ///     The analyses kept for good, by download: what lets the downloads list carry each row's verdict, and a restart
 ///     lose none of them.
 /// </summary>
-public sealed class AnalysisCacheTests : IDisposable
+public sealed class AnalysisStoreTests : IDisposable
 {
     private readonly string connectionString = $"Data Source=analyses_{Guid.NewGuid():N};Mode=Memory;Cache=Shared";
     private readonly SqliteConnection anchor;
     private readonly DbContextOptions<TransfersDbContext> dbOptions;
 
-    public AnalysisCacheTests()
+    public AnalysisStoreTests()
     {
         anchor = new SqliteConnection(connectionString);
         anchor.Open();
@@ -37,51 +37,65 @@ public sealed class AnalysisCacheTests : IDisposable
     public void Dispose() => anchor.Dispose();
 
     [Fact]
-    public void A_kept_analysis_is_there_after_a_restart()
+    public void A_saved_analysis_is_there_after_a_restart()
     {
         var download = Download();
-        Cache().Remember(download, Document("abc-v5", "analysis-v5", "warn", "Clipped"));
+        Store().Save(download, Document("abc-v5", "analysis-v5", "warn", "Clipped"));
 
         // a new instance reads it from the database, as slskd does after a restart
-        var cache = Cache();
+        var store = Store();
 
-        Assert.True(cache.TryGet(download, out var document));
+        Assert.True(store.TryGet(download, out var document));
         Assert.Equal("Clipped", document.GetProperty("verdict").GetProperty("headline").GetString());
-        Assert.Equal(new AnalysisVerdict("warn", "Clipped"), cache.VerdictsOf([download])[download]);
-        Assert.Equal(1, cache.Count);
+        Assert.Equal(new AnalysisVerdict("warn", "Clipped"), store.VerdictsOf([download])[download]);
+        Assert.Equal(1, store.Count);
+    }
+
+    [Fact]
+    public void A_list_reads_the_database_so_it_sees_what_was_saved_after_it_was_first_asked()
+    {
+        // nothing is held in memory: an analysis saved by one instance is in the next list another serves
+        var download = Download();
+        var reader = Store();
+        Assert.Empty(reader.VerdictsOf([download]));
+
+        Store().Save(download, Document("abc-v5", "analysis-v5", "bad", "Upsampled"));
+
+        Assert.Equal(new AnalysisVerdict("bad", "Upsampled"), reader.VerdictsOf([download])[download]);
+        Assert.Equal(1, reader.Count);
     }
 
     [Fact]
     public void Only_the_downloads_with_one_have_a_verdict()
     {
         var analysed = Download();
-        var cache = Cache();
-        cache.Remember(analysed, Document("abc-v5", "analysis-v5"));
+        var store = Store();
+        store.Save(analysed, Document("abc-v5", "analysis-v5"));
 
-        var verdicts = cache.VerdictsOf([analysed, Guid.NewGuid()]);
+        var verdicts = store.VerdictsOf([analysed, Guid.NewGuid()]);
 
         Assert.Equal([analysed], verdicts.Keys);
-        Assert.False(cache.TryGet(Guid.NewGuid(), out _));
+        Assert.False(store.TryGet(Guid.NewGuid(), out _));
     }
 
     [Fact]
     public void Two_downloads_of_the_same_audio_share_one_analysis()
     {
-        var cache = Cache();
-        cache.Remember(Download(), Document("same-audio-v5", "analysis-v5"));
-        cache.Remember(Download(), Document("same-audio-v5", "analysis-v5"));
+        var store = Store();
+        store.Save(Download(), Document("same-audio-v5", "analysis-v5"));
+        store.Save(Download(), Document("same-audio-v5", "analysis-v5"));
 
         using var context = new TransfersDbContext(dbOptions);
         Assert.Single(context.Analyses);
         Assert.Equal(2, context.DownloadAnalyses.Count());
-        Assert.Equal(2, cache.Count);
+        Assert.Equal(2, store.Count);
     }
 
     [Fact]
     public void A_provider_that_gives_no_id_gets_one_made_per_download()
     {
         var download = Download();
-        Cache().Remember(download, Document(id: null, "analysis-v5"));
+        Store().Save(download, Document(id: null, "analysis-v5"));
 
         using var context = new TransfersDbContext(dbOptions);
         Assert.Equal($"{download}-analysis-v5", Assert.Single(context.Analyses).Id);
@@ -93,44 +107,44 @@ public sealed class AnalysisCacheTests : IDisposable
         // the rules changed -- what counts as a gap, or as clipping -- and the provider says so with its version
         var old = Download();
         var fresh = Download();
-        Cache().Remember(old, Document("abc-v5", "analysis-v5"));
+        Store().Save(old, Document("abc-v5", "analysis-v5"));
 
-        var cache = Cache();
-        cache.Remember(fresh, Document("def-v6", "analysis-v6"));
+        var store = Store();
+        store.Save(fresh, Document("def-v6", "analysis-v6"));
 
-        Assert.False(cache.TryGet(old, out _));
-        Assert.True(cache.TryGet(fresh, out _));
-        Assert.Equal([fresh], cache.VerdictsOf([old, fresh]).Keys);
+        Assert.False(store.TryGet(old, out _));
+        Assert.True(store.TryGet(fresh, out _));
+        Assert.Equal([fresh], store.VerdictsOf([old, fresh]).Keys);
 
         using var context = new TransfersDbContext(dbOptions);
         Assert.Equal(["def-v6"], context.Analyses.Select(a => a.Id));
     }
 
     [Fact]
-    public void Clearing_drops_everything_kept()
+    public void Clearing_deletes_everything_saved()
     {
         var download = Download();
-        var cache = Cache();
-        cache.Remember(download, Document("abc-v5", "analysis-v5"));
-        cache.Remember(Download(), Document("def-v5", "analysis-v5"));
+        var store = Store();
+        store.Save(download, Document("abc-v5", "analysis-v5"));
+        store.Save(Download(), Document("def-v5", "analysis-v5"));
 
-        Assert.Equal(2, cache.Clear());
+        Assert.Equal(2, store.Clear());
 
-        Assert.Equal(0, cache.Count);
-        Assert.False(cache.TryGet(download, out _));
-        Assert.Equal(0, Cache().Count);
+        Assert.Equal(0, store.Count);
+        Assert.False(store.TryGet(download, out _));
+        Assert.Equal(0, Store().Count);
     }
 
     [Fact]
     public void Reanalysing_a_download_points_it_at_the_new_analysis()
     {
         var download = Download();
-        var cache = Cache();
-        cache.Remember(download, Document("abc-v5", "analysis-v5", "ok", "Fine"));
-        cache.Remember(download, Document("xyz-v5", "analysis-v5", "bad", "Upsampled"));
+        var store = Store();
+        store.Save(download, Document("abc-v5", "analysis-v5", "ok", "Fine"));
+        store.Save(download, Document("xyz-v5", "analysis-v5", "bad", "Upsampled"));
 
-        Assert.Equal("bad", cache.VerdictsOf([download])[download].Level);
-        Assert.Equal(1, cache.Count);
+        Assert.Equal("bad", store.VerdictsOf([download])[download].Level);
+        Assert.Equal(1, store.Count);
     }
 
     [Fact]
@@ -150,8 +164,8 @@ public sealed class AnalysisCacheTests : IDisposable
         Assert.False(migration.NeedsToBeApplied());
 
         var download = Download();
-        Cache().Remember(download, Document("abc-v5", "analysis-v5"));
-        Assert.True(Cache().TryGet(download, out _));
+        Store().Save(download, Document("abc-v5", "analysis-v5"));
+        Assert.True(Store().TryGet(download, out _));
     }
 
     [Fact]
@@ -162,12 +176,12 @@ public sealed class AnalysisCacheTests : IDisposable
         var provider = Download();
         var older = Download();
         var current = Download();
-        var cache = Cache();
-        cache.Remember(provider, Document("abc-v6", "analysis-v6"));
-        cache.Remember(older, Document("abc-slskd-v0", "slskd-v0"));
-        cache.Remember(current, Document($"def-{BuiltinAnalyser.Version}", BuiltinAnalyser.Version));
+        var store = Store();
+        store.Save(provider, Document("abc-v6", "analysis-v6"));
+        store.Save(older, Document("abc-slskd-v0", "slskd-v0"));
+        store.Save(current, Document($"def-{BuiltinAnalyser.Version}", BuiltinAnalyser.Version));
 
-        var builtin = Cache(source: "builtin");
+        var builtin = Store(source: "builtin");
 
         Assert.Equal([current], builtin.VerdictsOf([provider, older, current]).Keys);
         Assert.False(builtin.TryGet(provider, out _));
@@ -177,9 +191,9 @@ public sealed class AnalysisCacheTests : IDisposable
     public void With_a_provider_nothing_is_dropped_until_it_answers_under_another_version()
     {
         var download = Download();
-        Cache().Remember(download, Document("abc-v6", "analysis-v6"));
+        Store().Save(download, Document("abc-v6", "analysis-v6"));
 
-        Assert.Equal(1, Cache(source: "provider").Count);
+        Assert.Equal(1, Store(source: "provider").Count);
     }
 
     [Fact]
@@ -188,16 +202,16 @@ public sealed class AnalysisCacheTests : IDisposable
         var kept = Download();
         var removed = Download();
         var alone = Download();
-        var cache = Cache();
-        cache.Remember(kept, Document("shared-v5", "analysis-v5"));
-        cache.Remember(removed, Document("shared-v5", "analysis-v5"));
-        cache.Remember(alone, Document("only-v5", "analysis-v5"));
+        var store = Store();
+        store.Save(kept, Document("shared-v5", "analysis-v5"));
+        store.Save(removed, Document("shared-v5", "analysis-v5"));
+        store.Save(alone, Document("only-v5", "analysis-v5"));
 
         Remove(removed, alone);
 
-        Assert.Equal(2, cache.Sweep());
+        Assert.Equal(2, store.Sweep());
 
-        Assert.Equal([kept], cache.VerdictsOf([kept, removed, alone]).Keys);
+        Assert.Equal([kept], store.VerdictsOf([kept, removed, alone]).Keys);
         using var context = new TransfersDbContext(dbOptions);
         Assert.Equal(["shared-v5"], context.Analyses.Select(a => a.Id));
     }
@@ -206,10 +220,10 @@ public sealed class AnalysisCacheTests : IDisposable
     public void What_was_removed_while_slskd_was_down_is_dropped_on_first_use()
     {
         var removed = Download();
-        Cache().Remember(removed, Document("abc-v5", "analysis-v5"));
+        Store().Save(removed, Document("abc-v5", "analysis-v5"));
         Remove(removed);
 
-        Assert.Equal(0, Cache().Count);
+        Assert.Equal(0, Store().Count);
     }
 
     private Guid Download()
@@ -254,7 +268,7 @@ public sealed class AnalysisCacheTests : IDisposable
         return parsed.RootElement.Clone();
     }
 
-    private AnalysisCache Cache(string source = null)
+    private AnalysisStore Store(string source = null)
     {
         var factory = new Mock<IDbContextFactory<TransfersDbContext>>();
         factory.Setup(f => f.CreateDbContext()).Returns(() => new TransfersDbContext(dbOptions));
@@ -269,6 +283,6 @@ public sealed class AnalysisCacheTests : IDisposable
                 },
             });
 
-        return new AnalysisCache(factory.Object, options);
+        return new AnalysisStore(factory.Object, options);
     }
 }

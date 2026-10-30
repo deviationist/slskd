@@ -82,10 +82,10 @@ namespace slskd.Transfers.API
             DownloadFileDuration downloadFileDuration,
             slskd.Search.SearchExistence searchExistence,
             IOptionsSnapshot<Options> optionsSnapshot,
-            slskd.Player.AnalysisCache analysisCache = null,
+            slskd.Player.AnalysisStore analysisStore = null,
             slskd.Player.PlayerService playerService = null)
         {
-            AnalysisCache = analysisCache;
+            AnalysisStore = analysisStore;
             Player = playerService;
             Transfers = transferService;
             Users = userService;
@@ -121,7 +121,7 @@ namespace slskd.Transfers.API
         private DownloadFileAvailability FileAvailability { get; }
         private DownloadFileDuration FileDuration { get; }
         private slskd.Search.SearchExistence SearchExistence { get; }
-        private slskd.Player.AnalysisCache AnalysisCache { get; }
+        private slskd.Player.AnalysisStore AnalysisStore { get; }
         private slskd.Player.PlayerService Player { get; }
         private IOptionsSnapshot<Options> OptionsSnapshot { get; }
         private ILogger Log { get; set; } = Serilog.Log.ForContext<TransfersController>();
@@ -1469,8 +1469,8 @@ namespace slskd.Transfers.API
         private async Task AnnotateAsync(IEnumerable<slskd.Transfers.Transfer> downloads)
         {
             // one look-up for the lot, from memory: the list is served every second or so
-            var verdicts = AnalysisCache is not null && OptionsSnapshot.Value.Player.Analysis.Enabled
-                ? AnalysisCache.VerdictsOf(downloads.Select(d => d.Id))
+            var verdicts = AnalysisStore is not null && OptionsSnapshot.Value.Player.Analysis.Enabled
+                ? AnalysisStore.VerdictsOf(downloads.Select(d => d.Id))
                 : null;
 
             foreach (var download in downloads)
