@@ -132,7 +132,7 @@ public record AnalysisVerdict(string Level, string Headline);
 ///         soon as the provider is seen to have moved on, and the operator can drop the lot from the settings.
 ///     </para>
 ///     <para>
-///         And kept only for downloads still listed: every five minutes, and on first use, what is kept for a download
+///         And kept only for downloads still listed: daily, and on first use, what is kept for a download
 ///         since removed -- by hand, with its file, or by retention -- is dropped, and so is any analysis no download
 ///         is left to use. Removing a download is a soft delete, so the record stays and a join tells the two apart.
 ///     </para>
@@ -147,11 +147,16 @@ public class AnalysisCache
     {
         ContextFactory = contextFactory;
 
-        Clock.EveryFiveMinutes += (_, _) => Task.Run(() =>
+        // no daily tick on the clock: checked hourly, swept once a day has passed. a removed download is not listed,
+        // so its analysis sitting there until then costs a few KB and shows nowhere
+        Clock.EveryHour += (_, _) => Task.Run(() =>
         {
             try
             {
-                Sweep();
+                if (DateTime.UtcNow - LastSwept >= SweepEvery)
+                {
+                    Sweep();
+                }
             }
             catch (Exception ex)
             {
@@ -167,7 +172,10 @@ public class AnalysisCache
     // every download's verdict, read once and kept up with: what a list asks for, every poll
     private Dictionary<Guid, AnalysisVerdict> Verdicts { get; set; }
 
+    private static readonly TimeSpan SweepEvery = TimeSpan.FromDays(1);
+
     private bool Swept { get; set; }
+    private DateTime LastSwept { get; set; } = DateTime.MinValue;
 
     // the version the provider was last seen to speak
     private string Version { get; set; }
@@ -345,6 +353,8 @@ public class AnalysisCache
     {
         lock (Lock)
         {
+            LastSwept = DateTime.UtcNow;
+
             using var context = ContextFactory.CreateDbContext();
 
             var dropped = context.DownloadAnalyses
