@@ -20,6 +20,8 @@ import {
   Segment,
 } from 'semantic-ui-react';
 
+const isSeen = () => document.visibilityState === 'visible';
+
 const initialState = {
   active: '',
   conversations: {},
@@ -61,6 +63,7 @@ class Chat extends Component {
 
   componentDidMount() {
     this.unregisterPullRefresh = registerPullRefresh(this.refreshForPull);
+    document.addEventListener('visibilitychange', this.readActive);
     this.setState(
       {
         active: sessionStorage.getItem(activeChatKey) || '',
@@ -80,14 +83,11 @@ class Chat extends Component {
   // Before, that waited for the next poll, up to five seconds, and the menu's
   // count waited with it
   componentDidUpdate() {
-    const { active } = this.state;
-
-    if (active && this.context.countOf(active) > 0) {
-      this.context.acknowledge(active);
-    }
+    this.readActive();
   }
 
   componentWillUnmount() {
+    document.removeEventListener('visibilitychange', this.readActive);
     this.unregisterPullRefresh?.();
     clearInterval(this.state.interval);
     this.setState({ interval: undefined });
@@ -96,6 +96,18 @@ class Chat extends Component {
   // what is unread comes from the server's pushed state, shared with the
   // menu's badge: one count, not a second one polled for here
   static contextType = ChatUnreadContext;
+
+  // only while the page can be seen, as Rooms does: a conversation left open in
+  // a tab in the background is not being read, and its messages should stay
+  // unread, and be notified. Read as soon as the page comes back into view,
+  // rather than on the next poll
+  readActive = () => {
+    const { active } = this.state;
+
+    if (active && isSeen() && this.context.countOf(active) > 0) {
+      this.context.acknowledge(active);
+    }
+  };
 
   // the list of conversations and the open one's messages, which otherwise
   // only change when a conversation is picked or a message is sent
@@ -149,7 +161,7 @@ class Chat extends Component {
     if (activeConversation) {
       // *before* fetching messages, ack any unacked messages for the active
       // chat: a backstop for anything the pushed count has not caught yet
-      if (activeConversation.hasUnAcknowledgedMessages === true) {
+      if (activeConversation.hasUnAcknowledgedMessages === true && isSeen()) {
         await this.context.acknowledge(active);
       }
 
