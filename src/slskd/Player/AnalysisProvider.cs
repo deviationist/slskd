@@ -92,8 +92,9 @@ public record AnalysisAnswer(AnalysisState State, JsonElement? Analysis = null, 
 /// <remarks>
 ///     <para>
 ///         Server to server: the browser only ever talks to slskd, so the provider's token stays in slskd's config and
-///         there is one origin. Answers are kept per file identity (path, size, mtime), so a re-download is asked about
-///         afresh and a file nobody touched is asked about once.
+///         there is one origin. A finished analysis of a download is saved in the <see cref="AnalysisStore"/>, which answers
+///         for it from then on; here it is only held for a few minutes, per file identity (path, size, mtime), for a
+///         page that asked without waiting to collect.
 ///     </para>
 ///     <para>
 ///         A negative answer is kept too, for a while, so a page of rows the provider cannot see does not become a
@@ -110,6 +111,8 @@ public class AnalysisProvider
     // how soon a caller that did not wait is told to ask again
     private const int PollAfter = 3;
 
+    // a finished answer is held only until whoever asked without waiting comes back for it; a download's is saved
+    private static readonly TimeSpan HeldFor = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan NoneFor = TimeSpan.FromMinutes(10);
     private static readonly TimeSpan UnavailableFor = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan ConflictRetry = TimeSpan.FromSeconds(2);
@@ -119,13 +122,13 @@ public class AnalysisProvider
     /// </summary>
     /// <param name="httpClientFactory">The HTTP client factory.</param>
     /// <param name="optionsMonitor">The options monitor.</param>
-    /// <param name="cache">Where a finished analysis is kept for good, by download; none keeps them in memory only.</param>
+    /// <param name="store">Where a finished analysis is saved for good, by download.</param>
     /// <param name="builtin">slskd's own analyser, for <c>player.analysis.source: builtin</c>.</param>
-    public AnalysisProvider(IHttpClientFactory httpClientFactory, IOptionsMonitor<Options> optionsMonitor, AnalysisCache cache = null, Builtin.BuiltinAnalyser builtin = null)
+    public AnalysisProvider(IHttpClientFactory httpClientFactory, IOptionsMonitor<Options> optionsMonitor, AnalysisStore store = null, Builtin.BuiltinAnalyser builtin = null)
     {
         HttpClientFactory = httpClientFactory;
         OptionsMonitor = optionsMonitor;
-        Cache = cache;
+        Store = store;
         Builtin = builtin;
     }
 
@@ -138,7 +141,7 @@ public class AnalysisProvider
     private bool UsesBuiltin => OptionsMonitor.CurrentValue.Player.Analysis.UsesBuiltin && Builtin is not null;
     private Builtin.BuiltinAnalyser Builtin { get; }
 
-    private AnalysisCache Cache { get; }
+    private AnalysisStore Store { get; }
     private IHttpClientFactory HttpClientFactory { get; }
     private IOptionsMonitor<Options> OptionsMonitor { get; }
     private Options.PlayerOptions.PlayerAnalysisProviderOptions Settings => OptionsMonitor.CurrentValue.Player.Analysis.Provider;
@@ -157,7 +160,7 @@ public class AnalysisProvider
     public static (AnalysisState State, TimeSpan? KeepFor) Classify(HttpStatusCode status, int? retryAfter)
         => status switch
         {
-            HttpStatusCode.OK => (AnalysisState.Ready, TimeSpan.FromDays(1)),
+            HttpStatusCode.OK => (AnalysisState.Ready, HeldFor),
             HttpStatusCode.Accepted => (AnalysisState.Pending, null),
             HttpStatusCode.Forbidden or HttpStatusCode.NotFound => (AnalysisState.None, NoneFor),
             HttpStatusCode.Conflict => (AnalysisState.None, NoneFor),
@@ -165,7 +168,7 @@ public class AnalysisProvider
         };
 
     /// <summary>
-    ///     The analysis of <paramref name="file"/>, from the cache or the provider.
+    ///     The analysis of <paramref name="file"/>, from the analyser answering: slskd's own, or the provider.
     /// </summary>
     /// <param name="file">The resolved file.</param>
     /// <param name="wait">
@@ -174,8 +177,8 @@ public class AnalysisProvider
     ///     while the provider works.
     /// </param>
     /// <param name="download">
-    ///     The download the file is, if it is one: a finished analysis is then kept for it for good, by the request
-    ///     itself, so it is kept whether or not anyone is still waiting.
+    ///     The download the file is, if it is one: a finished analysis is then saved for it for good, by the request
+    ///     itself, so it is saved whether or not anyone is still waiting.
     /// </param>
     /// <param name="cancellationToken">A token to stop waiting. The request itself carries on for whoever asks next.</param>
     /// <returns>The answer.</returns>
@@ -205,15 +208,15 @@ public class AnalysisProvider
         // by source too, so switching between them is never answered from what the other said
         var key = $"{(builtin ? "builtin" : "provider")}|{file.FullName}|{file.Length}|{file.LastWriteTimeUtc.Ticks}";
 
-        if (Answers.TryGetValue(key, out AnalysisAnswer cached))
+        if (Answers.TryGetValue(key, out AnalysisAnswer held))
         {
             // the same file under another download, analysed while this one was not asked about
-            if (download is not null && cached.State == AnalysisState.Ready)
+            if (download is not null && held.State == AnalysisState.Ready)
             {
-                Remember(download.Value, cached);
+                Save(download.Value, held);
             }
 
-            return cached;
+            return held;
         }
 
         var lazy = InFlight.GetOrAdd(key, _ => new Lazy<Task<AnalysisAnswer>>(() => AskAndKeepAsync(key, located, file, download)));
@@ -240,7 +243,7 @@ public class AnalysisProvider
 
             if (download is not null && answer.State == AnalysisState.Ready)
             {
-                Remember(download.Value, answer);
+                Save(download.Value, answer);
             }
 
             return answer;
@@ -261,7 +264,7 @@ public class AnalysisProvider
         try
         {
             var document = await Builtin.AnalyseAsync(file);
-            return (new AnalysisAnswer(AnalysisState.Ready, document), TimeSpan.FromDays(1));
+            return (new AnalysisAnswer(AnalysisState.Ready, document), HeldFor);
         }
         catch (MediaToolException ex)
         {
@@ -373,21 +376,21 @@ public class AnalysisProvider
         }
     }
 
-    private void Remember(Guid download, AnalysisAnswer answer)
+    private void Save(Guid download, AnalysisAnswer answer)
     {
-        if (Cache is null || answer.Analysis is null)
+        if (Store is null || answer.Analysis is null)
         {
             return;
         }
 
         try
         {
-            Cache.Remember(download, answer.Analysis.Value);
+            Store.Save(download, answer.Analysis.Value);
         }
         catch (Exception ex)
         {
-            // a cache that cannot be written costs a request next time, not this answer
-            Log.Warning("Could not keep the analysis of download {Id}: {Message}", download, ex.Message);
+            // a store that cannot be written costs an analysis next time, not this answer
+            Log.Warning("Could not save the analysis of download {Id}: {Message}", download, ex.Message);
         }
     }
 

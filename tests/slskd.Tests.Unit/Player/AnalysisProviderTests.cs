@@ -265,13 +265,13 @@ namespace slskd.Tests.Unit.Player
                         },
                     },
                 },
-            }), keep is null ? null : new KeepingCache(keep), builtin);
+            }), keep is null ? null : new KeepingStore(keep), builtin);
         }
 
         // the cache, standing in for the database: what was kept, as it was handed over
-        private sealed class KeepingCache(Action<Guid, System.Text.Json.JsonElement> keep) : AnalysisCache(null)
+        private sealed class KeepingStore(Action<Guid, System.Text.Json.JsonElement> keep) : AnalysisStore(null)
         {
-            public override void Remember(Guid download, System.Text.Json.JsonElement document) => keep(download, document);
+            public override void Save(Guid download, System.Text.Json.JsonElement document) => keep(download, document);
         }
 
         private sealed class Handler(Func<HttpRequestMessage, Task<HttpResponseMessage>> respond) : HttpMessageHandler

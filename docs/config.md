@@ -253,7 +253,7 @@ lossy source re-wrapped as lossless, an upsampled rate, padded bit depth, clippi
 | `builtin` | slskd's own analyser, on this machine: one decode with ffmpeg and a pass of FFTs per file. |
 | `provider` | An external service under `provider` below, over the contract in [player-analysis-provider.md](player-analysis-provider.md). |
 
-Either way the answer is the same document, kept for good per download (see the contract's *Caching*). The built-in analyser carries its own version;
+Either way the answer is the same document, saved for good per download in the transfers database (see the contract's *Storage*). The built-in analyser carries its own version;
 a new version of it, or a change of `source`, drops what was kept under the other.
 
 A file is named to a provider as one of the `roots` below plus a path relative to it, never as an absolute path: the two services may see one folder under

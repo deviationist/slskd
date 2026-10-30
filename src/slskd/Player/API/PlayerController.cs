@@ -80,7 +80,7 @@ public class PlayerController : ControllerBase
     /// <param name="fileService">The file service.</param>
     /// <param name="playerService">The player service.</param>
     /// <param name="analysisProvider">The analysis provider client.</param>
-    /// <param name="analysisCache">The analyses kept, by download.</param>
+    /// <param name="analysisStore">The analyses saved, by download.</param>
     /// <param name="tickets">The stream tickets.</param>
     /// <param name="optionsMonitor">The options monitor.</param>
     public PlayerController(
@@ -88,7 +88,7 @@ public class PlayerController : ControllerBase
         FileService fileService,
         PlayerService playerService,
         AnalysisProvider analysisProvider,
-        AnalysisCache analysisCache,
+        AnalysisStore analysisStore,
         StreamTickets tickets,
         IOptionsMonitor<Options> optionsMonitor)
     {
@@ -96,7 +96,7 @@ public class PlayerController : ControllerBase
         Files = fileService;
         Player = playerService;
         Analysis = analysisProvider;
-        AnalysisCache = analysisCache;
+        AnalysisStore = analysisStore;
         Tickets = tickets;
         OptionsMonitor = optionsMonitor;
     }
@@ -105,7 +105,7 @@ public class PlayerController : ControllerBase
     private FileService Files { get; }
     private PlayerService Player { get; }
     private AnalysisProvider Analysis { get; }
-    private AnalysisCache AnalysisCache { get; }
+    private AnalysisStore AnalysisStore { get; }
     private StreamTickets Tickets { get; }
     private IOptionsMonitor<Options> OptionsMonitor { get; }
     private ILogger Log { get; } = Serilog.Log.ForContext<PlayerController>();
@@ -310,12 +310,12 @@ public class PlayerController : ControllerBase
             return Ok(AnalysisResponse.From(new AnalysisAnswer(AnalysisState.Off)));
         }
 
-        // kept for good once made: the audio of a download does not change, so there is nothing to look at on disk,
+        // saved for good once made: the audio of a download does not change, so there is nothing to look at on disk,
         // and a file since moved out still has the analysis it had
         if (Guid.TryParse(id, out var download) && !Program.IsRelayAgent && OptionsMonitor.CurrentValue.Player.Enabled
-            && AnalysisCache.TryGet(download, out var kept))
+            && AnalysisStore.TryGet(download, out var saved))
         {
-            return Ok(AnalysisResponse.From(new AnalysisAnswer(AnalysisState.Ready, kept)));
+            return Ok(AnalysisResponse.From(new AnalysisAnswer(AnalysisState.Ready, saved)));
         }
 
         var (guid, file, refusal) = Resolve(id);
@@ -334,30 +334,30 @@ public class PlayerController : ControllerBase
     }
 
     /// <summary>
-    ///     How many downloads have an analysis kept.
+    ///     How many downloads have an analysis saved.
     /// </summary>
     /// <returns>The count.</returns>
     /// <response code="200">The request completed successfully.</response>
-    [HttpGet("analysis/cache")]
+    [HttpGet("analyses")]
     [Authorize(Policy = AuthPolicy.Any)]
-    [ProducesResponseType(typeof(AnalysisCacheResponse), 200)]
-    public IActionResult GetAnalysisCache()
-        => Ok(new AnalysisCacheResponse { Configured = Analysis.Configured, Downloads = AnalysisCache.Count });
+    [ProducesResponseType(typeof(SavedAnalysesResponse), 200)]
+    public IActionResult GetSavedAnalyses()
+        => Ok(new SavedAnalysesResponse { Configured = Analysis.Configured, Downloads = AnalysisStore.Count });
 
     /// <summary>
-    ///     Drops every analysis kept, so each download is analysed again when it is next shown.
+    ///     Deletes every saved analysis, so each download is analysed again when it is next shown.
     /// </summary>
     /// <remarks>
-    ///     For an analyser changed in a way its version does not say. A new version clears what the old one made by
-    ///     itself, as soon as the provider is seen to speak it.
+    ///     For an analyser changed in a way its version does not say. A new version deletes what the old one made by
+    ///     itself, as soon as it is known.
     /// </remarks>
-    /// <returns>How many downloads' analyses were dropped.</returns>
-    /// <response code="200">The cache is empty.</response>
-    [HttpDelete("analysis/cache")]
+    /// <returns>How many downloads' analyses were deleted.</returns>
+    /// <response code="200">None are saved now.</response>
+    [HttpDelete("analyses")]
     [Authorize(Policy = AuthPolicy.Any)]
-    [ProducesResponseType(typeof(AnalysisCacheResponse), 200)]
-    public IActionResult ClearAnalysisCache()
-        => Ok(new AnalysisCacheResponse { Configured = Analysis.Configured, Downloads = AnalysisCache.Clear() });
+    [ProducesResponseType(typeof(SavedAnalysesResponse), 200)]
+    public IActionResult DeleteSavedAnalyses()
+        => Ok(new SavedAnalysesResponse { Configured = Analysis.Configured, Downloads = AnalysisStore.Clear() });
 
     private (Guid Id, FileInfo File, IActionResult Refusal) Resolve(string id, string ticket = null, bool requireTicket = false)
     {

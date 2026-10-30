@@ -53,7 +53,7 @@ Authorization: Bearer <token>
 
 | Status | Means | slskd does |
 |---|---|---|
-| 200 | An analysis, below | Keeps it for the download for good (see *Caching*) and shows it |
+| 200 | An analysis, below | Keeps it for the download for good (see *Storage*) and shows it |
 | 202 + `Retry-After` | Still being computed | Asks again after that many seconds |
 | 403 | Not a file the provider will analyse | Shows nothing; does not ask again |
 | 404 | The provider cannot see the file | Shows nothing; does not ask again |
@@ -86,7 +86,7 @@ Authorization: Bearer <token>
 - **`id`** (optional) names this analysis: a checksum of the **audio alone**
   (tags, artwork and the file's name and dates left out) and the analyser's
   version, as `<checksum>-<version>`. Two files with the same audio analysed
-  under the same rules get the same id. See *Caching*.
+  under the same rules get the same id. See *Storage*.
 - **`provider.version`** is the version of the analyser's rules. Change it
   whenever an answer could change for the same audio: a new finding, a
   retired one, a rewritten threshold.
@@ -102,25 +102,25 @@ Authorization: Bearer <token>
 - Unknown fields are ignored, so a provider may send more. `contract` changes
   only for a change a client cannot ignore.
 
-## Caching
+## Storage
 
 An analysis is a fact about the audio, and the audio of a download does not
-change, so slskd keeps every 200 **for good**, by download, in its transfers
-database. It survives restarts, retagging, and the file being moved or
+change, so slskd saves every 200 **for good**, by download, in its transfers
+database, and answers from there from then on. It survives restarts, retagging, and the file being moved or
 deleted, and the downloads list carries each row's verdict so the badge draws
 with the row. Only a download never analysed asks the provider.
 
 - When an answer arrives whose `provider.version` differs from the one
-  before, slskd drops everything made under the other versions: the rules
+  before, slskd deletes everything made under the other versions: the rules
   changed, so those answers are no longer the provider's.
 - Downloads whose answers carry the same `id` share one stored analysis.
-  Without an `id`, slskd keeps one per download.
-- **System > Data > Clear Audio Analysis** (`DELETE /api/v0/player/analysis/cache`)
-  drops the lot, for rules that changed without the version saying so.
+  Without an `id`, slskd saves one per download.
+- **System > Data > Clear Audio Analysis** (`DELETE /api/v0/player/analyses`)
+  deletes the lot, for rules that changed without the version saying so.
   `GET` on the same route gives the count.
 
 Only downloads still listed keep theirs. Daily, and at startup,
-slskd drops what it kept for a download since removed (by hand, with its file,
+slskd deletes what it saved for a download since removed (by hand, with its file,
 or by retention), and any analysis no listed download still uses.
 
 202, 403, 404 and faults are not kept beyond a short while: they are answers

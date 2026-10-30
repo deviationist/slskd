@@ -91,18 +91,18 @@ public record AnalysisResponse
 }
 
 /// <summary>
-///     The analysis cache.
+///     The saved analyses.
 /// </summary>
-public record AnalysisCacheResponse
+public record SavedAnalysesResponse
 {
     /// <summary>
-    ///     Gets a value indicating whether an analysis provider is configured, so a page can leave the cache out
-    ///     where there is nothing to cache.
+    ///     Gets a value indicating whether analysis is on, so a page can leave the saved analyses out where
+    ///     none are made.
     /// </summary>
     public bool Configured { get; init; }
 
     /// <summary>
-    ///     Gets the number of downloads with an analysis kept, or, from a clear, the number whose analysis was dropped.
+    ///     Gets the number of downloads with an analysis saved, or, from a delete, the number whose analysis was deleted.
     /// </summary>
     public int Downloads { get; init; }
 }

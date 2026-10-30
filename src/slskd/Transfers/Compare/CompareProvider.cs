@@ -97,7 +97,7 @@ public record CompareAnswer(CompareState State, JsonElement? Document = null, in
 /// <remarks>
 ///     <para>
 ///         Server to server, as <see cref="AnalysisProvider"/> is: the browser only ever talks to slskd, so the
-///         provider's token stays in slskd's config. Answers are kept per list of file identities (path, size, mtime)
+///         provider's token stays in slskd's config. Answers are held briefly, for the dialog to collect, per list of file identities (path, size, mtime)
 ///         in the order sent -- the document's indices are into that order, so the same files in another order are a
 ///         different question as far as the cache is concerned.
 ///     </para>
@@ -135,6 +135,9 @@ public class CompareProvider
     // how soon a caller that did not wait is told to ask again
     private const int PollAfter = 3;
 
+    // an answer is held only until the dialog that asked collects it, polling every few seconds, or is reopened
+    // straight away; a comparison is asked for by hand and seldom twice, so it is not kept beyond that
+    private static readonly TimeSpan HeldFor = TimeSpan.FromMinutes(5);
     private static readonly TimeSpan UnavailableFor = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan ConflictRetry = TimeSpan.FromSeconds(2);
 
@@ -176,7 +179,7 @@ public class CompareProvider
     public static (CompareState State, TimeSpan? KeepFor) Classify(HttpStatusCode status)
         => status switch
         {
-            HttpStatusCode.OK => (CompareState.Ready, TimeSpan.FromDays(1)),
+            HttpStatusCode.OK => (CompareState.Ready, HeldFor),
             HttpStatusCode.Accepted => (CompareState.Pending, null),
 
             // the provider is busy with other comparisons: the same as still working on this one, from where the
@@ -332,7 +335,7 @@ public class CompareProvider
 
         try
         {
-            return (new CompareAnswer(CompareState.Ready, await Builtin.CompareAsync(files)), TimeSpan.FromDays(1));
+            return (new CompareAnswer(CompareState.Ready, await Builtin.CompareAsync(files)), HeldFor);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {

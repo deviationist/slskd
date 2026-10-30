@@ -1,4 +1,4 @@
-// <copyright file="AnalysisCache.cs" company="JP Dillingham">
+// <copyright file="AnalysisStore.cs" company="JP Dillingham">
 //           ▄▄▄▄     ▄▄▄▄     ▄▄▄▄
 //     ▄▄▄▄▄▄█  █▄▄▄▄▄█  █▄▄▄▄▄█  █
 //     █__ --█  █__ --█    ◄█  -  █
@@ -43,7 +43,7 @@ using Serilog;
 using slskd.Transfers;
 
 /// <summary>
-///     One analysis a provider made, kept under its own id.
+///     One analysis, stored under its own id.
 /// </summary>
 /// <remarks>
 ///     A provider that gives an id gives one made of what was analysed and how: a checksum of the audio alone, and the
@@ -65,7 +65,7 @@ public class StoredAnalysis
     public string Version { get; set; }
 
     /// <summary>
-    ///     Gets or sets the verdict's level, kept apart so a list can draw its badges without the documents.
+    ///     Gets or sets the verdict's level, stored apart so a list can draw its badges without the documents.
     /// </summary>
     [Required]
     public string Level { get; set; }
@@ -83,7 +83,7 @@ public class StoredAnalysis
     public string Document { get; set; }
 
     /// <summary>
-    ///     Gets or sets when it was kept.
+    ///     Gets or sets when it was stored.
     /// </summary>
     public DateTime StoredAt { get; set; }
 }
@@ -114,37 +114,39 @@ public class DownloadAnalysis
 public record AnalysisVerdict(string Level, string Headline);
 
 /// <summary>
-///     Every analysis a provider has made of a download, kept for good.
+///     Every analysis made of a download, by slskd's own analyser or a provider, stored for good in the Transfers
+///     database.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Kept by download rather than by file, because a download is one file whose audio never changes: retagging,
+///         Stored by download rather than by file, because a download is one file whose audio never changes: retagging,
 ///         renaming or moving it changes nothing an analysis looked at. Its id is the one key that needs no look at the
 ///         disk, which is what lets the downloads list -- served every second or so, of hundreds of rows, over a network
-///         filesystem -- carry each row's verdict.
+///         filesystem -- carry each row's verdict, read from the database with the rows.
 ///     </para>
 ///     <para>
-///         Only a finished analysis is kept here. "Nothing to show" and "the provider is down" are answers about now,
+///         Only a finished analysis is stored. "Nothing to show" and "the provider is down" are answers about now,
 ///         and stay with <see cref="AnalysisProvider"/>, which forgets them.
 ///     </para>
 ///     <para>
-///         Kept until the analyser changes. A document made by a version other than the provider's now is dropped as
-///         soon as the provider is seen to have moved on, and the operator can drop the lot from the settings.
+///         Stored until the analyser changes. A document made by a version other than the one answering now is deleted
+///         as soon as that version is known -- at once for slskd's own analyser, on its first answer for a provider --
+///         and the operator can delete the lot from the settings.
 ///     </para>
 ///     <para>
-///         And kept only for downloads still listed: daily, and on first use, what is kept for a download
-///         since removed -- by hand, with its file, or by retention -- is dropped, and so is any analysis no download
-///         is left to use. Removing a download is a soft delete, so the record stays and a join tells the two apart.
+///         And stored only for downloads still listed: daily, and on first use, what is stored for a download since
+///         removed -- by hand, with its file, or by retention -- is deleted, and so is any analysis no download is left
+///         to use. Removing a download is a soft delete, so the record stays and a join tells the two apart.
 ///     </para>
 /// </remarks>
-public class AnalysisCache
+public class AnalysisStore
 {
     /// <summary>
-    ///     Initializes a new instance of the <see cref="AnalysisCache"/> class.
+    ///     Initializes a new instance of the <see cref="AnalysisStore"/> class.
     /// </summary>
     /// <param name="contextFactory">The transfers database context factory.</param>
     /// <param name="optionsMonitor">The options, which say whether slskd's own analyser is the one answering.</param>
-    public AnalysisCache(IDbContextFactory<TransfersDbContext> contextFactory, Microsoft.Extensions.Options.IOptionsMonitor<Options> optionsMonitor = null)
+    public AnalysisStore(IDbContextFactory<TransfersDbContext> contextFactory, Microsoft.Extensions.Options.IOptionsMonitor<Options> optionsMonitor = null)
     {
         ContextFactory = contextFactory;
         OptionsMonitor = optionsMonitor;
@@ -154,7 +156,7 @@ public class AnalysisCache
         {
             lock (Lock)
             {
-                Verdicts = null;
+                Prepared = false;
             }
         });
 
@@ -171,7 +173,7 @@ public class AnalysisCache
             }
             catch (Exception ex)
             {
-                Log.Warning("Could not sweep the analysis cache: {Message}", ex.Message);
+                Log.Warning("Could not sweep the stored analyses: {Message}", ex.Message);
             }
         });
     }
@@ -181,22 +183,21 @@ public class AnalysisCache
 
     // the version answers are made under now, when slskd knows it without asking: its own analyser's
     private string Expected => OptionsMonitor?.CurrentValue.Player.Analysis.UsesBuiltin == true ? Builtin.BuiltinAnalyser.Version : null;
-    private ILogger Log { get; } = Serilog.Log.ForContext<AnalysisCache>();
+    private ILogger Log { get; } = Serilog.Log.ForContext<AnalysisStore>();
     private object Lock { get; } = new();
-
-    // every download's verdict, read once and kept up with: what a list asks for, every poll
-    private Dictionary<Guid, AnalysisVerdict> Verdicts { get; set; }
 
     private static readonly TimeSpan SweepEvery = TimeSpan.FromDays(1);
 
+    // whether the first-use work -- the sweep, and dropping what another version made -- is done for the source now
+    private bool Prepared { get; set; }
     private bool Swept { get; set; }
     private DateTime LastSwept { get; set; } = DateTime.MinValue;
 
-    // the version the provider was last seen to speak
+    // the version answers were last seen made under
     private string Version { get; set; }
 
     /// <summary>
-    ///     Gets the number of downloads with an analysis kept.
+    ///     Gets the number of downloads with an analysis stored.
     /// </summary>
     public int Count
     {
@@ -204,53 +205,51 @@ public class AnalysisCache
         {
             lock (Lock)
             {
-                return Load().Count;
+                using var context = Open();
+                return context.DownloadAnalyses.Count();
             }
         }
     }
 
     /// <summary>
-    ///     The verdict of each of <paramref name="downloads"/> that has one kept.
+    ///     The verdict of each of <paramref name="downloads"/> that has one stored.
     /// </summary>
     /// <param name="downloads">The downloads' ids.</param>
     /// <returns>The verdicts, by download.</returns>
     public IReadOnlyDictionary<Guid, AnalysisVerdict> VerdictsOf(IEnumerable<Guid> downloads)
     {
+        var ids = downloads.ToList();
+
+        if (ids.Count == 0)
+        {
+            return new Dictionary<Guid, AnalysisVerdict>();
+        }
+
         lock (Lock)
         {
-            var verdicts = Load();
-            var found = new Dictionary<Guid, AnalysisVerdict>();
+            using var context = Open();
 
-            foreach (var id in downloads)
-            {
-                if (verdicts.TryGetValue(id, out var verdict))
-                {
-                    found[id] = verdict;
-                }
-            }
-
-            return found;
+            return context.DownloadAnalyses
+                .Where(d => ids.Contains(d.TransferId))
+                .Join(context.Analyses, d => d.AnalysisId, a => a.Id, (d, a) => new { d.TransferId, a.Level, a.Headline })
+                .AsEnumerable()
+                .ToDictionary(r => r.TransferId, r => new AnalysisVerdict(r.Level, r.Headline));
         }
     }
 
     /// <summary>
-    ///     The document kept for <paramref name="download"/>, if one is.
+    ///     The document stored for <paramref name="download"/>, if one is.
     /// </summary>
     /// <param name="download">The download's id.</param>
     /// <param name="document">The document.</param>
-    /// <returns>Whether one is kept.</returns>
+    /// <returns>Whether one is stored.</returns>
     public bool TryGet(Guid download, out JsonElement document)
     {
         document = default;
 
         lock (Lock)
         {
-            if (!Load().ContainsKey(download))
-            {
-                return false;
-            }
-
-            using var context = ContextFactory.CreateDbContext();
+            using var context = Open();
 
             var json = context.DownloadAnalyses
                 .Where(d => d.TransferId == download)
@@ -269,11 +268,11 @@ public class AnalysisCache
     }
 
     /// <summary>
-    ///     Keeps <paramref name="document"/> as the analysis of <paramref name="download"/>.
+    ///     Stores <paramref name="document"/> as the analysis of <paramref name="download"/>.
     /// </summary>
     /// <param name="download">The download's id.</param>
-    /// <param name="document">The provider's document, already checked against the contract.</param>
-    public virtual void Remember(Guid download, JsonElement document)
+    /// <param name="document">The analyser's document, already checked against the contract.</param>
+    public virtual void Save(Guid download, JsonElement document)
     {
         var version = StringAt(document, "provider", "version") ?? string.Empty;
         var id = StringAt(document, "id") ?? $"{download}-{version}";
@@ -282,17 +281,12 @@ public class AnalysisCache
 
         lock (Lock)
         {
-            var verdicts = Load();
+            using var context = Open();
 
-            using var context = ContextFactory.CreateDbContext();
-
-            // the provider has moved on: what it made under other rules is no longer its answer
+            // the analyser has moved on: what it made under other rules is no longer its answer
             if (Version is not null && Version != version)
             {
-                foreach (var transferId in DropOtherVersions(context, version))
-                {
-                    verdicts.Remove(transferId);
-                }
+                DropOtherVersions(context, version);
             }
 
             Version = version;
@@ -322,15 +316,13 @@ public class AnalysisCache
             }
 
             context.SaveChanges();
-
-            verdicts[download] = new AnalysisVerdict(level, headline);
         }
     }
 
     /// <summary>
-    ///     Drops every analysis kept, for when the analyser has changed in a way its version does not say.
+    ///     Deletes every stored analysis, for when the analyser has changed in a way its version does not say.
     /// </summary>
-    /// <returns>The number of downloads whose analysis was dropped.</returns>
+    /// <returns>The number of downloads whose analysis was deleted.</returns>
     public int Clear()
     {
         lock (Lock)
@@ -340,23 +332,23 @@ public class AnalysisCache
             var count = context.DownloadAnalyses.ExecuteDelete();
             context.Analyses.ExecuteDelete();
 
-            Verdicts = new Dictionary<Guid, AnalysisVerdict>();
             Version = null;
 
-            Log.Information("Cleared the analysis cache: {Count} downloads will be analysed again when next shown", count);
+            Log.Information("Deleted the stored analyses: {Count} downloads will be analysed again when next shown", count);
             return count;
         }
     }
 
     /// <summary>
-    ///     Drops what is kept for downloads no longer listed, and every analysis no download is left to use.
+    ///     Deletes what is stored for downloads no longer listed, and every analysis no download is left to use.
     /// </summary>
-    /// <returns>The number of downloads whose analysis was dropped.</returns>
+    /// <returns>The number of downloads whose analysis was deleted.</returns>
     public int Sweep()
     {
         lock (Lock)
         {
             LastSwept = DateTime.UtcNow;
+            Swept = true;
 
             using var context = ContextFactory.CreateDbContext();
 
@@ -370,32 +362,27 @@ public class AnalysisCache
 
             if (dropped > 0 || unused > 0)
             {
-                // read again on next use rather than edited here: a sweep is rare, and the list is cheap to read
-                Verdicts = null;
-                Log.Information("Dropped the analysis of {Count} removed downloads, and {Unused} analyses nothing uses", dropped, unused);
+                Log.Information("Deleted the analysis of {Count} removed downloads, and {Unused} analyses nothing uses", dropped, unused);
             }
 
             return dropped;
         }
     }
 
-    // drops every analysis not made under `version`, and the downloads' links to them; returns those downloads
-    private List<Guid> DropOtherVersions(TransfersDbContext context, string version)
+    // deletes every analysis not made under `version`, and the downloads' links to them
+    private void DropOtherVersions(TransfersDbContext context, string version)
     {
         var stale = context.Analyses.Where(a => a.Version != version).Select(a => a.Id).ToList();
 
         if (stale.Count == 0)
         {
-            return [];
+            return;
         }
-
-        var orphaned = context.DownloadAnalyses.Where(d => stale.Contains(d.AnalysisId)).Select(d => d.TransferId).ToList();
 
         context.DownloadAnalyses.Where(d => stale.Contains(d.AnalysisId)).ExecuteDelete();
         context.Analyses.Where(a => stale.Contains(a.Id)).ExecuteDelete();
 
-        Log.Information("Analyses are now made by {Version}; dropped {Count} made by another", version, stale.Count);
-        return orphaned;
+        Log.Information("Analyses are now made by {Version}; deleted {Count} made by another", version, stale.Count);
     }
 
     private static string StringAt(JsonElement element, params string[] path)
@@ -411,37 +398,32 @@ public class AnalysisCache
         return element.ValueKind == JsonValueKind.String ? element.GetString() : null;
     }
 
-    private Dictionary<Guid, AnalysisVerdict> Load()
+    // a context, with the first-use work done: called under the lock
+    private TransfersDbContext Open()
     {
-        if (Verdicts is not null)
+        if (!Prepared)
         {
-            return Verdicts;
+            Prepared = true;
+
+            // whatever was removed while slskd was not running
+            if (!Swept)
+            {
+                Sweep();
+            }
+
+            using var context = ContextFactory.CreateDbContext();
+
+            Version = context.Analyses.OrderByDescending(a => a.StoredAt).Select(a => a.Version).FirstOrDefault();
+
+            // slskd's own analyser has a version slskd knows, so what any other made -- an older version of it, or
+            // another source -- is dropped now, rather than when the first new answer happens to arrive
+            if (Expected is { } expected)
+            {
+                DropOtherVersions(context, expected);
+                Version = expected;
+            }
         }
 
-        // whatever was removed while slskd was not running
-        if (!Swept)
-        {
-            Swept = true;
-            Sweep();
-        }
-
-        using var context = ContextFactory.CreateDbContext();
-
-        // slskd's own analyser has a version slskd knows, so what any other made -- an older version of it, or
-        // another source -- is dropped now, rather than when the first new answer happens to arrive
-        if (Expected is { } expected)
-        {
-            DropOtherVersions(context, expected);
-            Version = expected;
-        }
-
-        Verdicts = context.DownloadAnalyses
-            .Join(context.Analyses, d => d.AnalysisId, a => a.Id, (d, a) => new { d.TransferId, a.Level, a.Headline })
-            .AsEnumerable()
-            .ToDictionary(r => r.TransferId, r => new AnalysisVerdict(r.Level, r.Headline));
-
-        Version = context.Analyses.OrderByDescending(a => a.StoredAt).Select(a => a.Version).FirstOrDefault();
-
-        return Verdicts;
+        return ContextFactory.CreateDbContext();
     }
 }
