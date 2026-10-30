@@ -38,7 +38,7 @@ public sealed class AnalysisCacheTests : IDisposable
     [Fact]
     public void A_kept_analysis_is_there_after_a_restart()
     {
-        var download = Guid.NewGuid();
+        var download = Download();
         Cache().Remember(download, Document("abc-v5", "analysis-v5", "warn", "Clipped"));
 
         // a new instance reads it from the database, as slskd does after a restart
@@ -53,7 +53,7 @@ public sealed class AnalysisCacheTests : IDisposable
     [Fact]
     public void Only_the_downloads_with_one_have_a_verdict()
     {
-        var analysed = Guid.NewGuid();
+        var analysed = Download();
         var cache = Cache();
         cache.Remember(analysed, Document("abc-v5", "analysis-v5"));
 
@@ -67,8 +67,8 @@ public sealed class AnalysisCacheTests : IDisposable
     public void Two_downloads_of_the_same_audio_share_one_analysis()
     {
         var cache = Cache();
-        cache.Remember(Guid.NewGuid(), Document("same-audio-v5", "analysis-v5"));
-        cache.Remember(Guid.NewGuid(), Document("same-audio-v5", "analysis-v5"));
+        cache.Remember(Download(), Document("same-audio-v5", "analysis-v5"));
+        cache.Remember(Download(), Document("same-audio-v5", "analysis-v5"));
 
         using var context = new TransfersDbContext(dbOptions);
         Assert.Single(context.Analyses);
@@ -79,7 +79,7 @@ public sealed class AnalysisCacheTests : IDisposable
     [Fact]
     public void A_provider_that_gives_no_id_gets_one_made_per_download()
     {
-        var download = Guid.NewGuid();
+        var download = Download();
         Cache().Remember(download, Document(id: null, "analysis-v5"));
 
         using var context = new TransfersDbContext(dbOptions);
@@ -90,8 +90,8 @@ public sealed class AnalysisCacheTests : IDisposable
     public void A_new_version_of_the_analyser_drops_what_the_old_one_made()
     {
         // the rules changed -- what counts as a gap, or as clipping -- and the provider says so with its version
-        var old = Guid.NewGuid();
-        var fresh = Guid.NewGuid();
+        var old = Download();
+        var fresh = Download();
         Cache().Remember(old, Document("abc-v5", "analysis-v5"));
 
         var cache = Cache();
@@ -108,10 +108,10 @@ public sealed class AnalysisCacheTests : IDisposable
     [Fact]
     public void Clearing_drops_everything_kept()
     {
-        var download = Guid.NewGuid();
+        var download = Download();
         var cache = Cache();
         cache.Remember(download, Document("abc-v5", "analysis-v5"));
-        cache.Remember(Guid.NewGuid(), Document("def-v5", "analysis-v5"));
+        cache.Remember(Download(), Document("def-v5", "analysis-v5"));
 
         Assert.Equal(2, cache.Clear());
 
@@ -123,7 +123,7 @@ public sealed class AnalysisCacheTests : IDisposable
     [Fact]
     public void Reanalysing_a_download_points_it_at_the_new_analysis()
     {
-        var download = Guid.NewGuid();
+        var download = Download();
         var cache = Cache();
         cache.Remember(download, Document("abc-v5", "analysis-v5", "ok", "Fine"));
         cache.Remember(download, Document("xyz-v5", "analysis-v5", "bad", "Upsampled"));
@@ -148,9 +148,62 @@ public sealed class AnalysisCacheTests : IDisposable
         migration.Apply();
         Assert.False(migration.NeedsToBeApplied());
 
-        var download = Guid.NewGuid();
+        var download = Download();
         Cache().Remember(download, Document("abc-v5", "analysis-v5"));
         Assert.True(Cache().TryGet(download, out _));
+    }
+
+    [Fact]
+    public void A_removed_download_loses_its_analysis_and_one_still_listed_keeps_a_shared_one()
+    {
+        var kept = Download();
+        var removed = Download();
+        var alone = Download();
+        var cache = Cache();
+        cache.Remember(kept, Document("shared-v5", "analysis-v5"));
+        cache.Remember(removed, Document("shared-v5", "analysis-v5"));
+        cache.Remember(alone, Document("only-v5", "analysis-v5"));
+
+        Remove(removed, alone);
+
+        Assert.Equal(2, cache.Sweep());
+
+        Assert.Equal([kept], cache.VerdictsOf([kept, removed, alone]).Keys);
+        using var context = new TransfersDbContext(dbOptions);
+        Assert.Equal(["shared-v5"], context.Analyses.Select(a => a.Id));
+    }
+
+    [Fact]
+    public void What_was_removed_while_slskd_was_down_is_dropped_on_first_use()
+    {
+        var removed = Download();
+        Cache().Remember(removed, Document("abc-v5", "analysis-v5"));
+        Remove(removed);
+
+        Assert.Equal(0, Cache().Count);
+    }
+
+    private Guid Download()
+    {
+        using var context = new TransfersDbContext(dbOptions);
+        var transfer = new Transfer
+        {
+            Id = Guid.NewGuid(),
+            Direction = Soulseek.TransferDirection.Download,
+            Username = "someone",
+            Filename = "@@x\\Artist\\01 Track.flac",
+            State = Soulseek.TransferStates.Completed | Soulseek.TransferStates.Succeeded,
+            RequestedAt = DateTime.UtcNow,
+        };
+        context.Transfers.Add(transfer);
+        context.SaveChanges();
+        return transfer.Id;
+    }
+
+    private void Remove(params Guid[] downloads)
+    {
+        using var context = new TransfersDbContext(dbOptions);
+        context.Transfers.Where(t => downloads.Contains(t.Id)).ExecuteUpdate(t => t.SetProperty(x => x.Removed, true));
     }
 
     private static JsonElement Document(string id, string version, string level = "ok", string headline = "Fine")
