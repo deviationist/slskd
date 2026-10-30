@@ -3,12 +3,17 @@
 slskd can say which of several finished downloads are the same track, judged
 from the audio rather than the names: "Darkness (Chris Cargo Mix)" and
 "Darkness (Chris Cargo Remix)" may be one recording renamed by whoever shared
-it, or two different things. slskd does no comparing itself. It asks a
-**provider**, over HTTP, and draws the answer. The feature is **off by
-default**. It is on only when it is enabled *and* a provider is configured;
-otherwise the Compare button is not drawn.
+it, or two different things. The feature is **off by default**;
+`transfers.compare.source` turns it on, with slskd's own comparer (`builtin`)
+or an external **provider** (`provider`), asked over HTTP. See
+[config.md](config.md#compare).
 
-This page is the contract a provider implements. The response's shape is also
+**This contract is slskd's.** slskd defines it here, along with its schema, and
+its own comparer answers in exactly this shape. A provider is any service that
+implements it as written; one that keeps a copy of the schema keeps it in step
+with this one, never the other way round.
+
+This page is the contract. The response's shape is also
 written as a JSON Schema in [`transfers-compare-provider.schema.json`](transfers-compare-provider.schema.json),
 which a provider can test itself against. It follows the
 [analysis provider](player-analysis-provider.md) contract closely: files are
@@ -19,7 +24,7 @@ named the same way, and a provider may implement both behind one token.
 ```yaml
 transfers:
   compare:
-    enabled: true            # off unless set
+    source: provider         # off (the default), builtin or provider
     provider:
       url: http://analysis.example:8080/contract   # the provider's base; slskd appends /v1/compare
       token: <bearer token>

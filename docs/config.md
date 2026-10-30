@@ -609,25 +609,30 @@ transfers:
 ## Compare
 
 *Compare* on the Downloads page says which of the ticked finished downloads are the same track, judged from the audio rather than the names: two copies
-called "Mix" and "Remix" may be one recording renamed, or two different things.  slskd does no comparing itself; it asks an external provider, server to
-server, and draws the answer.  The contract a provider implements is in [transfers-compare-provider.md](transfers-compare-provider.md).
+called "Mix" and "Remix" may be one recording renamed, or two different things.  It is **off by default**, because every comparison decodes several
+files.  `source` turns it on, and says what compares:
 
-Off by default, because every comparison hands the provider several files to decode.  The button is shown only when `enabled` is set *and* a provider URL is
-configured.  At most 10 downloads are compared at once.
+| `source` | What compares |
+| -------- | ------------- |
+| `off` | Nothing; the button is not drawn. |
+| `builtin` | slskd's own comparer, on this machine: one decode per file, every pair scored. |
+| `provider` | An external service under `provider` below, over the contract in [transfers-compare-provider.md](transfers-compare-provider.md). |
 
-`roots` work as the [analysis provider](#analysis-provider)'s do: a file is named to the provider as one of these names plus a path relative to it, and the
-provider holds the same names mapped to its own mounts.  The two are configured separately, so either can be on without the other, but one provider may serve
-both with the same values.
+Left unset, `enabled` decides, as it did before there was a choice: `enabled: true` means `provider`.  Either way the answer is the same document, and
+at most 10 downloads are compared at once.
+
+`roots` work as the [analysis provider](#audio-analysis)'s do: a file is named to the provider as one of these names plus a path relative to it, and the
+provider holds the same names mapped to its own mounts.  The built-in comparer reads the files where they are and needs none.
 
 | Command-Line | Environment Variable | Description                                                       |
 | ------------ | -------------------- | ----------------------------------------------------------------- |
-| `--compare`  | `SLSKD_COMPARE`      | Offer Compare on finished downloads, judged by the compare provider |
+| `--compare`  | `SLSKD_COMPARE`      | Offer Compare on finished downloads, judged by the compare provider (when `source` is unset) |
 
 #### **YAML**
 ```yaml
 transfers:
   compare:
-    enabled: false
+    source: off              # off, builtin or provider
     provider:
       url: http://analysis.example:8080/contract
       token: <bearer token>

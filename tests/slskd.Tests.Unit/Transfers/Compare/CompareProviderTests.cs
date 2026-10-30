@@ -286,7 +286,43 @@ namespace slskd.Tests.Unit.Transfers.Compare
         private static HttpResponseMessage Json(HttpStatusCode status, string body)
             => new(status) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
 
-        private CompareProvider Provider(string url = "http://provider.invalid/contract", bool enabled = true, Task hold = null)
+        [Fact]
+        public async Task The_builtin_comparer_answers_without_asking_anyone_and_wherever_the_files_are()
+        {
+            // outside every root: the roots name folders to a provider elsewhere, and slskd's own comparer needs none
+            var a = new FileInfo(Path.Combine(Path.GetTempPath(), $"slskd.compare.{Guid.NewGuid()}.flac"));
+            var b = new FileInfo(Path.Combine(Path.GetTempPath(), $"slskd.compare.{Guid.NewGuid()}.flac"));
+            File.WriteAllBytes(a.FullName, [1]);
+            File.WriteAllBytes(b.FullName, [2]);
+
+            // twelve seconds of a tone that swells and fades, the same for both
+            var pcm = Enumerable.Range(0, 12 * slskd.Transfers.Compare.Builtin.SameTrack.Rate)
+                .Select(n => (float)(Math.Sin(n / 3.0) * (0.5 + (0.5 * Math.Sin(n / 3000.0)))))
+                .SelectMany(BitConverter.GetBytes)
+                .ToArray();
+
+            try
+            {
+                var provider = Provider(source: "builtin", builtin: new slskd.Transfers.Compare.Builtin.BuiltinCompare(new slskd.Tests.Unit.Player.FakeMediaTool { DecodedPcm = pcm }));
+                var answer = await provider.GetAsync([a, b]);
+
+                Assert.True(provider.Enabled);
+                Assert.Equal(CompareState.Ready, answer.State);
+                Assert.Equal("slskd", answer.Document.Value.GetProperty("provider").GetProperty("name").GetString());
+                Assert.Empty(Requests);
+            }
+            finally
+            {
+                a.Delete();
+                b.Delete();
+            }
+        }
+
+        [Fact]
+        public void Compare_is_off_until_it_is_asked_for()
+            => Assert.False(Provider(enabled: false).Enabled);
+
+        private CompareProvider Provider(string url = "http://provider.invalid/contract", bool enabled = true, Task hold = null, string source = null, slskd.Transfers.Compare.Builtin.BuiltinCompare builtin = null)
         {
             var handler = new Handler(async request =>
             {
@@ -311,6 +347,7 @@ namespace slskd.Tests.Unit.Transfers.Compare
                     Compare = new slskd.Options.TransfersOptions.CompareOptions
                     {
                         Enabled = enabled,
+                        Source = source,
                         Provider = new slskd.Options.TransfersOptions.CompareProviderOptions
                         {
                             Url = url,
@@ -319,7 +356,7 @@ namespace slskd.Tests.Unit.Transfers.Compare
                         },
                     },
                 },
-            }));
+            }), builtin);
         }
 
         private sealed class Handler(Func<HttpRequestMessage, Task<HttpResponseMessage>> respond) : HttpMessageHandler

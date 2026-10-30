@@ -143,16 +143,22 @@ public class CompareProvider
     /// </summary>
     /// <param name="httpClientFactory">The HTTP client factory.</param>
     /// <param name="optionsMonitor">The options monitor.</param>
-    public CompareProvider(IHttpClientFactory httpClientFactory, IOptionsMonitor<Options> optionsMonitor)
+    /// <param name="builtin">slskd's own comparer, for <c>transfers.compare.source: builtin</c>.</param>
+    public CompareProvider(IHttpClientFactory httpClientFactory, IOptionsMonitor<Options> optionsMonitor, Builtin.BuiltinCompare builtin = null)
     {
         HttpClientFactory = httpClientFactory;
         OptionsMonitor = optionsMonitor;
+        Builtin = builtin;
     }
 
     /// <summary>
-    ///     Gets a value indicating whether Compare is enabled and a provider is configured.
+    ///     Gets a value indicating whether Compare is offered: slskd's own comparer, or a configured provider, as
+    ///     <c>transfers.compare.source</c> says. Off by default.
     /// </summary>
-    public bool Enabled => Settings.Enabled && Settings.Provider.Configured;
+    public bool Enabled => UsesBuiltin || Settings.UsesProvider;
+
+    private bool UsesBuiltin => Settings.UsesBuiltin && Builtin is not null;
+    private Builtin.BuiltinCompare Builtin { get; }
 
     private IHttpClientFactory HttpClientFactory { get; }
     private IOptionsMonitor<Options> OptionsMonitor { get; }
@@ -232,11 +238,18 @@ public class CompareProvider
             return new CompareAnswer(CompareState.Refused, Reason: $"Compare takes 2 to {MaximumFiles} files");
         }
 
-        var (located, outside) = Locate(files);
+        var builtin = UsesBuiltin;
+        List<(string Root, string File)> located = null;
 
-        if (outside.Count > 0)
+        // the roots name folders to a provider elsewhere; slskd's own comparer reads the files where they are
+        if (!builtin)
         {
-            return new CompareAnswer(CompareState.Refused, Reason: "not in a folder the provider is asked about: " + string.Join(", ", outside.Select(f => f.Name)));
+            (located, var outside) = Locate(files);
+
+            if (outside.Count > 0)
+            {
+                return new CompareAnswer(CompareState.Refused, Reason: "not in a folder the provider is asked about: " + string.Join(", ", outside.Select(f => f.Name)));
+            }
         }
 
         foreach (var file in files)
@@ -244,7 +257,8 @@ public class CompareProvider
             file.Refresh();
         }
 
-        var key = string.Join('\n', files.Select(f => $"{f.FullName}|{f.Length}|{f.LastWriteTimeUtc.Ticks}"));
+        // by source too, so switching between them is never answered from what the other said
+        var key = (builtin ? "builtin\n" : "provider\n") + string.Join('\n', files.Select(f => $"{f.FullName}|{f.Length}|{f.LastWriteTimeUtc.Ticks}"));
 
         if (Answers.TryGetValue(key, out CompareAnswer cached))
         {
@@ -296,7 +310,7 @@ public class CompareProvider
     {
         try
         {
-            var (answer, keepFor) = await AskAsync(located, files);
+            var (answer, keepFor) = located is null ? await CompareHereAsync(files) : await AskAsync(located, files);
 
             if (keepFor is not null)
             {
@@ -309,6 +323,25 @@ public class CompareProvider
         {
             // by the request itself rather than by whoever was waiting, who may have stopped waiting
             InFlight.TryRemove(key, out _);
+        }
+    }
+
+    private async Task<(CompareAnswer Answer, TimeSpan? KeepFor)> CompareHereAsync(IReadOnlyList<FileInfo> files)
+    {
+        await Limit.WaitAsync();
+
+        try
+        {
+            return (new CompareAnswer(CompareState.Ready, await Builtin.CompareAsync(files)), TimeSpan.FromDays(1));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            Log.Warning("The built-in comparer failed for {Count} file(s): {Message}", files.Count, ex.Message);
+            return (new CompareAnswer(CompareState.Unavailable, Reason: "the comparison failed"), UnavailableFor);
+        }
+        finally
+        {
+            Limit.Release();
         }
     }
 
