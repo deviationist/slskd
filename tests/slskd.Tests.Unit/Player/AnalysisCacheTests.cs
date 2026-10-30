@@ -9,6 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Moq;
 using slskd.Migrations;
 using slskd.Player;
+using slskd.Player.Builtin;
 using slskd.Transfers;
 using Xunit;
 
@@ -154,6 +155,34 @@ public sealed class AnalysisCacheTests : IDisposable
     }
 
     [Fact]
+    public void With_the_builtin_analyser_on_whatever_another_version_made_is_dropped_on_first_use()
+    {
+        // slskd knows its own analyser's version, so a bump of it -- or a switch from a provider -- clears at once,
+        // rather than when the first new answer happens to arrive
+        var provider = Download();
+        var older = Download();
+        var current = Download();
+        var cache = Cache();
+        cache.Remember(provider, Document("abc-v6", "analysis-v6"));
+        cache.Remember(older, Document("abc-slskd-v0", "slskd-v0"));
+        cache.Remember(current, Document($"def-{BuiltinAnalyser.Version}", BuiltinAnalyser.Version));
+
+        var builtin = Cache(source: "builtin");
+
+        Assert.Equal([current], builtin.VerdictsOf([provider, older, current]).Keys);
+        Assert.False(builtin.TryGet(provider, out _));
+    }
+
+    [Fact]
+    public void With_a_provider_nothing_is_dropped_until_it_answers_under_another_version()
+    {
+        var download = Download();
+        Cache().Remember(download, Document("abc-v6", "analysis-v6"));
+
+        Assert.Equal(1, Cache(source: "provider").Count);
+    }
+
+    [Fact]
     public void A_removed_download_loses_its_analysis_and_one_still_listed_keeps_a_shared_one()
     {
         var kept = Download();
@@ -225,10 +254,21 @@ public sealed class AnalysisCacheTests : IDisposable
         return parsed.RootElement.Clone();
     }
 
-    private AnalysisCache Cache()
+    private AnalysisCache Cache(string source = null)
     {
         var factory = new Mock<IDbContextFactory<TransfersDbContext>>();
         factory.Setup(f => f.CreateDbContext()).Returns(() => new TransfersDbContext(dbOptions));
-        return new AnalysisCache(factory.Object);
+
+        var options = source is null
+            ? null
+            : new TestOptionsMonitor<slskd.Options>(new slskd.Options
+            {
+                Player = new slskd.Options.PlayerOptions
+                {
+                    Analysis = new slskd.Options.PlayerOptions.PlayerAnalysisOptions { Source = source },
+                },
+            });
+
+        return new AnalysisCache(factory.Object, options);
     }
 }

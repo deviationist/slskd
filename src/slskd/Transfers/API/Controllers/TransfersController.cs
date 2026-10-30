@@ -1469,7 +1469,7 @@ namespace slskd.Transfers.API
         private async Task AnnotateAsync(IEnumerable<slskd.Transfers.Transfer> downloads)
         {
             // one look-up for the lot, from memory: the list is served every second or so
-            var verdicts = AnalysisCache is not null && OptionsSnapshot.Value.Player.Analysis.Provider.Configured
+            var verdicts = AnalysisCache is not null && OptionsSnapshot.Value.Player.Analysis.Enabled
                 ? AnalysisCache.VerdictsOf(downloads.Select(d => d.Id))
                 : null;
 

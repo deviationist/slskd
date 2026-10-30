@@ -467,13 +467,65 @@ namespace slskd
             /// <summary>
             ///     Analysis options.
             /// </summary>
-            public class PlayerAnalysisOptions
+            public class PlayerAnalysisOptions : IValidatableObject
             {
                 /// <summary>
-                ///     Gets the external analysis provider. Without a URL there is no analysis.
+                ///     Gets what analyses a track: <c>off</c> (the default), <c>builtin</c> for slskd's own analyser, or
+                ///     <c>provider</c> for the external service under <see cref="Provider"/>.
+                /// </summary>
+                public string Source { get; init; } = "off";
+
+                /// <summary>
+                ///     Gets slskd's own analyser.
+                /// </summary>
+                [Validate]
+                public PlayerAnalysisBuiltinOptions Builtin { get; init; } = new PlayerAnalysisBuiltinOptions();
+
+                /// <summary>
+                ///     Gets the external analysis provider, used when <see cref="Source"/> is <c>provider</c>.
                 /// </summary>
                 [Validate]
                 public PlayerAnalysisProviderOptions Provider { get; init; } = new PlayerAnalysisProviderOptions();
+
+                /// <summary>
+                ///     Gets a value indicating whether slskd's own analyser answers.
+                /// </summary>
+                public bool UsesBuiltin => string.Equals(Source, "builtin", StringComparison.OrdinalIgnoreCase);
+
+                /// <summary>
+                ///     Gets a value indicating whether the external provider answers.
+                /// </summary>
+                public bool UsesProvider => string.Equals(Source, "provider", StringComparison.OrdinalIgnoreCase) && Provider.Configured;
+
+                /// <summary>
+                ///     Gets a value indicating whether anything analyses at all.
+                /// </summary>
+                public bool Enabled => UsesBuiltin || UsesProvider;
+
+                public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+                {
+                    if (Source is not ("off" or "builtin" or "provider"))
+                    {
+                        yield return new ValidationResult($"The {nameof(Source)} field must be off, builtin or provider");
+                    }
+
+                    if (string.Equals(Source, "provider", StringComparison.OrdinalIgnoreCase) && !Provider.Configured)
+                    {
+                        yield return new ValidationResult($"The {nameof(Source)} is provider, but no provider URL is set");
+                    }
+                }
+            }
+
+            /// <summary>
+            ///     slskd's own analyser.
+            /// </summary>
+            public class PlayerAnalysisBuiltinOptions
+            {
+                /// <summary>
+                ///     Gets the number of files analysed at once. Each is a decode and a pass of FFTs, on this machine.
+                /// </summary>
+                [Range(1, 16)]
+                public int Concurrency { get; init; } = 1;
             }
 
             /// <summary>
@@ -483,7 +535,7 @@ namespace slskd
             public class PlayerAnalysisProviderOptions : IValidatableObject
             {
                 /// <summary>
-                ///     Gets the provider's base URL; slskd appends /v1/analysis. Empty turns analysis off.
+                ///     Gets the provider's base URL; slskd appends /v1/analysis.
                 /// </summary>
                 public string Url { get; init; } = null;
 

@@ -241,19 +241,32 @@ on its next play.
 A track's waveform and transcodes are dropped with it when slskd deletes its file. Transcodes of files that went any other way -- moved, or deleted
 by hand -- are unused from then on, and go with the `ttl`.
 
-### Analysis Provider
+### Audio Analysis
 
-The player can show what an external service found wrong with a track: a badge on the row, marks under the waveform where a problem sits, and a panel of
-findings. slskd does no analysis itself; it asks the provider, server to server, and draws the answer. With no provider URL none of this is shown. The contract a
-provider implements is in [player-analysis-provider.md](player-analysis-provider.md).
+The player can show what is wrong with a track: a badge on the row, marks under the waveform where a problem sits, and a panel of findings -- a
+lossy source re-wrapped as lossless, an upsampled rate, padded bit depth, clipping, dropouts, a mono file posing as stereo. It is **off by default**.
+`source` turns it on, and says what answers:
 
-A file is named to the provider as one of the `roots` below plus a path relative to it, never as an absolute path: the two services may see one folder under
-two different paths, and the provider holds the same names mapped to its own. Root names are plain words, and no root folder may be inside another.
+| `source` | What analyses |
+| -------- | ------------- |
+| `off` (default) | Nothing; none of it is shown. |
+| `builtin` | slskd's own analyser, on this machine: one decode with ffmpeg and a pass of FFTs per file. |
+| `provider` | An external service under `provider` below, over the contract in [player-analysis-provider.md](player-analysis-provider.md). |
+
+Either way the answer is the same document, kept for good per download (see the contract's *Caching*). The built-in analyser carries its own version;
+a new version of it, or a change of `source`, drops what was kept under the other.
+
+A file is named to a provider as one of the `roots` below plus a path relative to it, never as an absolute path: the two services may see one folder under
+two different paths, and the provider holds the same names mapped to its own. Root names are plain words, and no root folder may be inside another. The
+built-in analyser reads the file where it is and needs no roots.
 
 #### **YAML**
 ```yaml
 player:
   analysis:
+    source: off           # off, builtin or provider
+    builtin:
+      concurrency: 1      # files analysed at once
     provider:
       url: http://analysis.example:8080/contract
       token: <bearer token>

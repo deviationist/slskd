@@ -49,6 +49,29 @@ namespace slskd.Tests.Unit.Player
 
         public Task<double?> ProbeDurationAsync(string path, CancellationToken cancellationToken = default)
             => Task.FromResult(Path.GetFileName(path).StartsWith('.') ? OutputDuration : SourceDuration);
+
+        public string Probe { get; set; } = "{}";
+        public byte[] DecodedPcm { get; set; } = [];
+        public int Chunk { get; set; } = 4096;
+
+        public Task<string> ProbeAsync(string path, CancellationToken cancellationToken = default) => Task.FromResult(Probe);
+
+        public async Task DecodeToAsync(string source, int rate, int channels, string format, Stream destination, CancellationToken cancellationToken = default)
+        {
+            lock (Calls)
+            {
+                Calls.Add($"decode:{format}:{channels}:{rate}");
+            }
+
+            // in uneven pieces, as a pipe delivers them, so a frame can arrive split across two
+            for (var i = 0; i < DecodedPcm.Length; i += Chunk)
+            {
+                await destination.WriteAsync(DecodedPcm.AsMemory(i, Math.Min(Chunk, DecodedPcm.Length - i)), cancellationToken);
+            }
+        }
+
+        public Task<string> HashAudioAsync(string source, CancellationToken cancellationToken = default)
+            => Task.FromResult(new string('c', 64));
     }
 
     public class PlayerServiceTests : IDisposable

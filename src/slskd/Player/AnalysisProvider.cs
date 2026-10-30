@@ -120,17 +120,23 @@ public class AnalysisProvider
     /// <param name="httpClientFactory">The HTTP client factory.</param>
     /// <param name="optionsMonitor">The options monitor.</param>
     /// <param name="cache">Where a finished analysis is kept for good, by download; none keeps them in memory only.</param>
-    public AnalysisProvider(IHttpClientFactory httpClientFactory, IOptionsMonitor<Options> optionsMonitor, AnalysisCache cache = null)
+    /// <param name="builtin">slskd's own analyser, for <c>player.analysis.source: builtin</c>.</param>
+    public AnalysisProvider(IHttpClientFactory httpClientFactory, IOptionsMonitor<Options> optionsMonitor, AnalysisCache cache = null, Builtin.BuiltinAnalyser builtin = null)
     {
         HttpClientFactory = httpClientFactory;
         OptionsMonitor = optionsMonitor;
         Cache = cache;
+        Builtin = builtin;
     }
 
     /// <summary>
-    ///     Gets a value indicating whether a provider is configured.
+    ///     Gets a value indicating whether anything analyses: slskd's own analyser or an external provider, as
+    ///     <c>player.analysis.source</c> says. Off by default.
     /// </summary>
-    public bool Configured => Settings.Configured;
+    public bool Configured => OptionsMonitor.CurrentValue.Player.Analysis.Enabled;
+
+    private bool UsesBuiltin => OptionsMonitor.CurrentValue.Player.Analysis.UsesBuiltin && Builtin is not null;
+    private Builtin.BuiltinAnalyser Builtin { get; }
 
     private AnalysisCache Cache { get; }
     private IHttpClientFactory HttpClientFactory { get; }
@@ -180,15 +186,24 @@ public class AnalysisProvider
             return new AnalysisAnswer(AnalysisState.Off);
         }
 
-        var located = AnalysisRoots.Locate(Settings.Roots, file.FullName);
+        var builtin = UsesBuiltin;
+        (string Root, string File)? located = null;
 
-        if (located is null)
+        // the roots name folders to a provider elsewhere; slskd's own analyser reads the file where it is
+        if (!builtin)
         {
-            return new AnalysisAnswer(AnalysisState.None, Reason: "not in a folder the provider is asked about");
+            located = AnalysisRoots.Locate(Settings.Roots, file.FullName);
+
+            if (located is null)
+            {
+                return new AnalysisAnswer(AnalysisState.None, Reason: "not in a folder the provider is asked about");
+            }
         }
 
         file.Refresh();
-        var key = $"{file.FullName}|{file.Length}|{file.LastWriteTimeUtc.Ticks}";
+
+        // by source too, so switching between them is never answered from what the other said
+        var key = $"{(builtin ? "builtin" : "provider")}|{file.FullName}|{file.Length}|{file.LastWriteTimeUtc.Ticks}";
 
         if (Answers.TryGetValue(key, out AnalysisAnswer cached))
         {
@@ -201,7 +216,7 @@ public class AnalysisProvider
             return cached;
         }
 
-        var lazy = InFlight.GetOrAdd(key, _ => new Lazy<Task<AnalysisAnswer>>(() => AskAndKeepAsync(key, located.Value, file, download)));
+        var lazy = InFlight.GetOrAdd(key, _ => new Lazy<Task<AnalysisAnswer>>(() => AskAndKeepAsync(key, located, file, download)));
         var task = lazy.Value;
 
         if (!wait && !task.IsCompleted)
@@ -212,11 +227,11 @@ public class AnalysisProvider
         return await task.WaitAsync(cancellationToken);
     }
 
-    private async Task<AnalysisAnswer> AskAndKeepAsync(string key, (string Root, string File) located, FileInfo file, Guid? download)
+    private async Task<AnalysisAnswer> AskAndKeepAsync(string key, (string Root, string File)? located, FileInfo file, Guid? download)
     {
         try
         {
-            var (answer, keepFor) = await AskAsync(located, file);
+            var (answer, keepFor) = located is { } where ? await AskAsync(where, file) : await AnalyseAsync(file);
 
             if (keepFor is not null)
             {
@@ -234,6 +249,34 @@ public class AnalysisProvider
         {
             // by the request itself rather than by whoever was waiting, who may have stopped waiting
             InFlight.TryRemove(key, out _);
+        }
+    }
+
+    private async Task<(AnalysisAnswer Answer, TimeSpan? KeepFor)> AnalyseAsync(FileInfo file)
+    {
+        var limit = LimitFor(OptionsMonitor.CurrentValue.Player.Analysis.Builtin.Concurrency);
+
+        await limit.WaitAsync();
+
+        try
+        {
+            var document = await Builtin.AnalyseAsync(file);
+            return (new AnalysisAnswer(AnalysisState.Ready, document), TimeSpan.FromDays(1));
+        }
+        catch (MediaToolException ex)
+        {
+            // ffmpeg could not read it: a file that is not what it says, or is broken. asking again changes nothing
+            Log.Debug("The built-in analyser could not read {File}: {Message}", file.Name, ex.Message);
+            return (new AnalysisAnswer(AnalysisState.None, Reason: "the file could not be decoded"), NoneFor);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            Log.Warning("The built-in analyser failed for {File}: {Message}", file.Name, ex.Message);
+            return (new AnalysisAnswer(AnalysisState.Unavailable, Reason: "the analysis failed"), UnavailableFor);
+        }
+        finally
+        {
+            limit.Release();
         }
     }
 
