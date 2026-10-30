@@ -56,6 +56,92 @@ public class RecurrenceTests
         Assert.Equal(1, summer!.Value.Hour);
     }
 
+    // the night the clocks go back in Oslo (03:00 CEST becomes 02:00 CET) and the night they go forward
+    private static readonly DateTime FallBack = new(2026, 10, 25, 0, 0, 0, DateTimeKind.Utc);
+    private static readonly DateTime SpringForward = new(2026, 3, 29, 0, 0, 0, DateTimeKind.Utc);
+
+    [Fact]
+    public void An_Hourly_Rule_Gets_Past_The_Hour_That_Happens_Twice()
+    {
+        // the live case of 2026-10-25: an hourly watch anchored at 02:10:45Z on 5 October, rescheduled at 00:30Z on
+        // the night 02:10 local happened twice. walking the hours in local time, the evaluator added an hour to the
+        // first 02:10 and got the second, which it read back as the first -- and spun on one thread from then on
+        var anchor = new DateTime(2026, 10, 5, 2, 10, 45, DateTimeKind.Utc);
+
+        var next = Within(() => Recurrence.Next("FREQ=HOURLY;INTERVAL=1", anchor, "Europe/Oslo", FallBack.AddMinutes(30)));
+
+        Assert.Equal(new DateTime(2026, 10, 25, 1, 10, 45, DateTimeKind.Utc), next);
+    }
+
+    [Theory]
+    [InlineData("FREQ=HOURLY;INTERVAL=1", 1)]
+    [InlineData("FREQ=HOURLY;INTERVAL=6", 6)]
+    public void An_Hourly_Rule_Is_The_Same_Number_Of_Hours_Apart_Through_Both_Changes(string rule, int hours)
+    {
+        // hourly is a span of time, not a time of day: every N hours is N hours apart, whatever the clocks do
+        foreach (var change in new[] { FallBack, SpringForward })
+        {
+            var anchor = change.AddDays(-20).AddMinutes(10);
+            var times = Walk(rule, anchor, change.AddHours(-12), 30);
+
+            Assert.All(times.Zip(times.Skip(1)), pair => Assert.Equal(TimeSpan.FromHours(hours), pair.Second - pair.First));
+        }
+    }
+
+    [Theory]
+    [InlineData("FREQ=DAILY;BYHOUR=2;BYMINUTE=30;BYSECOND=0")]
+    [InlineData("FREQ=DAILY;BYHOUR=3;BYMINUTE=0;BYSECOND=0")]
+    [InlineData("FREQ=WEEKLY;BYDAY=SU;BYHOUR=2;BYMINUTE=30;BYSECOND=0")]
+    public void A_Rule_At_A_Time_Of_Day_Gets_Through_Both_Changes(string rule)
+    {
+        // 02:30 happens twice in October and not at all in March: either way the next one is found, and soon
+        foreach (var change in new[] { FallBack, SpringForward })
+        {
+            var times = Walk(rule, Anchor, change.AddDays(-3), 6);
+
+            Assert.Equal(6, times.Count);
+            Assert.All(times.Zip(times.Skip(1)), pair => Assert.True(pair.Second > pair.First));
+        }
+    }
+
+    [Fact]
+    public void The_Shortest_Interval_Of_An_Hourly_Rule_Is_Found_Across_A_Change()
+    {
+        // checked when a watch is saved, over the 90 days after its anchor -- which crosses a change twice a year
+        var interval = Within(() => Recurrence.ShortestInterval("FREQ=HOURLY;INTERVAL=2", FallBack.AddDays(-1), "Europe/Oslo"));
+
+        Assert.Equal(TimeSpan.FromHours(2), interval);
+    }
+
+    private static List<DateTime> Walk(string rule, DateTime anchor, DateTime from, int count)
+    {
+        var times = new List<DateTime>();
+        var after = from;
+
+        for (var i = 0; i < count; i++)
+        {
+            var next = Within(() => Recurrence.Next(rule, anchor, "Europe/Oslo", after));
+
+            if (next is null)
+            {
+                break;
+            }
+
+            times.Add(next.Value);
+            after = next.Value;
+        }
+
+        return times;
+    }
+
+    // a rule that spins never returns, so the test says so rather than hanging the run
+    private static T Within<T>(Func<T> evaluate)
+    {
+        var task = System.Threading.Tasks.Task.Run(evaluate);
+        Assert.True(task.Wait(TimeSpan.FromSeconds(5)), "the rule was still being evaluated after 5 seconds");
+        return task.Result;
+    }
+
     [Fact]
     public void The_Next_Occurrence_Is_Strictly_After_The_Moment_Asked_About()
     {
