@@ -37,6 +37,7 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Text.Json;
+using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 using slskd.Transfers;
@@ -130,6 +131,11 @@ public record AnalysisVerdict(string Level, string Headline);
 ///         Kept until the analyser changes. A document made by a version other than the provider's now is dropped as
 ///         soon as the provider is seen to have moved on, and the operator can drop the lot from the settings.
 ///     </para>
+///     <para>
+///         And kept only for downloads still listed: every five minutes, and on first use, what is kept for a download
+///         since removed -- by hand, with its file, or by retention -- is dropped, and so is any analysis no download
+///         is left to use. Removing a download is a soft delete, so the record stays and a join tells the two apart.
+///     </para>
 /// </remarks>
 public class AnalysisCache
 {
@@ -140,6 +146,18 @@ public class AnalysisCache
     public AnalysisCache(IDbContextFactory<TransfersDbContext> contextFactory)
     {
         ContextFactory = contextFactory;
+
+        Clock.EveryFiveMinutes += (_, _) => Task.Run(() =>
+        {
+            try
+            {
+                Sweep();
+            }
+            catch (Exception ex)
+            {
+                Log.Warning("Could not sweep the analysis cache: {Message}", ex.Message);
+            }
+        });
     }
 
     private IDbContextFactory<TransfersDbContext> ContextFactory { get; }
@@ -148,6 +166,8 @@ public class AnalysisCache
 
     // every download's verdict, read once and kept up with: what a list asks for, every poll
     private Dictionary<Guid, AnalysisVerdict> Verdicts { get; set; }
+
+    private bool Swept { get; set; }
 
     // the version the provider was last seen to speak
     private string Version { get; set; }
@@ -317,6 +337,35 @@ public class AnalysisCache
         }
     }
 
+    /// <summary>
+    ///     Drops what is kept for downloads no longer listed, and every analysis no download is left to use.
+    /// </summary>
+    /// <returns>The number of downloads whose analysis was dropped.</returns>
+    public int Sweep()
+    {
+        lock (Lock)
+        {
+            using var context = ContextFactory.CreateDbContext();
+
+            var dropped = context.DownloadAnalyses
+                .Where(d => !context.Transfers.Any(t => t.Id == d.TransferId && !t.Removed))
+                .ExecuteDelete();
+
+            var unused = context.Analyses
+                .Where(a => !context.DownloadAnalyses.Any(d => d.AnalysisId == a.Id))
+                .ExecuteDelete();
+
+            if (dropped > 0 || unused > 0)
+            {
+                // read again on next use rather than edited here: a sweep is rare, and the list is cheap to read
+                Verdicts = null;
+                Log.Information("Dropped the analysis of {Count} removed downloads, and {Unused} analyses nothing uses", dropped, unused);
+            }
+
+            return dropped;
+        }
+    }
+
     private static string StringAt(JsonElement element, params string[] path)
     {
         foreach (var name in path)
@@ -335,6 +384,13 @@ public class AnalysisCache
         if (Verdicts is not null)
         {
             return Verdicts;
+        }
+
+        // whatever was removed while slskd was not running
+        if (!Swept)
+        {
+            Swept = true;
+            Sweep();
         }
 
         using var context = ContextFactory.CreateDbContext();

@@ -114,6 +114,10 @@ with the row. Only a download never analysed asks the provider.
   drops the lot, for rules that changed without the version saying so.
   `GET` on the same route gives the count.
 
+Only downloads still listed keep theirs. Every five minutes, and at startup,
+slskd drops what it kept for a download since removed (by hand, with its file,
+or by retention), and any analysis no listed download still uses.
+
 202, 403, 404 and faults are not kept beyond a short while: they are answers
 about now.
 
