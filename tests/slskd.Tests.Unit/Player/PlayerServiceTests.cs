@@ -207,5 +207,63 @@ namespace slskd.Tests.Unit.Player
             Assert.True(File.Exists(recent));
             Assert.True(File.Exists(staged));
         }
+
+        [Fact]
+        public async Task A_file_about_to_be_deleted_takes_its_waveform_and_transcodes_with_it()
+        {
+            await Service.PeaksAsync(Source);
+            await Service.AudioAsync(Source, Codecs.Find("opus"));
+            await Service.AudioAsync(Source, Codecs.Find("aac"));
+
+            var other = new FileInfo(Path.Combine(Temp, "02 Other.aiff"));
+            File.WriteAllBytes(other.FullName, new byte[] { 7 });
+            await Service.PeaksAsync(other);
+
+            // a waveform, and two transcodes with their receipts
+            Assert.Equal(5, Service.Forget(Source));
+
+            Assert.Equal([$"{PlayerService.Identity(other)}.peaks.json"], Directory.GetFiles(Cache).Select(Path.GetFileName));
+        }
+
+        [Fact]
+        public void A_file_already_gone_has_nothing_to_forget()
+        {
+            Source.Delete();
+
+            Assert.Equal(0, Service.Forget(Source));
+        }
+
+        [Fact]
+        public void A_transcode_unused_for_the_ttl_goes_with_its_receipt_and_waveforms_stay()
+        {
+            Directory.CreateDirectory(Cache);
+            var now = DateTime.UtcNow;
+            var stale = new string('a', 32);
+            var fresh = new string('b', 32);
+
+            string Entry(string name, int daysUnused)
+            {
+                var path = Path.Combine(Cache, name);
+                File.WriteAllBytes(path, new byte[] { 1 });
+                File.SetLastWriteTimeUtc(path, now.AddDays(-daysUnused));
+                return path;
+            }
+
+            var staleWebm = Entry($"{stale}.webm", 31);
+            var staleReceipt = Entry($"{stale}.audio.opus.json", 31);
+            var staleM4a = Entry($"{stale}.m4a", 31);
+            var freshWebm = Entry($"{fresh}.webm", 29);
+            var oldPeaks = Entry($"{stale}.peaks.json", 300);
+            var notOurs = Entry("notes.webm", 300);
+
+            Assert.Equal(2, PlayerService.Expire(Cache, TimeSpan.FromDays(30), now));
+
+            Assert.False(File.Exists(staleWebm));
+            Assert.False(File.Exists(staleReceipt));
+            Assert.False(File.Exists(staleM4a));
+            Assert.True(File.Exists(freshWebm));
+            Assert.True(File.Exists(oldPeaks));
+            Assert.True(File.Exists(notOurs));
+        }
     }
 }

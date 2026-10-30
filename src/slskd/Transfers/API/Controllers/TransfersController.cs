@@ -82,9 +82,11 @@ namespace slskd.Transfers.API
             DownloadFileDuration downloadFileDuration,
             slskd.Search.SearchExistence searchExistence,
             IOptionsSnapshot<Options> optionsSnapshot,
-            slskd.Player.AnalysisCache analysisCache = null)
+            slskd.Player.AnalysisCache analysisCache = null,
+            slskd.Player.PlayerService playerService = null)
         {
             AnalysisCache = analysisCache;
+            Player = playerService;
             Transfers = transferService;
             Users = userService;
             Files = fileService;
@@ -120,6 +122,7 @@ namespace slskd.Transfers.API
         private DownloadFileDuration FileDuration { get; }
         private slskd.Search.SearchExistence SearchExistence { get; }
         private slskd.Player.AnalysisCache AnalysisCache { get; }
+        private slskd.Player.PlayerService Player { get; }
         private IOptionsSnapshot<Options> OptionsSnapshot { get; }
         private ILogger Log { get; set; } = Serilog.Log.ForContext<TransfersController>();
 
@@ -306,6 +309,17 @@ namespace slskd.Transfers.API
                 // it not be there, and it is not. `File.Delete` not throwing over an empty path is the
                 // same rule, and this reports it the same way. failure is reserved for a file that is
                 // there, should go, and will not.
+                // the player's waveform and transcodes of it, first: named by the file's identity, which can only
+                // be worked out while the file is there -- and resolved the way the player resolves it, links followed
+                var playable = Player is null
+                    ? null
+                    : slskd.Player.PlayableFile.Resolve(transfer, OptionsSnapshot.Value.Directories.Downloads, Files, out _);
+
+                if (playable is not null)
+                {
+                    Player.Forget(playable);
+                }
+
                 var results = await Files.DeleteFilesAsync(filename);
 
                 return await results[filename].Match(
