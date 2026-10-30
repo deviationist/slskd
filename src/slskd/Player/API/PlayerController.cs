@@ -135,6 +135,10 @@ public class PlayerController : ControllerBase
     /// <param name="id">The download's id.</param>
     /// <param name="ticket">A stream ticket.</param>
     /// <param name="codec"><c>opus</c> (the default) or <c>aac</c>, which WebKit needs for its meter to read anything.</param>
+    /// <param name="original">
+    ///     True when the browser has said it plays the file's own format: the file is then sent as it is, where it is
+    ///     one of <see cref="Codecs.Originals"/>, and transcoded with <paramref name="codec"/> otherwise.
+    /// </param>
     /// <param name="cancellationToken">The request's cancellation token.</param>
     /// <returns>The audio.</returns>
     /// <response code="200">The request completed successfully.</response>
@@ -144,7 +148,7 @@ public class PlayerController : ControllerBase
     /// <response code="502">The transcode failed.</response>
     [HttpGet("{id}/audio")]
     [AllowAnonymous]
-    public async Task<IActionResult> GetAudioAsync([FromRoute] string id, [FromQuery] string ticket, [FromQuery] string codec, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetAudioAsync([FromRoute] string id, [FromQuery] string ticket, [FromQuery] string codec, [FromQuery] bool original, CancellationToken cancellationToken)
     {
         var chosen = Codecs.Find(codec);
 
@@ -159,6 +163,20 @@ public class PlayerController : ControllerBase
         if (refusal is not null)
         {
             return refusal;
+        }
+
+        // the file as it is, when the browser has said it plays it. it is the browser's word, not ours, so the player
+        // falls back to `codec` if it will not play after all
+        if (original && Codecs.Originals.TryGetValue(file.Extension, out var originalType))
+        {
+            Response.Headers.CacheControl = "private, max-age=300";
+
+            return PhysicalFile(
+                file.FullName,
+                originalType,
+                lastModified: file.LastWriteTimeUtc,
+                entityTag: new EntityTagHeaderValue("\"" + PlayerService.Identity(file) + "\""),
+                enableRangeProcessing: true);
         }
 
         try

@@ -429,6 +429,12 @@ namespace slskd
             public PlayerCacheOptions Cache { get; init; } = new PlayerCacheOptions();
 
             /// <summary>
+            ///     Gets the bitrate, in kbps, a file is transcoded at when the browser cannot play the original.
+            /// </summary>
+            [Range(96, 512)]
+            public int Bitrate { get; init; } = 320;
+
+            /// <summary>
             ///     Gets the analysis options.
             /// </summary>
             [Validate]

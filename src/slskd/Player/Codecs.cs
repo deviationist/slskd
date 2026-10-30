@@ -35,6 +35,7 @@ namespace slskd.Player;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 /// <summary>
 ///     One way of making a file a browser can play.
@@ -42,8 +43,25 @@ using System.IO;
 /// <param name="Name">The name a client asks for it by.</param>
 /// <param name="Suffix">The cache file's extension.</param>
 /// <param name="ContentType">The response's content type.</param>
-/// <param name="Arguments">The ffmpeg output arguments.</param>
-public record Codec(string Name, string Suffix, string ContentType, IReadOnlyList<string> Arguments);
+/// <param name="Arguments">The ffmpeg output arguments, with <see cref="Codecs.Bitrate"/> where the bitrate goes.</param>
+/// <param name="MaxBitrate">The highest bitrate the encoder takes, in kbps.</param>
+public record Codec(string Name, string Suffix, string ContentType, IReadOnlyList<string> Arguments, int MaxBitrate = 512)
+{
+    /// <summary>
+    ///     The ffmpeg output arguments at <paramref name="kbps"/>, held to what the encoder takes.
+    /// </summary>
+    /// <param name="kbps">The bitrate.</param>
+    /// <returns>The arguments.</returns>
+    public IReadOnlyList<string> ArgumentsAt(int kbps)
+        => Arguments.Select(a => a == Codecs.Bitrate ? $"{BitrateAt(kbps)}k" : a).ToList();
+
+    /// <summary>
+    ///     The bitrate a transcode at <paramref name="kbps"/> is actually made at.
+    /// </summary>
+    /// <param name="kbps">The bitrate asked for.</param>
+    /// <returns>The bitrate, in kbps.</returns>
+    public int BitrateAt(int kbps) => Math.Min(kbps, MaxBitrate);
+}
 
 /// <summary>
 ///     The encodings the player serves, and which files are sent as they are.
@@ -79,13 +97,36 @@ public static class Codecs
     public const long PassthroughMaxBytes = 25L * 1024 * 1024;
 
     /// <summary>
+    ///     Where the bitrate goes in a codec's arguments; see <see cref="Codec.ArgumentsAt"/>.
+    /// </summary>
+    public const string Bitrate = "{bitrate}";
+
+    /// <summary>
     ///     The encodings, by name.
     /// </summary>
     public static readonly IReadOnlyDictionary<string, Codec> ByName = new Dictionary<string, Codec>(StringComparer.Ordinal)
     {
-        ["opus"] = new("opus", ".webm", "audio/webm", new[] { "-c:a", "libopus", "-b:a", "128k", "-compression_level", "0", "-f", "webm" }),
-        ["aac"] = new("aac", ".m4a", "audio/mp4", new[] { "-c:a", "aac", "-aac_coder", "fast", "-b:a", "128k", "-movflags", "+faststart", "-f", "mp4" }),
-        ["mp3"] = new("mp3", ".mp3", "audio/mpeg", new[] { "-c:a", "libmp3lame", "-b:a", "128k", "-f", "mp3" }),
+        // always stereo: libopus takes at most 256 kbps a channel, so a mono source refused 320k outright
+        ["opus"] = new("opus", ".webm", "audio/webm", new[] { "-c:a", "libopus", "-ac", "2", "-b:a", Bitrate, "-compression_level", "0", "-f", "webm" }, MaxBitrate: 510),
+        ["aac"] = new("aac", ".m4a", "audio/mp4", new[] { "-c:a", "aac", "-aac_coder", "fast", "-b:a", Bitrate, "-movflags", "+faststart", "-f", "mp4" }),
+        ["mp3"] = new("mp3", ".mp3", "audio/mpeg", new[] { "-c:a", "libmp3lame", "-b:a", Bitrate, "-f", "mp3" }, MaxBitrate: 320),
+    };
+
+    /// <summary>
+    ///     The files a browser may be sent as they are, when it says it can play them, and their content types.
+    /// </summary>
+    /// <remarks>
+    ///     Asked for by the player, never assumed: only the browser knows what it plays, so the player asks it, and
+    ///     falls back to a transcode when a file it was sure of will not play after all. Not AIFF, which no browser
+    ///     plays, and not M4A, which may be ALAC, which Chrome does not.
+    /// </remarks>
+    public static readonly IReadOnlyDictionary<string, string> Originals = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+    {
+        [".flac"] = "audio/flac",
+        [".wav"] = "audio/wav",
+        [".mp3"] = "audio/mpeg",
+        [".ogg"] = "audio/ogg",
+        [".opus"] = "audio/ogg",
     };
 
     /// <summary>

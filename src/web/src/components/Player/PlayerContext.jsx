@@ -7,6 +7,7 @@ import {
   getTicket,
 } from '../../lib/player/api';
 import { previewCodec, primeAudio } from '../../lib/player/audioGraph';
+import { playsOriginal } from '../../lib/player/formats';
 import {
   readLast,
   readVolume,
@@ -90,6 +91,7 @@ export const PlayerProvider = ({ children, enabled = true }) => {
     restored.current
       ? {
           artist: null,
+          format: restored.current.format,
           id: restored.current.id,
           title: restored.current.title,
           username: restored.current.username,
@@ -103,6 +105,11 @@ export const PlayerProvider = ({ children, enabled = true }) => {
   const [ended, setEnded] = useState(false);
   const [failed, setFailed] = useState('');
   const pressed = useRef(false);
+
+  // whether the element is playing a file as it is, and the tracks whose file
+  // the browser said it plays and then would not: those are transcoded
+  const original = useRef(false);
+  const refused = useRef(new Set());
   const currentRef = useRef(current);
   currentRef.current = current;
 
@@ -181,7 +188,11 @@ export const PlayerProvider = ({ children, enabled = true }) => {
       setAt(from);
       setFailed('');
       setEnded(false);
-      element.src = audioUrl(track.id, ticket.current, CODEC);
+      original.current =
+        !refused.current.has(track.id) && playsOriginal(element, track.format);
+      element.src = audioUrl(track.id, ticket.current, CODEC, {
+        original: original.current,
+      });
       element.load();
 
       if (autoplay) {
@@ -374,6 +385,7 @@ export const PlayerProvider = ({ children, enabled = true }) => {
     if (current) {
       writeLast({
         at: position,
+        format: current.format,
         id: current.id,
         title: current.title,
         username: current.username,
@@ -541,9 +553,24 @@ export const PlayerProvider = ({ children, enabled = true }) => {
           emit('ended', currentRef.current);
         }}
         onError={() => {
-          if (audio.current?.getAttribute('src')) {
-            recover();
+          const element = audio.current;
+
+          if (!element?.getAttribute('src')) {
+            return;
           }
+
+          // the browser said it plays this format and then would not: the same
+          // track again, transcoded, from where it was
+          if (original.current && currentRef.current) {
+            refused.current.add(currentRef.current.id);
+            load(currentRef.current, {
+              autoplay: pressed.current,
+              from: element.currentTime,
+            });
+            return;
+          }
+
+          recover();
         }}
         onLoadedMetadata={(event) => {
           // the one moment a seek sticks: setting currentTime before the

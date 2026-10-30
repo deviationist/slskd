@@ -40,6 +40,7 @@ export const readLast = (storage = store('sessionStorage')) => {
     return {
       at: Number.isFinite(value.at) && value.at > 0 ? value.at : 0,
       id: value.id,
+      format: typeof value.format === 'string' ? value.format : '',
       title: value.title,
       username: typeof value.username === 'string' ? value.username : '',
     };
