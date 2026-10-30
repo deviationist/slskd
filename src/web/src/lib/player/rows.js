@@ -49,6 +49,7 @@ export const isPlayable = (file) =>
 // what the player holds for a row
 export const trackOf = (file) => ({
   artist: null,
+  format: extensionOf(file.filename),
   id: file.id,
   title: fileNameOf(file.filename),
   username: file.username ?? '',

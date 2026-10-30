@@ -35,6 +35,8 @@ describe('which rows play', () => {
   it('holds the row by its id, titled by its file name', () => {
     expect(trackOf(row())).toEqual({
       artist: null,
+      // so the player can ask the browser whether it plays the file as it is
+      format: 'aiff',
       id: row().id,
       title: '01 Track.aiff',
       username: 'somebody',

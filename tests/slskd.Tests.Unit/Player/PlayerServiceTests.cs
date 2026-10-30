@@ -15,6 +15,7 @@ namespace slskd.Tests.Unit.Player
     internal class FakeMediaTool : IMediaTool
     {
         public List<string> Calls { get; } = new();
+        public IReadOnlyList<string> LastArguments { get; private set; }
         public double? SourceDuration { get; set; } = 300;
         public double? OutputDuration { get; set; } = 300;
         public TaskCompletionSource Gate { get; set; }
@@ -35,6 +36,7 @@ namespace slskd.Tests.Unit.Player
             lock (Calls)
             {
                 Calls.Add("transcode:" + codec.Name);
+                LastArguments = codec.Arguments;
             }
 
             if (Gate is not null)
@@ -207,6 +209,55 @@ namespace slskd.Tests.Unit.Player
             Assert.True(File.Exists(recent));
             Assert.True(File.Exists(staged));
         }
+
+        [Fact]
+        public async Task A_transcode_is_made_at_the_bitrate_set()
+        {
+            await Service.AudioAsync(Source, Codecs.Find("opus"));
+
+            Assert.Equal("320k", Tool.LastArguments[Tool.LastArguments.ToList().IndexOf("-b:a") + 1]);
+        }
+
+        [Fact]
+        public async Task A_transcode_made_at_another_bitrate_is_made_again()
+        {
+            // the cache from before the setting: every transcode in it was made at 128k
+            await ServiceAt(128).AudioAsync(Source, Codecs.Find("opus"));
+            await ServiceAt(128).AudioAsync(Source, Codecs.Find("opus"));
+            await ServiceAt(320).AudioAsync(Source, Codecs.Find("opus"));
+
+            Assert.Equal(new[] { "transcode:opus", "transcode:opus" }, Tool.Calls);
+        }
+
+        [Fact]
+        public void A_bitrate_is_held_to_what_the_encoder_takes()
+        {
+            Assert.Equal(320, Codecs.Find("mp3").BitrateAt(512));
+            Assert.Equal(510, Codecs.Find("opus").BitrateAt(512));
+            Assert.Contains("256k", Codecs.Find("aac").ArgumentsAt(256));
+            Assert.All(Codecs.ByName.Values, c => Assert.DoesNotContain(Codecs.Bitrate, c.ArgumentsAt(320)));
+        }
+
+        [Fact]
+        public void Only_formats_every_browser_may_play_are_offered_as_they_are()
+        {
+            // no browser plays AIFF, and an M4A may be ALAC, which Chrome does not
+            Assert.Contains(".flac", Codecs.Originals.Keys);
+            Assert.DoesNotContain(".aiff", Codecs.Originals.Keys);
+            Assert.DoesNotContain(".aif", Codecs.Originals.Keys);
+            Assert.DoesNotContain(".m4a", Codecs.Originals.Keys);
+        }
+
+        private PlayerService ServiceAt(int kbps) => new(
+            new TestOptionsMonitor<slskd.Options>(new slskd.Options
+            {
+                Player = new slskd.Options.PlayerOptions
+                {
+                    Bitrate = kbps,
+                    Cache = new slskd.Options.PlayerOptions.PlayerCacheOptions { Directory = Cache },
+                },
+            }),
+            Tool);
 
         [Fact]
         public async Task A_file_about_to_be_deleted_takes_its_waveform_and_transcodes_with_it()

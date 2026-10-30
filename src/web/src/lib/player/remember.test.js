@@ -26,9 +26,13 @@ const ID = '0b9a6c7e-1d2f-4a3b-8c9d-0e1f2a3b4c5d';
 describe('the remembered track', () => {
   it('reads back what was written', () => {
     const storage = memory();
-    writeLast({ at: 42, id: ID, title: 'x', username: 'u' }, storage);
+    writeLast(
+      { at: 42, format: 'flac', id: ID, title: 'x', username: 'u' },
+      storage,
+    );
     expect(readLast(storage)).toEqual({
       at: 42,
+      format: 'flac',
       id: ID,
       title: 'x',
       username: 'u',

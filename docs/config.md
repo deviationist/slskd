@@ -227,11 +227,16 @@ player:
   enabled: true
   ffmpeg: ffmpeg
   ffprobe: ffprobe
+  bitrate: 320        # kbps, for a file the browser cannot play as it is (MP3 tops out at 320)
   cache:
     directory: ~      # default: player-cache under the application's data directory
     capacity: 2048    # megabytes; least recently used dropped first
     ttl: 30           # days a transcode is kept unused; 0 keeps them to the capacity
 ```
+
+The player sends a file as it is whenever the browser says it plays the format -- FLAC, WAV, MP3 and Ogg in every current browser -- and
+transcodes only what it cannot, such as AIFF, or a file it was sure of that would not play after all. A transcode made at another bitrate is made again
+on its next play.
 
 A track's waveform and transcodes are dropped with it when slskd deletes its file. Transcodes of files that went any other way -- moved, or deleted
 by hand -- are unused from then on, and go with the `ttl`.

@@ -38,12 +38,18 @@ export const getAnalysisCache = async () =>
 export const clearAnalysisCache = async () =>
   (await api.delete('/player/analysis/cache')).data;
 
-// absolute, because an element fetches it outside axios
-export const audioUrl = (id, ticket, codec) => {
+// absolute, because an element fetches it outside axios. `original` asks for
+// the file as it is, where the browser has said it plays it; the server falls
+// back to `codec` for a format it will not send as it is
+export const audioUrl = (id, ticket, codec, { original = false } = {}) => {
   const query = new URLSearchParams({ ticket });
 
   if (codec) {
     query.set('codec', codec);
+  }
+
+  if (original) {
+    query.set('original', 'true');
   }
 
   return `${apiBaseUrl}${base(id)}/audio?${query}`;

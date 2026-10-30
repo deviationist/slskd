@@ -295,7 +295,12 @@ public class PlayerService
         {
             // the receipt, not just the file. a half-written transcode is a real file of a real size and passes every
             // test a stat can make; what it does not have is a record that its length was checked against the source
-            if (File.Exists(destination) && new FileInfo(destination).Length > 0 && ReadJson<Receipt>(receipt)?.Codec == codec.Name)
+            var kbps = codec.BitrateAt(OptionsMonitor.CurrentValue.Player.Bitrate);
+            var kept = ReadJson<Receipt>(receipt);
+
+            // at the bitrate asked for now: a transcode made at another is made again, which is how a change of the
+            // setting reaches what is already cached
+            if (File.Exists(destination) && new FileInfo(destination).Length > 0 && kept?.Codec == codec.Name && kept.Bitrate == kbps)
             {
                 Touch(destination);
                 return (destination, codec.ContentType);
@@ -305,7 +310,7 @@ public class PlayerService
 
             try
             {
-                await MediaTool.TranscodeAsync(source.FullName, staged, codec, cancellationToken);
+                await MediaTool.TranscodeAsync(source.FullName, staged, codec with { Arguments = codec.ArgumentsAt(kbps) }, cancellationToken);
 
                 // before the rename, so a bad encode is never published. ffmpeg's exit code is not enough on its own --
                 // the 2026-09-07 file was committed with one
@@ -335,7 +340,7 @@ public class PlayerService
             // one that might never arrive
             try
             {
-                WriteStaged(receipt, stream => JsonSerializer.Serialize(stream, new Receipt(codec.Name)));
+                WriteStaged(receipt, stream => JsonSerializer.Serialize(stream, new Receipt(codec.Name, kbps)));
             }
             catch (IOException ex)
             {
@@ -455,7 +460,7 @@ public class PlayerService
         return new Release(semaphore);
     }
 
-    private sealed record Receipt(string Codec);
+    private sealed record Receipt(string Codec, int Bitrate);
 
     private sealed class Release(SemaphoreSlim semaphore) : IDisposable
     {
