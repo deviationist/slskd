@@ -60,7 +60,44 @@ namespace slskd
         public string[] Rooms { get; init; } = Array.Empty<string>();
         public User[] Users { get; init; } = Array.Empty<User>();
         public ConversationsState Conversations { get; init; } = new ConversationsState();
+        public RoomsUnreadState RoomsUnread { get; init; } = new RoomsUnreadState();
     }
+
+    /// <summary>
+    ///     What is unread in the rooms joined, so that a page other than Rooms can say someone has posted.
+    /// </summary>
+    /// <remarks>
+    ///     Kept in memory, like the room messages themselves: neither survives a restart, so a count that did would
+    ///     count messages that can no longer be shown.
+    /// </remarks>
+    public record RoomsUnreadState
+    {
+        /// <summary>
+        ///     Gets the number of room messages not yet seen, from anyone but the operator.
+        /// </summary>
+        public int UnreadMessages { get; init; }
+
+        /// <summary>
+        ///     Gets the number of rooms those messages are in.
+        /// </summary>
+        public int UnreadRooms { get; init; }
+
+        /// <summary>
+        ///     Gets the unread count per room, for every room with any.
+        /// </summary>
+        /// <remarks>
+        ///     A list rather than a dictionary for the same reason as <see cref="ConversationsState.ByUser"/>: a room
+        ///     name must come out exactly as it went in.
+        /// </remarks>
+        public IReadOnlyList<UnreadRoomState> ByRoom { get; init; } = [];
+    }
+
+    /// <summary>
+    ///     What is unread in one room.
+    /// </summary>
+    /// <param name="RoomName">Which room.</param>
+    /// <param name="Count">How many of its messages are unread.</param>
+    public record UnreadRoomState(string RoomName, int Count);
 
     /// <summary>
     ///     What is unread in private chat, so that a page other than Chat can say a message has arrived.

@@ -1,4 +1,5 @@
-import { badgeOf, describeUnread } from '../../lib/chat';
+import { describeUnread } from '../../lib/chat';
+import CountBadge from '../Shared/CountBadge';
 import { useChatUnread } from './ChatUnreadContext';
 import React from 'react';
 
@@ -11,21 +12,12 @@ import React from 'react';
  */
 const UnreadBadge = () => {
   const { unread } = useChatUnread();
-  const text = badgeOf(unread?.unAcknowledgedMessages);
-
-  if (!text) return null;
-
-  const words = describeUnread(unread);
 
   return (
-    <span
-      aria-label={words}
-      className="unread-badge"
-      role="status"
-      title={words}
-    >
-      {text}
-    </span>
+    <CountBadge
+      count={unread?.unAcknowledgedMessages}
+      words={describeUnread(unread)}
+    />
   );
 };
 

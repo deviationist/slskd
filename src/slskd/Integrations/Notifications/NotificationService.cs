@@ -91,6 +91,7 @@ public class NotificationService
         {
             NotificationEvent.PrivateMessage => events.PrivateMessage,
             NotificationEvent.RoomMention => events.RoomMention,
+            NotificationEvent.RoomMessage => events.RoomMessage,
             NotificationEvent.WatchResults => events.WatchResults,
             NotificationEvent.ConnectionLost => events.ConnectionLost,
             NotificationEvent.ShareScanFailed => events.ShareScanFailed,

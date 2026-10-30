@@ -64,6 +64,11 @@ namespace slskd.Messaging.API
         public string Owner { get; set; }
 
         /// <summary>
+        ///     A value indicating whether the room exists only in slskd, made by a simulated message.
+        /// </summary>
+        public bool IsSimulated { get; set; }
+
+        /// <summary>
         ///     The list of users in the room.
         /// </summary>
         public IEnumerable<UserDataResponse> Users { get; set; } = new List<UserDataResponse>();
@@ -82,6 +87,7 @@ namespace slskd.Messaging.API
                 OperatorCount = room.OperatorCount,
                 Operators = room.Operators?.ToList(),
                 Owner = room.Owner,
+                IsSimulated = room.IsSimulated,
                 Users = new List<UserDataResponse>(),
                 Messages = new List<RoomMessageResponse>(),
             };

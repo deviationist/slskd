@@ -2025,7 +2025,7 @@ html {
 }
 
 /* ---------------------------------------------------------------------------
- * The unread count on Chat, in the menu and on the phone's bar: a small red
+ * The unread count on Chat and Rooms, in the menu and on the phone's bar: a small red
  * pill at the top right of the item's icon. Placed absolutely against the item
  * (a Semantic menu item, and the bar's link, are both positioned), so neither
  * layout moves to make room for it -- it appears and goes without the menu

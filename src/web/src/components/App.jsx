@@ -17,7 +17,6 @@ import AppContext from './AppContext';
 import AppFooter from './AppFooter';
 import Browse from './Browse/Browse';
 import Chat from './Chat/Chat';
-import { ChatUnreadProvider } from './Chat/ChatUnreadContext';
 import UnreadBadge from './Chat/UnreadBadge';
 import Dashboard from './Dashboard/Dashboard';
 import LoginForm from './LoginForm';
@@ -25,8 +24,10 @@ import MobileNav from './MobileNav';
 import PlayerBar from './Player/PlayerBar';
 import { PlayerProvider } from './Player/PlayerContext';
 import Rooms from './Rooms/Rooms';
+import RoomsUnreadBadge from './Rooms/RoomsUnreadBadge';
 import Searches from './Search/Searches';
 import ErrorSegment from './Shared/ErrorSegment';
+import UnreadProviders from './Shared/UnreadProviders';
 import ShareLinks from './ShareLinks/ShareLinks';
 import System from './System/System';
 import TopBar from './TopBar';
@@ -609,9 +610,12 @@ class App extends Component {
       // the player wraps the app rather than one page, so a track keeps playing
       // across a navigation: the answer to "what was that" is often elsewhere
       <PlayerProvider enabled={!isAgent}>
-        {/* what is unread in chat, from the server's pushed state, for the
-            menu's badge and the Chat page alike */}
-        <ChatUnreadProvider unread={applicationState.conversations}>
+        {/* what is unread in chat and in rooms, from the server's pushed
+            state, for the menu's badges and the pages alike */}
+        <UnreadProviders
+          chat={applicationState.conversations}
+          rooms={applicationState.roomsUnread}
+        >
           <Sidebar.Pushable
             as={Segment}
             className="app"
@@ -674,6 +678,7 @@ class App extends Component {
                     <Menu.Item>
                       <Icon name="comments" />
                       Rooms
+                      <RoomsUnreadBadge />
                     </Menu.Item>
                   </NavLink>
                   <NavLink to={`${urlBase}/chat`}>
@@ -1012,7 +1017,7 @@ class App extends Component {
             position="bottom-center"
             rtl={false}
           />
-        </ChatUnreadProvider>
+        </UnreadProviders>
       </PlayerProvider>
     );
   }

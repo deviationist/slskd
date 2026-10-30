@@ -622,6 +622,15 @@ namespace slskd
             public bool LogUnobservedExceptions { get; init; } = false;
 
             /// <summary>
+            ///     Gets a value indicating whether room messages may be simulated through the API, to try out unread
+            ///     counts and notifications without a room or anyone in it.
+            /// </summary>
+            [Argument(default, "room-simulation")]
+            [EnvironmentVariable("ROOM_SIMULATION")]
+            [Description("allow simulated room messages through the API (for testing)")]
+            public bool RoomSimulation { get; init; } = false;
+
+            /// <summary>
             ///     Gets a value indicating whether the application should run in experimental mode.
             /// </summary>
             [Argument(default, "experimental")]
@@ -3773,6 +3782,9 @@ namespace slskd
                 public NotificationEventOptions RoomMention { get; init; } = new NotificationEventOptions();
 
                 [Validate]
+                public RoomMessageNotificationOptions RoomMessage { get; init; } = new RoomMessageNotificationOptions();
+
+                [Validate]
                 public NotificationEventOptions WatchResults { get; init; } = new NotificationEventOptions { Enabled = true };
 
                 [Validate]
@@ -3819,6 +3831,24 @@ namespace slskd
                 /// </summary>
                 [Range(0, 86400)]
                 public int Delay { get; init; } = 60;
+            }
+
+            /// <summary>
+            ///     Room messages, which are notified only once they have gone unread for a while, and only from the
+            ///     rooms named.
+            /// </summary>
+            public class RoomMessageNotificationOptions : NotificationEventOptions
+            {
+                /// <summary>
+                ///     Gets how long, in seconds, a message must stay unread before it is notified.
+                /// </summary>
+                [Range(0, 86400)]
+                public int Delay { get; init; } = 60;
+
+                /// <summary>
+                ///     Gets the rooms to notify for. None named means every room joined.
+                /// </summary>
+                public string[] Rooms { get; init; } = [];
             }
 
             /// <summary>

@@ -137,13 +137,82 @@ namespace slskd.Messaging.API
                 return Forbid();
             }
 
-            if (Tracker.TryGet(roomName, out var _))
+            if (Tracker.TryGet(roomName, out var room))
             {
-                await Client.SendRoomMessageAsync(roomName, message);
+                // nobody is in a simulated room to hear it: it is said here and only here, as the server would echo it
+                if (room.IsSimulated)
+                {
+                    RoomService.Simulate(roomName, Client.Username, message);
+                }
+                else
+                {
+                    await Client.SendRoomMessageAsync(roomName, message);
+                }
+
                 return StatusCode(StatusCodes.Status201Created);
             }
 
             return NotFound();
+        }
+
+        /// <summary>
+        ///     Marks everything in the specified room read.
+        /// </summary>
+        /// <param name="roomName"></param>
+        /// <returns></returns>
+        /// <response code="204">The request completed successfully.</response>
+        /// <response code="404">The room has not been joined.</response>
+        [HttpPut("joined/{roomName}/read")]
+        [Authorize(Policy = AuthPolicy.Any)]
+        [ProducesResponseType(204)]
+        [ProducesResponseType(404)]
+        public IActionResult MarkRead([FromRoute, UrlEncoded] string roomName)
+        {
+            if (Program.IsRelayAgent)
+            {
+                return Forbid();
+            }
+
+            if (!Tracker.Rooms.ContainsKey(roomName))
+            {
+                return NotFound();
+            }
+
+            RoomService.MarkRead(roomName);
+            return NoContent();
+        }
+
+        /// <summary>
+        ///     Takes in a room message as though the server had sent it, to try out unread counts and notifications.
+        /// </summary>
+        /// <remarks>
+        ///     Only with the <c>room-simulation</c> flag set; otherwise there is no such endpoint. A room not joined is
+        ///     made, and exists only in slskd: it is never joined on the server, and what is sent to it goes nowhere.
+        /// </remarks>
+        /// <param name="request"></param>
+        /// <returns></returns>
+        /// <response code="201">The message was taken in.</response>
+        /// <response code="404">Room simulation is not enabled.</response>
+        [HttpPost("simulated")]
+        [Authorize(Policy = AuthPolicy.Any)]
+        [ProducesResponseType(typeof(RoomMessageResponse), 201)]
+        [ProducesResponseType(404)]
+        public IActionResult Simulate([FromBody] SimulatedRoomMessageRequest request)
+        {
+            if (Program.IsRelayAgent)
+            {
+                return Forbid();
+            }
+
+            if (!OptionsSnapshot.Value.Flags.RoomSimulation)
+            {
+                return NotFound();
+            }
+
+            var message = RoomService.Simulate(request.RoomName, request.Username, request.Message);
+            var self = message.Username == ApplicationStateMonitor.CurrentValue.User.Username;
+
+            return StatusCode(StatusCodes.Status201Created, RoomMessageResponse.FromRoomMessage(message, self));
         }
 
         /// <summary>

@@ -72,6 +72,26 @@ namespace slskd.Messaging
         /// <param name="roomNames">The list of room names to join.</param>
         /// <returns>The operation context.</returns>
         Task TryJoinAsync(params string[] roomNames);
+
+        /// <summary>
+        ///     Marks everything in the specified <paramref name="roomName"/> read: the operator has seen it.
+        /// </summary>
+        /// <param name="roomName">The room.</param>
+        void MarkRead(string roomName);
+
+        /// <summary>
+        ///     Takes in a message as though the server had sent it, making the room if it is not joined.
+        /// </summary>
+        /// <remarks>
+        ///     It goes the way a real one does -- the blacklist, the room's messages, the unread count, the event that
+        ///     notifications listen for -- so what it shows is what a real message would do. A room it makes is marked
+        ///     <see cref="Room.IsSimulated"/>, and is never joined on the server.
+        /// </remarks>
+        /// <param name="roomName">The room.</param>
+        /// <param name="username">Who it is from.</param>
+        /// <param name="message">What they said.</param>
+        /// <returns>The message, as the room holds it.</returns>
+        RoomMessage Simulate(string roomName, string username, string message);
     }
 
     /// <summary>
@@ -121,6 +141,11 @@ namespace slskd.Messaging
         private IUserService Users { get; set; }
         private EventBus EventBus { get; }
 
+        // unread per room. Changed under the lock and published whole, so two messages arriving at once cannot each
+        // publish a count that misses the other
+        private Dictionary<string, int> Unread { get; } = new(StringComparer.Ordinal);
+        private object UnreadLock { get; } = new();
+
         /// <summary>
         ///     Joins the specified <paramref name="roomName"/>.
         /// </summary>
@@ -157,7 +182,13 @@ namespace slskd.Messaging
 
             try
             {
-                await Client.LeaveRoomAsync(roomName);
+                // a simulated room was never joined, so there is nothing to tell the server
+                if (!(RoomTracker.TryGet(roomName, out var room) && room.IsSimulated))
+                {
+                    await Client.LeaveRoomAsync(roomName);
+                }
+
+                CountUnread(roomName, _ => 0);
             }
             catch (Exception ex)
             {
@@ -203,7 +234,10 @@ namespace slskd.Messaging
                 await TryJoinAsync(autoJoinRooms);
             }
 
-            var previouslyJoinedRooms = RoomTracker.Rooms.Keys.Except(autoJoinRooms);
+            var previouslyJoinedRooms = RoomTracker.Rooms
+                .Where(room => !room.Value.IsSimulated)
+                .Select(room => room.Key)
+                .Except(autoJoinRooms);
 
             if (previouslyJoinedRooms.Any())
             {
@@ -231,6 +265,7 @@ namespace slskd.Messaging
             {
                 Logger.Information("Left room {Room}", args.RoomName);
                 StateMutator.SetValue(state => state with { Rooms = state.Rooms.Where(room => room != args.RoomName).ToArray() });
+                CountUnread(args.RoomName, _ => 0);
             }
             else
             {
@@ -238,16 +273,99 @@ namespace slskd.Messaging
             }
         }
 
-        private void Client_RoomMessageReceived(object sender, RoomMessageReceivedEventArgs args)
+        /// <inheritdoc/>
+        public void MarkRead(string roomName) => CountUnread(roomName, _ => 0);
+
+        /// <inheritdoc/>
+        public RoomMessage Simulate(string roomName, string username, string message)
         {
-            if (Users.IsBlacklisted(args.Username))
+            // a no-op for a room already there, joined or simulated
+            RoomTracker.TryAdd(roomName, new Room { Name = roomName, IsSimulated = true });
+
+            var simulated = new RoomMessage
             {
-                Logger.Debug("Ignored message from blacklisted user {Username} in {Room}: {Message}", args.Username, args.RoomName, args.Message);
+                Timestamp = DateTime.UtcNow,
+                RoomName = roomName,
+                Username = username,
+                Message = message,
+                Direction = IsSelf(username) ? MessageDirection.Out : MessageDirection.In,
+            };
+
+            Logger.Information("Simulated a message from {Username} in {Room}", username, roomName);
+            Receive(simulated);
+
+            return simulated;
+        }
+
+        private bool IsSelf(string username) => !string.IsNullOrEmpty(username) && username == Client.Username;
+
+        /// <summary>
+        ///     Changes one room's unread count and publishes them all.
+        /// </summary>
+        /// <param name="roomName">The room.</param>
+        /// <param name="change">The new count, from the old.</param>
+        private void CountUnread(string roomName, Func<int, int> change)
+        {
+            if (string.IsNullOrEmpty(roomName))
+            {
                 return;
             }
 
-            var message = RoomMessage.FromEventArgs(args, DateTime.UtcNow);
-            RoomTracker.AddOrUpdateMessage(args.RoomName, message);
+            lock (UnreadLock)
+            {
+                var before = Unread.GetValueOrDefault(roomName);
+                var after = change(before);
+
+                if (after == before)
+                {
+                    return;
+                }
+
+                if (after > 0)
+                {
+                    Unread[roomName] = after;
+                }
+                else
+                {
+                    Unread.Remove(roomName);
+                }
+
+                var byRoom = Unread
+                    .OrderBy(room => room.Key, StringComparer.Ordinal)
+                    .Select(room => new UnreadRoomState(room.Key, room.Value))
+                    .ToList();
+
+                StateMutator.SetValue(state => state with
+                {
+                    RoomsUnread = new RoomsUnreadState
+                    {
+                        UnreadMessages = byRoom.Sum(room => room.Count),
+                        UnreadRooms = byRoom.Count,
+                        ByRoom = byRoom,
+                    },
+                });
+            }
+        }
+
+        private void Client_RoomMessageReceived(object sender, RoomMessageReceivedEventArgs args)
+            => Receive(RoomMessage.FromEventArgs(args, DateTime.UtcNow));
+
+        private void Receive(RoomMessage message)
+        {
+            if (Users.IsBlacklisted(message.Username))
+            {
+                Logger.Debug("Ignored message from blacklisted user {Username} in {Room}: {Message}", message.Username, message.RoomName, message.Message);
+                return;
+            }
+
+            RoomTracker.AddOrUpdateMessage(message.RoomName, message);
+
+            // the server sends the operator's own messages back like anyone else's; those are never unread. Counted
+            // before the event is raised, so that a notifier hearing it finds the count already moved
+            if (!IsSelf(message.Username))
+            {
+                CountUnread(message.RoomName, count => count + 1);
+            }
 
             // todo: persist these in the database before raising (why are we not??)
             EventBus.Raise<RoomMessageReceivedEvent>(new RoomMessageReceivedEvent
