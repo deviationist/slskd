@@ -1242,16 +1242,24 @@ namespace slskd
             }
 
             /// <summary>
-            ///     Compare options: which of several finished downloads are the same track, judged by an external
-            ///     provider from the audio.
+            ///     Compare options: which of several finished downloads are the same track, judged from the audio by
+            ///     slskd's own comparer or an external provider.
             /// </summary>
-            public class CompareOptions
+            public class CompareOptions : IValidatableObject
             {
                 /// <summary>
-                ///     Gets a value indicating whether Compare is offered. It also needs a provider.
+                ///     Gets what compares: <c>off</c>, <c>builtin</c> for slskd's own comparer, or <c>provider</c> for
+                ///     the external service under <see cref="Provider"/>. Unset, <see cref="Enabled"/> decides, as it
+                ///     did before there was a choice.
+                /// </summary>
+                public string Source { get; init; } = null;
+
+                /// <summary>
+                ///     Gets a value indicating whether Compare is offered, by the provider, when <see cref="Source"/> is
+                ///     not set. Kept so a configuration from before <see cref="Source"/> means what it meant.
                 /// </summary>
                 /// <remarks>
-                ///     Off by default: every comparison hands the provider several files to decode.
+                ///     Off by default: every comparison decodes several files.
                 /// </remarks>
                 [Argument(default, "compare")]
                 [EnvironmentVariable("COMPARE")]
@@ -1259,7 +1267,36 @@ namespace slskd
                 public bool Enabled { get; init; } = false;
 
                 /// <summary>
-                ///     Gets the external compare provider. Without a URL there is no Compare.
+                ///     Gets the source in effect: <see cref="Source"/>, or <c>provider</c> when only
+                ///     <see cref="Enabled"/> is set, or <c>off</c>.
+                /// </summary>
+                public string EffectiveSource => (Source ?? (Enabled ? "provider" : "off")).ToLowerInvariant();
+
+                /// <summary>
+                ///     Gets a value indicating whether slskd's own comparer answers.
+                /// </summary>
+                public bool UsesBuiltin => EffectiveSource == "builtin";
+
+                /// <summary>
+                ///     Gets a value indicating whether the external provider answers.
+                /// </summary>
+                public bool UsesProvider => EffectiveSource == "provider" && Provider.Configured;
+
+                public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+                {
+                    if (Source is not null && Source.ToLowerInvariant() is not ("off" or "builtin" or "provider"))
+                    {
+                        yield return new ValidationResult($"The {nameof(Source)} field must be off, builtin or provider");
+                    }
+
+                    if (Source is not null && Source.Equals("provider", StringComparison.OrdinalIgnoreCase) && !Provider.Configured)
+                    {
+                        yield return new ValidationResult($"The {nameof(Source)} is provider, but no provider URL is set");
+                    }
+                }
+
+                /// <summary>
+                ///     Gets the external compare provider, used when the source is <c>provider</c>.
                 /// </summary>
                 [Validate]
                 public CompareProviderOptions Provider { get; init; } = new CompareProviderOptions();
@@ -1272,7 +1309,7 @@ namespace slskd
             public class CompareProviderOptions : IValidatableObject
             {
                 /// <summary>
-                ///     Gets the provider's base URL; slskd appends /v1/compare. Empty turns Compare off.
+                ///     Gets the provider's base URL; slskd appends /v1/compare.
                 /// </summary>
                 public string Url { get; init; } = null;
 

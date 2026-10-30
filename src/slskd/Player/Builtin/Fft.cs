@@ -105,6 +105,67 @@ public sealed class Fft
     private Complex[] Work { get; }
 
     /// <summary>
+    ///     Transforms <paramref name="data"/> in place: the discrete Fourier transform, or with
+    ///     <paramref name="inverse"/> its inverse, scaled by 1/n as numpy's is.
+    /// </summary>
+    /// <param name="data">The values, a power of two long.</param>
+    /// <param name="inverse">Whether to take the inverse.</param>
+    public static void Transform(Complex[] data, bool inverse = false)
+    {
+        var size = data.Length;
+
+        if (size < 2 || (size & (size - 1)) != 0)
+        {
+            throw new ArgumentException("The length must be a power of two", nameof(data));
+        }
+
+        for (int i = 1, j = 0; i < size; i++)
+        {
+            var bit = size >> 1;
+
+            for (; (j & bit) != 0; bit >>= 1)
+            {
+                j ^= bit;
+            }
+
+            j ^= bit;
+
+            if (i < j)
+            {
+                (data[i], data[j]) = (data[j], data[i]);
+            }
+        }
+
+        for (var length = 2; length <= size; length <<= 1)
+        {
+            var angle = (inverse ? 2 : -2) * Math.PI / length;
+            var step = Complex.FromPolarCoordinates(1, angle);
+
+            for (var start = 0; start < size; start += length)
+            {
+                var w = Complex.One;
+
+                for (var k = 0; k < length / 2; k++)
+                {
+                    var odd = data[start + k + (length / 2)] * w;
+                    var even = data[start + k];
+                    data[start + k] = even + odd;
+                    data[start + k + (length / 2)] = even - odd;
+                    w *= step;
+                }
+            }
+        }
+
+        if (inverse)
+        {
+            for (var i = 0; i < size; i++)
+            {
+                data[i] /= size;
+            }
+        }
+    }
+
+    /// <summary>
     ///     Adds the power spectrum, <c>|rfft(samples * hanning)|²</c>, of one window to <paramref name="into"/>.
     /// </summary>
     /// <param name="samples">One window of samples.</param>
