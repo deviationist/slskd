@@ -140,6 +140,33 @@ namespace slskd.Tests.Unit.Player
             Assert.Single(Requests);
         }
 
+        [Fact]
+        public async Task A_finished_analysis_is_kept_for_its_download_even_by_a_caller_that_left()
+        {
+            var gate = new TaskCompletionSource();
+            var kept = new List<(Guid, string)>();
+            var download = Guid.NewGuid();
+            Responses.Enqueue(Json(HttpStatusCode.OK, Document));
+            var provider = Provider(hold: gate.Task, keep: (id, document) => kept.Add((id, document.GetProperty("verdict").GetProperty("headline").GetString())));
+
+            await provider.GetAsync(Track, wait: false, download: download);
+            gate.SetResult();
+            await provider.GetAsync(Track);
+
+            Assert.Equal([(download, "fine")], kept);
+        }
+
+        [Fact]
+        public async Task Nothing_but_a_finished_analysis_is_kept()
+        {
+            var kept = 0;
+            Responses.Enqueue(Json(HttpStatusCode.NotFound, "{}"));
+
+            await Provider(keep: (_, _) => kept++).GetAsync(Track, download: Guid.NewGuid());
+
+            Assert.Equal(0, kept);
+        }
+
         [Theory]
         [InlineData(HttpStatusCode.Forbidden, AnalysisState.None)]
         [InlineData(HttpStatusCode.NotFound, AnalysisState.None)]
@@ -151,7 +178,7 @@ namespace slskd.Tests.Unit.Player
         private static HttpResponseMessage Json(HttpStatusCode status, string body)
             => new(status) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
 
-        private AnalysisProvider Provider(string url = "http://provider.invalid/contract", Task hold = null)
+        private AnalysisProvider Provider(string url = "http://provider.invalid/contract", Task hold = null, Action<Guid, System.Text.Json.JsonElement> keep = null)
         {
             var handler = new Handler(async request =>
             {
@@ -182,7 +209,13 @@ namespace slskd.Tests.Unit.Player
                         },
                     },
                 },
-            }));
+            }), keep is null ? null : new KeepingCache(keep));
+        }
+
+        // the cache, standing in for the database: what was kept, as it was handed over
+        private sealed class KeepingCache(Action<Guid, System.Text.Json.JsonElement> keep) : AnalysisCache(null)
+        {
+            public override void Remember(Guid download, System.Text.Json.JsonElement document) => keep(download, document);
         }
 
         private sealed class Handler(Func<HttpRequestMessage, Task<HttpResponseMessage>> respond) : HttpMessageHandler

@@ -81,8 +81,10 @@ namespace slskd.Transfers.API
             DownloadFileAvailability downloadFileAvailability,
             DownloadFileDuration downloadFileDuration,
             slskd.Search.SearchExistence searchExistence,
-            IOptionsSnapshot<Options> optionsSnapshot)
+            IOptionsSnapshot<Options> optionsSnapshot,
+            slskd.Player.AnalysisCache analysisCache = null)
         {
+            AnalysisCache = analysisCache;
             Transfers = transferService;
             Users = userService;
             Files = fileService;
@@ -117,6 +119,7 @@ namespace slskd.Transfers.API
         private DownloadFileAvailability FileAvailability { get; }
         private DownloadFileDuration FileDuration { get; }
         private slskd.Search.SearchExistence SearchExistence { get; }
+        private slskd.Player.AnalysisCache AnalysisCache { get; }
         private IOptionsSnapshot<Options> OptionsSnapshot { get; }
         private ILogger Log { get; set; } = Serilog.Log.ForContext<TransfersController>();
 
@@ -1451,6 +1454,11 @@ namespace slskd.Transfers.API
         /// <returns>The operation context.</returns>
         private async Task AnnotateAsync(IEnumerable<slskd.Transfers.Transfer> downloads)
         {
+            // one look-up for the lot, from memory: the list is served every second or so
+            var verdicts = AnalysisCache is not null && OptionsSnapshot.Value.Player.Analysis.Provider.Configured
+                ? AnalysisCache.VerdictsOf(downloads.Select(d => d.Id))
+                : null;
+
             foreach (var download in downloads)
             {
                 // say whether each finished download's file is still there, rather than leaving the UI to find out
@@ -1473,6 +1481,11 @@ namespace slskd.Transfers.API
                     the more useful half. A caller can then tell the three cases apart -- no search, a search it can
                     still open, and a search that is gone -- which an empty field could not.
                 */
+                if (verdicts is not null && verdicts.TryGetValue(download.Id, out var verdict))
+                {
+                    download.Analysis = verdict;
+                }
+
                 if (download.SearchId.HasValue && !await SearchExistence.ExistsAsync(download.SearchId.Value))
                 {
                     download.SearchId = null;

@@ -89,3 +89,20 @@ public record AnalysisResponse
         Reason = answer.Reason,
     };
 }
+
+/// <summary>
+///     The analysis cache.
+/// </summary>
+public record AnalysisCacheResponse
+{
+    /// <summary>
+    ///     Gets a value indicating whether an analysis provider is configured, so a page can leave the cache out
+    ///     where there is nothing to cache.
+    /// </summary>
+    public bool Configured { get; init; }
+
+    /// <summary>
+    ///     Gets the number of downloads with an analysis kept, or, from a clear, the number whose analysis was dropped.
+    /// </summary>
+    public int Downloads { get; init; }
+}

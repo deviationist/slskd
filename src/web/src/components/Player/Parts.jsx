@@ -297,19 +297,45 @@ export const RowPlay = ({ file }) => {
  * headline. Drawn only once there is a verdict, and only when a provider is
  * configured -- a column of spinners for an answer that is never coming is
  * noise.
+ *
+ * A download analysed before comes with its verdict in the list, kept for good
+ * on the server, so its badge is drawn with the row and nothing is asked until
+ * the findings are opened. Only one never analysed asks on its own.
  */
 export const RowBadge = ({ file }) => {
   const player = usePlayer();
-  const enabled = Boolean(player?.analysisOn) && isPlayable(file);
-  const answer = useAnalysis(file?.id, { enabled, wait: false });
   const [open, setOpen] = useState(false);
+  const enabled = Boolean(player?.analysisOn) && isPlayable(file);
+  const listed = file?.analysis ?? null;
+  const answer = useAnalysis(file?.id, {
+    enabled: enabled && (!listed || open),
+    wait: Boolean(listed),
+  });
 
-  if (
-    !enabled ||
-    !answer ||
-    answer.state === 'off' ||
-    answer.state === 'none'
-  ) {
+  if (!enabled) {
+    return null;
+  }
+
+  if (listed) {
+    return (
+      <>
+        <Badge
+          onOpen={() => setOpen(true)}
+          verdict={listed}
+        />
+        {open && answer?.state === 'ready' && (
+          <Findings
+            analysis={answer.analysis}
+            onClose={() => setOpen(false)}
+            onSeek={(seconds) => player.play(trackOf(file), { at: seconds })}
+            title={trackOf(file).title}
+          />
+        )}
+      </>
+    );
+  }
+
+  if (!answer || answer.state === 'off' || answer.state === 'none') {
     return null;
   }
 
@@ -325,22 +351,12 @@ export const RowBadge = ({ file }) => {
     );
   }
 
-  const { verdict } = answer.analysis;
-
   return (
     <>
-      <button
-        className={`player-badge player-badge-${verdict.level}`}
-        data-mbp="player"
-        onClick={(event) => {
-          event.stopPropagation();
-          setOpen(true);
-        }}
-        title={`${verdict.headline}: tap to read the analysis`}
-        type="button"
-      >
-        {verdict.headline}
-      </button>
+      <Badge
+        onOpen={() => setOpen(true)}
+        verdict={answer.analysis.verdict}
+      />
       {open && (
         <Findings
           analysis={answer.analysis}
@@ -352,6 +368,21 @@ export const RowBadge = ({ file }) => {
     </>
   );
 };
+
+const Badge = ({ onOpen, verdict }) => (
+  <button
+    className={`player-badge player-badge-${verdict.level}`}
+    data-mbp="player"
+    onClick={(event) => {
+      event.stopPropagation();
+      onOpen();
+    }}
+    title={`${verdict.headline}: tap to read the analysis`}
+    type="button"
+  >
+    {verdict.headline}
+  </button>
+);
 
 export const CloseButton = ({ className, onClick }) => (
   <button

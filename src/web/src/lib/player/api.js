@@ -30,6 +30,14 @@ export const getAnalysis = async (id, { signal, wait = true } = {}) =>
     })
   ).data;
 
+// what is kept of every analysis, for good: { configured, downloads }
+export const getAnalysisCache = async () =>
+  (await api.get('/player/analysis/cache')).data;
+
+// drop it all, so each download is analysed again when next shown
+export const clearAnalysisCache = async () =>
+  (await api.delete('/player/analysis/cache')).data;
+
 // absolute, because an element fetches it outside axios
 export const audioUrl = (id, ticket, codec) => {
   const query = new URLSearchParams({ ticket });

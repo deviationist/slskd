@@ -80,6 +80,7 @@ public class PlayerController : ControllerBase
     /// <param name="fileService">The file service.</param>
     /// <param name="playerService">The player service.</param>
     /// <param name="analysisProvider">The analysis provider client.</param>
+    /// <param name="analysisCache">The analyses kept, by download.</param>
     /// <param name="tickets">The stream tickets.</param>
     /// <param name="optionsMonitor">The options monitor.</param>
     public PlayerController(
@@ -87,6 +88,7 @@ public class PlayerController : ControllerBase
         FileService fileService,
         PlayerService playerService,
         AnalysisProvider analysisProvider,
+        AnalysisCache analysisCache,
         StreamTickets tickets,
         IOptionsMonitor<Options> optionsMonitor)
     {
@@ -94,6 +96,7 @@ public class PlayerController : ControllerBase
         Files = fileService;
         Player = playerService;
         Analysis = analysisProvider;
+        AnalysisCache = analysisCache;
         Tickets = tickets;
         OptionsMonitor = optionsMonitor;
     }
@@ -102,6 +105,7 @@ public class PlayerController : ControllerBase
     private FileService Files { get; }
     private PlayerService Player { get; }
     private AnalysisProvider Analysis { get; }
+    private AnalysisCache AnalysisCache { get; }
     private StreamTickets Tickets { get; }
     private IOptionsMonitor<Options> OptionsMonitor { get; }
     private ILogger Log { get; } = Serilog.Log.ForContext<PlayerController>();
@@ -288,7 +292,15 @@ public class PlayerController : ControllerBase
             return Ok(AnalysisResponse.From(new AnalysisAnswer(AnalysisState.Off)));
         }
 
-        var (_, file, refusal) = Resolve(id);
+        // kept for good once made: the audio of a download does not change, so there is nothing to look at on disk,
+        // and a file since moved out still has the analysis it had
+        if (Guid.TryParse(id, out var download) && !Program.IsRelayAgent && OptionsMonitor.CurrentValue.Player.Enabled
+            && AnalysisCache.TryGet(download, out var kept))
+        {
+            return Ok(AnalysisResponse.From(new AnalysisAnswer(AnalysisState.Ready, kept)));
+        }
+
+        var (guid, file, refusal) = Resolve(id);
 
         // a file that has gone, or never was audio, has no analysis -- an answer, not an error. every list asks about
         // each finished row it draws, and most finished downloads have long since been moved out, so as 404s these
@@ -300,8 +312,34 @@ public class PlayerController : ControllerBase
                 : Ok(AnalysisResponse.From(new AnalysisAnswer(AnalysisState.None, Reason: "no playable file")));
         }
 
-        return Ok(AnalysisResponse.From(await Analysis.GetAsync(file, wait, cancellationToken)));
+        return Ok(AnalysisResponse.From(await Analysis.GetAsync(file, wait, guid, cancellationToken)));
     }
+
+    /// <summary>
+    ///     How many downloads have an analysis kept.
+    /// </summary>
+    /// <returns>The count.</returns>
+    /// <response code="200">The request completed successfully.</response>
+    [HttpGet("analysis/cache")]
+    [Authorize(Policy = AuthPolicy.Any)]
+    [ProducesResponseType(typeof(AnalysisCacheResponse), 200)]
+    public IActionResult GetAnalysisCache()
+        => Ok(new AnalysisCacheResponse { Configured = Analysis.Configured, Downloads = AnalysisCache.Count });
+
+    /// <summary>
+    ///     Drops every analysis kept, so each download is analysed again when it is next shown.
+    /// </summary>
+    /// <remarks>
+    ///     For an analyser changed in a way its version does not say. A new version clears what the old one made by
+    ///     itself, as soon as the provider is seen to speak it.
+    /// </remarks>
+    /// <returns>How many downloads' analyses were dropped.</returns>
+    /// <response code="200">The cache is empty.</response>
+    [HttpDelete("analysis/cache")]
+    [Authorize(Policy = AuthPolicy.Any)]
+    [ProducesResponseType(typeof(AnalysisCacheResponse), 200)]
+    public IActionResult ClearAnalysisCache()
+        => Ok(new AnalysisCacheResponse { Configured = Analysis.Configured, Downloads = AnalysisCache.Clear() });
 
     private (Guid Id, FileInfo File, IActionResult Refusal) Resolve(string id, string ticket = null, bool requireTicket = false)
     {
