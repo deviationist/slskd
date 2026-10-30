@@ -1,5 +1,6 @@
 import './Transfers.css';
 import * as compareLibrary from '../../lib/compare';
+import * as oneTaggerLibrary from '../../lib/oneTagger';
 import { usePullRefresh } from '../../lib/pullToRefresh';
 import * as transfersLibrary from '../../lib/transfers';
 import AppContext from '../AppContext';
@@ -192,6 +193,9 @@ const Transfers = ({ direction, server }) => {
   // hub, so this is false until it connects, which errs towards not offering
   // something that would not work
   const retrievalEnabled = options?.remoteFileRetrieval === true;
+  // OneTagger opens downloads only, and only where the server has it on
+  const oneTaggerEnabled =
+    direction === 'download' && oneTaggerLibrary.isEnabled(options);
 
   // whether a removal takes the downloaded file with it. read from the download
   // options whichever direction is being shown -- the option governs downloads
@@ -487,6 +491,7 @@ const Transfers = ({ direction, server }) => {
           onRetryAll={retryAll}
           onRetryRequested={retry}
           onShareRequested={onShareRequested}
+          oneTaggerEnabled={oneTaggerEnabled}
           retrievalEnabled={retrievalEnabled}
           total={total}
           users={sorted}
@@ -503,6 +508,7 @@ const Transfers = ({ direction, server }) => {
             onCompareRequested={onCompareRequested}
             onSelectionReport={onSelectionReport}
             onShareRequested={onShareRequested}
+            oneTaggerEnabled={oneTaggerEnabled}
             remove={remove}
             removeAll={removeAll}
             retrievalEnabled={retrievalEnabled}

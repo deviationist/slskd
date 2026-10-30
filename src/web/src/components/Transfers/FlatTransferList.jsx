@@ -25,6 +25,7 @@ import {
   scrollParentOf,
 } from '../../lib/util';
 import CompareButton from '../Compare/CompareButton';
+import { OneTaggerRowButton } from '../OneTagger/OneTagger';
 import { RowBadge, RowPlay } from '../Player/Parts';
 import {
   ColumnPicker,
@@ -384,6 +385,7 @@ const SelectionActions = ({
  * @param {Function} params.onRemoveRequested - Removes one transfer.
  * @param {Function} params.onRetryRequested - Retries one transfer.
  * @param {Function} [params.onShareRequested] - Opens the share dialog for some rows; absent where links cannot be made.
+ * @param {boolean} [params.oneTaggerEnabled] - Whether a finished download can be opened in OneTagger.
  * @param {boolean} params.retrievalEnabled - Whether a finished file can be fetched to the browser.
  * @param {number} params.total - How many transfers there are before the filter.
  * @param {object[]} params.users - The transfers, grouped as the API returns them.
@@ -401,6 +403,7 @@ const FlatTransferList = ({
   onRetryAll,
   onRetryRequested,
   onShareRequested,
+  oneTaggerEnabled,
   retrievalEnabled,
   total,
   users,
@@ -997,6 +1000,7 @@ const FlatTransferList = ({
                           }
                         />
                       )}
+                      {oneTaggerEnabled && <OneTaggerRowButton file={row} />}
                       {onShareRequested && shareLinks.isShareable(row) && (
                         <Popup
                           content="Share: a link anyone can download this from, for a while"

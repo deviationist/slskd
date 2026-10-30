@@ -2060,3 +2060,12 @@ html {
         top: 2px;
     }
 }
+
+/* OneTagger's mark in the menu, where Semantic sizes an icon font glyph: an
+   svg has no glyph box of its own, so it is given the square one. */
+.navigation .item > svg.icon.onetagger-mark {
+  display: block;
+  height: 1em;
+  margin: 0 auto 0.5rem;
+  width: 1em;
+}

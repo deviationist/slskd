@@ -18,24 +18,14 @@ const done = (name, extra = {}) => ({
 });
 
 describe('isEnabled', () => {
-  it('wants Compare enabled and a provider', () => {
-    const on = {
-      transfers: { compare: { enabled: true, provider: { url: 'http://p' } } },
-    };
+  it('follows the source the server says is in effect', () => {
+    const compare = (settings) =>
+      isEnabled({ transfers: { compare: settings } });
 
-    expect(isEnabled(on)).toBe(true);
-    expect(
-      isEnabled({
-        transfers: { compare: { enabled: true, provider: { url: null } } },
-      }),
-    ).toBe(false);
-    expect(
-      isEnabled({
-        transfers: {
-          compare: { enabled: false, provider: { url: 'http://p' } },
-        },
-      }),
-    ).toBe(false);
+    expect(compare({ usesBuiltin: true, usesProvider: false })).toBe(true);
+    expect(compare({ usesBuiltin: false, usesProvider: true })).toBe(true);
+    // a provider named but not chosen, or chosen with no address: off
+    expect(compare({ usesBuiltin: false, usesProvider: false })).toBe(false);
     // options arrive over the hub; before they do, nothing is offered
     expect(isEnabled(undefined)).toBe(false);
   });

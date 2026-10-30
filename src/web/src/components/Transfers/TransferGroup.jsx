@@ -123,6 +123,7 @@ class TransferGroup extends Component {
       nextProps.direction !== props.direction ||
       nextProps.deleteFileOnRemoval !== props.deleteFileOnRemoval ||
       nextProps.retrievalEnabled !== props.retrievalEnabled ||
+      nextProps.oneTaggerEnabled !== props.oneTaggerEnabled ||
       Boolean(nextProps.onShareRequested) !== Boolean(props.onShareRequested) ||
       Boolean(nextProps.onCompareRequested) !==
         Boolean(props.onCompareRequested) ||
@@ -572,6 +573,7 @@ class TransferGroup extends Component {
                 onRetryRequested={this.handleRetry}
                 onSelectionChange={this.handleSelectionChange}
                 onShareRequested={this.props.onShareRequested}
+                oneTaggerEnabled={this.props.oneTaggerEnabled}
                 retrievalEnabled={this.props.retrievalEnabled}
                 username={user.username}
               />

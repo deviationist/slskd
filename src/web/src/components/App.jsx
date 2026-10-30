@@ -21,6 +21,7 @@ import UnreadBadge from './Chat/UnreadBadge';
 import Dashboard from './Dashboard/Dashboard';
 import LoginForm from './LoginForm';
 import MobileNav from './MobileNav';
+import { OneTaggerMenuItem } from './OneTagger/OneTagger';
 import PlayerBar from './Player/PlayerBar';
 import { PlayerProvider } from './Player/PlayerContext';
 import Rooms from './Rooms/Rooms';
@@ -792,6 +793,7 @@ class App extends Component {
                     Update
                   </Menu.Item>
                 )}
+                <OneTaggerMenuItem options={applicationOptions} />
                 <NavLink to={`${urlBase}/system`}>
                   <Menu.Item>
                     <Icon name="cogs" />

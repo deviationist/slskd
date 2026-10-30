@@ -18,13 +18,14 @@ import * as transfers from './transfers';
 export const MAXIMUM_FILES = 10;
 
 /**
- * Whether Compare is on: enabled, and a provider configured. Options arrive
- * over the hub, so this is false until they do, which errs towards not
- * offering something that would not work.
+ * Whether Compare is on: slskd's own comparer, or a configured provider, as
+ * the server works out from `source` (or `enabled` alone). Options arrive over
+ * the hub, so this is false until they do, which errs towards not offering
+ * something that would not work.
  */
 export const isEnabled = (options) =>
-  options?.transfers?.compare?.enabled === true &&
-  Boolean(options?.transfers?.compare?.provider?.url);
+  options?.transfers?.compare?.usesBuiltin === true ||
+  options?.transfers?.compare?.usesProvider === true;
 
 /**
  * Whether a download can be compared: finished, its file recorded and not
