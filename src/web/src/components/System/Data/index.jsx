@@ -1,5 +1,6 @@
+import { clearAnalysisCache, getAnalysisCache } from '../../../lib/player/api';
 import { clearCompleted } from '../../../lib/transfers';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { toast } from 'react-toastify';
 import { Button, Divider, Header, Icon } from 'semantic-ui-react';
 
@@ -8,6 +9,72 @@ const clear = async ({ direction, setState }) => {
   await clearCompleted({ direction });
   setState(false);
   toast.success(`Completed ${direction}s cleared!`);
+};
+
+const plural = (count) => `${count} download${count === 1 ? '' : 's'}`;
+
+// only where a provider is configured: without one there is nothing kept
+export const AnalysisCache = () => {
+  const [cache, setCache] = useState(null);
+  const [clearing, setClearing] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setCache(await getAnalysisCache());
+      } catch {
+        setCache(null);
+      }
+    };
+
+    load();
+  }, []);
+
+  if (!cache?.configured) {
+    return null;
+  }
+
+  const onClear = async () => {
+    setClearing(true);
+
+    try {
+      const { downloads } = await clearAnalysisCache();
+      setCache({ ...cache, downloads: 0 });
+      toast.success(`Audio analysis cleared for ${plural(downloads)}`);
+    } catch (error) {
+      toast.error(`Could not clear the audio analysis: ${error.message}`);
+    } finally {
+      setClearing(false);
+    }
+  };
+
+  return (
+    <>
+      <Header
+        as="h3"
+        className="transfer-header"
+      >
+        Audio Analysis
+      </Header>
+      <Divider />
+      <p>
+        Each download's audio analysis is kept for good once made: the audio
+        does not change, and a new version of the analyser clears what the old
+        one made by itself. Clear it if the analyser's rules have changed
+        without its version saying so; each download is then analysed again the
+        next time it is shown. Kept for {plural(cache.downloads)}.
+      </p>
+      <Button
+        disabled={cache.downloads === 0}
+        loading={clearing}
+        onClick={onClear}
+        primary
+      >
+        <Icon name="trash alternate" />
+        Clear Audio Analysis
+      </Button>
+    </>
+  );
 };
 
 const Data = () => {
@@ -46,6 +113,7 @@ const Data = () => {
         <Icon name="trash alternate" />
         Clear All Completed Downloads
       </Button>
+      <AnalysisCache />
     </div>
   );
 };

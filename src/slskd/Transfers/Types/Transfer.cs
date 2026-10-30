@@ -217,6 +217,17 @@ public class Transfer
     public Guid? SearchId { get; set; }
 
     /// <summary>
+    ///     Gets or sets the verdict of the analysis kept for the file this download produced, or null where none is
+    ///     kept.
+    /// </summary>
+    /// <remarks>
+    ///     Not persisted here: the analysis is the <see cref="slskd.Player.AnalysisCache"/>'s, and this is its verdict
+    ///     read back. Filled in when a list is served, so a row draws its badge without asking for it.
+    /// </remarks>
+    [NotMapped]
+    public slskd.Player.AnalysisVerdict Analysis { get; set; }
+
+    /// <summary>
     ///     Gets or sets the text of the search this download was started from, as it was at the time.
     /// </summary>
     /// <remarks>

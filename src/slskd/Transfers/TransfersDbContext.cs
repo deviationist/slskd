@@ -51,6 +51,8 @@ namespace slskd.Transfers
         public DbSet<ShareLinkFile> ShareLinkFiles { get; set; }
         public DbSet<ShareLinkAccess> ShareLinkAccesses { get; set; }
         public DbSet<ShareLinkRecipient> ShareLinkRecipients { get; set; }
+        public DbSet<slskd.Player.StoredAnalysis> Analyses { get; set; }
+        public DbSet<slskd.Player.DownloadAnalysis> DownloadAnalyses { get; set; }
 
         public override int SaveChanges(bool acceptAllChangesOnSuccess)
         {
@@ -77,6 +79,26 @@ namespace slskd.Transfers
             ConfigureTransfers(modelBuilder);
             ConfigureBatches(modelBuilder);
             ConfigureShareLinks(modelBuilder);
+            ConfigureAnalyses(modelBuilder);
+        }
+
+        private void ConfigureAnalyses(ModelBuilder modelBuilder)
+        {
+            modelBuilder
+                .Entity<slskd.Player.StoredAnalysis>()
+                .Property(e => e.StoredAt)
+                .HasConversion(v => v, v => DateTime.SpecifyKind(v, DateTimeKind.Utc));
+
+            // a new version of the analyser drops everything made by the others
+            modelBuilder
+                .Entity<slskd.Player.StoredAnalysis>()
+                .HasIndex(a => a.Version)
+                .HasDatabaseName("IDX_Analyses_Version");
+
+            modelBuilder
+                .Entity<slskd.Player.DownloadAnalysis>()
+                .HasIndex(d => d.AnalysisId)
+                .HasDatabaseName("IDX_DownloadAnalyses_AnalysisId");
         }
 
         private void ConfigureShareLinks(ModelBuilder modelBuilder)

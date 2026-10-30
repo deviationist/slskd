@@ -48,7 +48,7 @@ Authorization: Bearer <token>
 
 | Status | Means | slskd does |
 |---|---|---|
-| 200 | An analysis, below | Keeps it for this file (path, size, mtime) and shows it |
+| 200 | An analysis, below | Keeps it for the download for good (see *Caching*) and shows it |
 | 202 + `Retry-After` | Still being computed | Asks again after that many seconds |
 | 403 | Not a file the provider will analyse | Shows nothing; does not ask again |
 | 404 | The provider cannot see the file | Shows nothing; does not ask again |
@@ -61,7 +61,8 @@ Authorization: Bearer <token>
 ```jsonc
 {
   "contract": 1,
-  "provider": { "name": "example-analyzer", "version": "1.4.0" },
+  "id": "9f2c…e41a-v5",
+  "provider": { "name": "example-analyzer", "version": "analysis-v5" },
   "verdict": { "level": "bad", "headline": "lossy? 18.9 kHz" },
   "summary": "MP3 · 44.1 kHz · stereo · 219 kbps · 7:12",
   "findings": [
@@ -77,6 +78,13 @@ Authorization: Bearer <token>
 }
 ```
 
+- **`id`** (optional) names this analysis: a checksum of the **audio alone**
+  (tags, artwork and the file's name and dates left out) and the analyser's
+  version, as `<checksum>-<version>`. Two files with the same audio analysed
+  under the same rules get the same id. See *Caching*.
+- **`provider.version`** is the version of the analyser's rules. Change it
+  whenever an answer could change for the same audio: a new finding, a
+  retired one, a rewritten threshold.
 - **`verdict`** is the row's badge and the line under the player's title.
   `level` is `ok`, `warn` or `bad` throughout.
 - **`summary`** is free text for the top of the findings panel.
@@ -88,6 +96,26 @@ Authorization: Bearer <token>
   finding's colour with its label. A provider never sends an empty lane.
 - Unknown fields are ignored, so a provider may send more. `contract` changes
   only for a change a client cannot ignore.
+
+## Caching
+
+An analysis is a fact about the audio, and the audio of a download does not
+change, so slskd keeps every 200 **for good**, by download, in its transfers
+database. It survives restarts, retagging, and the file being moved or
+deleted, and the downloads list carries each row's verdict so the badge draws
+with the row. Only a download never analysed asks the provider.
+
+- When an answer arrives whose `provider.version` differs from the one
+  before, slskd drops everything made under the other versions: the rules
+  changed, so those answers are no longer the provider's.
+- Downloads whose answers carry the same `id` share one stored analysis.
+  Without an `id`, slskd keeps one per download.
+- **System > Data > Clear Audio Analysis** (`DELETE /api/v0/player/analysis/cache`)
+  drops the lot, for rules that changed without the version saying so.
+  `GET` on the same route gives the count.
+
+202, 403, 404 and faults are not kept beyond a short while: they are answers
+about now.
 
 ## What a provider must refuse
 

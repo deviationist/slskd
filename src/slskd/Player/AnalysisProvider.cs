@@ -119,10 +119,12 @@ public class AnalysisProvider
     /// </summary>
     /// <param name="httpClientFactory">The HTTP client factory.</param>
     /// <param name="optionsMonitor">The options monitor.</param>
-    public AnalysisProvider(IHttpClientFactory httpClientFactory, IOptionsMonitor<Options> optionsMonitor)
+    /// <param name="cache">Where a finished analysis is kept for good, by download; none keeps them in memory only.</param>
+    public AnalysisProvider(IHttpClientFactory httpClientFactory, IOptionsMonitor<Options> optionsMonitor, AnalysisCache cache = null)
     {
         HttpClientFactory = httpClientFactory;
         OptionsMonitor = optionsMonitor;
+        Cache = cache;
     }
 
     /// <summary>
@@ -130,6 +132,7 @@ public class AnalysisProvider
     /// </summary>
     public bool Configured => Settings.Configured;
 
+    private AnalysisCache Cache { get; }
     private IHttpClientFactory HttpClientFactory { get; }
     private IOptionsMonitor<Options> OptionsMonitor { get; }
     private Options.PlayerOptions.PlayerAnalysisProviderOptions Settings => OptionsMonitor.CurrentValue.Player.Analysis.Provider;
@@ -164,9 +167,13 @@ public class AnalysisProvider
     ///     at once and the request carries on, so a page asking about every row it draws holds no connection open
     ///     while the provider works.
     /// </param>
+    /// <param name="download">
+    ///     The download the file is, if it is one: a finished analysis is then kept for it for good, by the request
+    ///     itself, so it is kept whether or not anyone is still waiting.
+    /// </param>
     /// <param name="cancellationToken">A token to stop waiting. The request itself carries on for whoever asks next.</param>
     /// <returns>The answer.</returns>
-    public async Task<AnalysisAnswer> GetAsync(FileInfo file, bool wait = true, CancellationToken cancellationToken = default)
+    public async Task<AnalysisAnswer> GetAsync(FileInfo file, bool wait = true, Guid? download = null, CancellationToken cancellationToken = default)
     {
         if (!Configured)
         {
@@ -185,10 +192,16 @@ public class AnalysisProvider
 
         if (Answers.TryGetValue(key, out AnalysisAnswer cached))
         {
+            // the same file under another download, analysed while this one was not asked about
+            if (download is not null && cached.State == AnalysisState.Ready)
+            {
+                Remember(download.Value, cached);
+            }
+
             return cached;
         }
 
-        var lazy = InFlight.GetOrAdd(key, _ => new Lazy<Task<AnalysisAnswer>>(() => AskAndKeepAsync(key, located.Value, file)));
+        var lazy = InFlight.GetOrAdd(key, _ => new Lazy<Task<AnalysisAnswer>>(() => AskAndKeepAsync(key, located.Value, file, download)));
         var task = lazy.Value;
 
         if (!wait && !task.IsCompleted)
@@ -199,7 +212,7 @@ public class AnalysisProvider
         return await task.WaitAsync(cancellationToken);
     }
 
-    private async Task<AnalysisAnswer> AskAndKeepAsync(string key, (string Root, string File) located, FileInfo file)
+    private async Task<AnalysisAnswer> AskAndKeepAsync(string key, (string Root, string File) located, FileInfo file, Guid? download)
     {
         try
         {
@@ -208,6 +221,11 @@ public class AnalysisProvider
             if (keepFor is not null)
             {
                 Answers.Set(key, answer, new MemoryCacheEntryOptions { Size = 1, AbsoluteExpirationRelativeToNow = keepFor });
+            }
+
+            if (download is not null && answer.State == AnalysisState.Ready)
+            {
+                Remember(download.Value, answer);
             }
 
             return answer;
@@ -309,6 +327,24 @@ public class AnalysisProvider
         {
             Log.Warning("Analysis provider did not answer for {Root}/{File}: {Message}", located.Root, located.File, ex.Message);
             return null;
+        }
+    }
+
+    private void Remember(Guid download, AnalysisAnswer answer)
+    {
+        if (Cache is null || answer.Analysis is null)
+        {
+            return;
+        }
+
+        try
+        {
+            Cache.Remember(download, answer.Analysis.Value);
+        }
+        catch (Exception ex)
+        {
+            // a cache that cannot be written costs a request next time, not this answer
+            Log.Warning("Could not keep the analysis of download {Id}: {Message}", download, ex.Message);
         }
     }
 

@@ -7,6 +7,11 @@
   "required": ["contract", "provider", "verdict", "summary", "findings", "lanes"],
   "properties": {
     "contract": { "const": 1 },
+    "id": {
+      "description": "Optional. Names this analysis: a checksum of the audio alone and the analyser's version, as <checksum>-<version>. The same audio under the same rules gets the same id.",
+      "type": "string",
+      "minLength": 1
+    },
     "provider": {
       "type": "object",
       "required": ["name", "version"],
