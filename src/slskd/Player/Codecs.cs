@@ -106,7 +106,8 @@ public static class Codecs
     /// </summary>
     public static readonly IReadOnlyDictionary<string, Codec> ByName = new Dictionary<string, Codec>(StringComparer.Ordinal)
     {
-        ["opus"] = new("opus", ".webm", "audio/webm", new[] { "-c:a", "libopus", "-b:a", Bitrate, "-compression_level", "0", "-f", "webm" }, MaxBitrate: 510),
+        // always stereo: libopus takes at most 256 kbps a channel, so a mono source refused 320k outright
+        ["opus"] = new("opus", ".webm", "audio/webm", new[] { "-c:a", "libopus", "-ac", "2", "-b:a", Bitrate, "-compression_level", "0", "-f", "webm" }, MaxBitrate: 510),
         ["aac"] = new("aac", ".m4a", "audio/mp4", new[] { "-c:a", "aac", "-aac_coder", "fast", "-b:a", Bitrate, "-movflags", "+faststart", "-f", "mp4" }),
         ["mp3"] = new("mp3", ".mp3", "audio/mpeg", new[] { "-c:a", "libmp3lame", "-b:a", Bitrate, "-f", "mp3" }, MaxBitrate: 320),
     };
