@@ -51,6 +51,14 @@ using Ical.Net.DataTypes;
 ///         03:00" is a different instant in summer than in winter, and an operator who asked for 03:00 means 03:00
 ///         where they are.
 ///     </para>
+///     <para>
+///         Except a rule that recurs by the hour, which is evaluated in UTC. "Every N hours" is a span of time, not a
+///         time of day, so the zone changes nothing about it -- and in a zone that keeps daylight saving, the
+///         evaluator walks the hours in local time and cannot get past the hour that happens twice in autumn: it adds
+///         an hour to the first 02:10 and reads the second back as the first. From the night of 2026-10-25 every
+///         hourly watch in Europe/Oslo spun one thread at 100% and never ran again. A <c>BYHOUR</c> on an hourly rule
+///         (set through the API; the presets have none) therefore names UTC hours.
+///     </para>
 /// </remarks>
 public static class Recurrence
 {
@@ -171,13 +179,17 @@ public static class Recurrence
 
     private static Calendar Build(string rrule, DateTime anchor, string timeZone)
     {
-        var start = new CalDateTime(DateTime.SpecifyKind(anchor, DateTimeKind.Utc)).ToTimeZone(timeZone);
+        var pattern = new RecurrencePattern(rrule);
+
+        // by the hour, in UTC: see the remarks on the class
+        var zone = pattern.Frequency is FrequencyType.Hourly or FrequencyType.Minutely or FrequencyType.Secondly ? "UTC" : timeZone;
+        var start = new CalDateTime(DateTime.SpecifyKind(anchor, DateTimeKind.Utc)).ToTimeZone(zone);
 
         var calendarEvent = new CalendarEvent
         {
             Start = start,
             Duration = new Duration(minutes: 1),
-            RecurrenceRule = new RecurrencePattern(rrule),
+            RecurrenceRule = pattern,
         };
 
         var calendar = new Calendar();
