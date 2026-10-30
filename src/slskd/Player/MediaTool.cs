@@ -73,6 +73,35 @@ public interface IMediaTool
     /// <param name="cancellationToken">A token to cancel the probe.</param>
     /// <returns>Seconds, or null.</returns>
     Task<double?> ProbeDurationAsync(string path, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     What ffprobe says of the first audio stream and the container, as its JSON.
+    /// </summary>
+    /// <param name="path">The file.</param>
+    /// <param name="cancellationToken">A token to cancel the probe.</param>
+    /// <returns>The JSON.</returns>
+    Task<string> ProbeAsync(string path, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Decodes a source to raw PCM, written to <paramref name="destination"/> as it is decoded rather than held.
+    /// </summary>
+    /// <param name="source">The source file.</param>
+    /// <param name="rate">The sample rate to decode at.</param>
+    /// <param name="channels">The channels to decode to.</param>
+    /// <param name="format">The sample format: <c>s16le</c>, <c>s32le</c> or <c>f32le</c>.</param>
+    /// <param name="destination">Where the PCM goes.</param>
+    /// <param name="cancellationToken">A token to cancel the decode.</param>
+    /// <returns>The operation context.</returns>
+    Task DecodeToAsync(string source, int rate, int channels, string format, Stream destination, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     A SHA-256 of the first audio stream's coded packets: the audio alone, so tags, artwork, a rename or a move
+    ///     leave it unchanged.
+    /// </summary>
+    /// <param name="source">The source file.</param>
+    /// <param name="cancellationToken">A token to cancel the read.</param>
+    /// <returns>The checksum, as 64 hex digits.</returns>
+    Task<string> HashAudioAsync(string source, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -180,7 +209,61 @@ public class MediaTool : IMediaTool
         }
     }
 
-    private static async Task<(int ExitCode, byte[] Stdout)> RunAsync(string executable, IEnumerable<string> arguments, TimeSpan timeout, bool capture, CancellationToken cancellationToken)
+    /// <inheritdoc/>
+    public async Task<string> ProbeAsync(string path, CancellationToken cancellationToken = default)
+    {
+        var (_, stdout) = await RunAsync(Ffprobe, new[]
+        {
+            "-v", "error",
+        }.Concat(InputGuard).Concat(new[]
+        {
+            "-select_streams", "a:0",
+            "-show_entries", "stream=codec_name,sample_rate,channels,bits_per_raw_sample,bits_per_sample,bit_rate",
+            "-show_entries", "format=duration,bit_rate,format_name",
+            "-of", "json", path,
+        }), ProbeTimeout, capture: true, cancellationToken);
+
+        return System.Text.Encoding.UTF8.GetString(stdout);
+    }
+
+    /// <inheritdoc/>
+    public Task DecodeToAsync(string source, int rate, int channels, string format, Stream destination, CancellationToken cancellationToken = default)
+        => RunAsync(Ffmpeg, new[]
+        {
+            "-v", "error", "-nostdin",
+        }.Concat(InputGuard).Concat(new[]
+        {
+            "-i", source,
+            "-t", Codecs.MaxSeconds.ToString(CultureInfo.InvariantCulture),
+            "-vn", "-ac", channels.ToString(CultureInfo.InvariantCulture), "-ar", rate.ToString(CultureInfo.InvariantCulture),
+            "-f", format, "-",
+        }), Timeout, capture: false, cancellationToken, sink: destination);
+
+    /// <inheritdoc/>
+    public async Task<string> HashAudioAsync(string source, CancellationToken cancellationToken = default)
+    {
+        // the coded packets, not the decoded samples: two encodes of one recording share a decoded checksum and not
+        // their bitrate, so one would be taken for the other
+        var (_, stdout) = await RunAsync(Ffmpeg, new[]
+        {
+            "-v", "error", "-nostdin",
+        }.Concat(InputGuard).Concat(new[]
+        {
+            "-i", source, "-map", "0:a:0", "-c", "copy", "-f", "hash", "-hash", "sha256", "-",
+        }), Timeout, capture: true, cancellationToken);
+
+        var text = System.Text.Encoding.ASCII.GetString(stdout).Trim();
+        var digest = text.StartsWith("SHA256=", StringComparison.Ordinal) ? text["SHA256=".Length..] : string.Empty;
+
+        if (digest.Length != 64)
+        {
+            throw new MediaToolException($"ffmpeg gave an unexpected hash: '{text}'");
+        }
+
+        return digest;
+    }
+
+    private static async Task<(int ExitCode, byte[] Stdout)> RunAsync(string executable, IEnumerable<string> arguments, TimeSpan timeout, bool capture, CancellationToken cancellationToken, Stream sink = null)
     {
         var info = new ProcessStartInfo(executable)
         {
@@ -214,7 +297,7 @@ public class MediaTool : IMediaTool
         var output = new MemoryStream();
         var stdout = capture
             ? process.StandardOutput.BaseStream.CopyToAsync(output, cts.Token)
-            : process.StandardOutput.BaseStream.CopyToAsync(Stream.Null, cts.Token);
+            : process.StandardOutput.BaseStream.CopyToAsync(sink ?? Stream.Null, cts.Token);
         var stderr = process.StandardError.ReadToEndAsync(cts.Token);
 
         try

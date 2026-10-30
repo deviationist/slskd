@@ -1,12 +1,17 @@
 # Player: analysis provider
 
-slskd's player can show what an external service found wrong with a track: a
-badge on the row, marks under the waveform where a problem sits, and a panel of
-findings. slskd does no analysis itself. It asks a **provider**, over HTTP, and
-draws the answer. With no provider configured none of this is shown, and the
-player works the same.
+slskd's player can show what is wrong with a track: a badge on the row, marks
+under the waveform where a problem sits, and a panel of findings. Off by
+default; `player.analysis.source` turns it on, with slskd's own analyser
+(`builtin`) or an external **provider** (`provider`), asked over HTTP. See
+[config.md](config.md#audio-analysis).
 
-This page is the contract a provider implements. The response's shape is also
+**This contract is slskd's.** slskd defines it here, along with its schema, and
+its own analyser answers in exactly this shape. A provider is any service that
+implements it as written; one that keeps a copy of the schema keeps it in step
+with this one, never the other way round.
+
+This page is the contract. The response's shape is also
 written as a JSON Schema in [`player-analysis-provider.schema.json`](player-analysis-provider.schema.json),
 which a provider can test itself against.
 

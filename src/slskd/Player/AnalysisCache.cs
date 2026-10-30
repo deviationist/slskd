@@ -143,9 +143,20 @@ public class AnalysisCache
     ///     Initializes a new instance of the <see cref="AnalysisCache"/> class.
     /// </summary>
     /// <param name="contextFactory">The transfers database context factory.</param>
-    public AnalysisCache(IDbContextFactory<TransfersDbContext> contextFactory)
+    /// <param name="optionsMonitor">The options, which say whether slskd's own analyser is the one answering.</param>
+    public AnalysisCache(IDbContextFactory<TransfersDbContext> contextFactory, Microsoft.Extensions.Options.IOptionsMonitor<Options> optionsMonitor = null)
     {
         ContextFactory = contextFactory;
+        OptionsMonitor = optionsMonitor;
+
+        // a change of source -- to the built-in analyser, or away from it -- is looked at again on next use
+        optionsMonitor?.OnChange((_, _) =>
+        {
+            lock (Lock)
+            {
+                Verdicts = null;
+            }
+        });
 
         // no daily tick on the clock: checked hourly, swept once a day has passed. a removed download is not listed,
         // so its analysis sitting there until then costs a few KB and shows nowhere
@@ -166,6 +177,10 @@ public class AnalysisCache
     }
 
     private IDbContextFactory<TransfersDbContext> ContextFactory { get; }
+    private Microsoft.Extensions.Options.IOptionsMonitor<Options> OptionsMonitor { get; }
+
+    // the version answers are made under now, when slskd knows it without asking: its own analyser's
+    private string Expected => OptionsMonitor?.CurrentValue.Player.Analysis.UsesBuiltin == true ? Builtin.BuiltinAnalyser.Version : null;
     private ILogger Log { get; } = Serilog.Log.ForContext<AnalysisCache>();
     private object Lock { get; } = new();
 
@@ -274,21 +289,9 @@ public class AnalysisCache
             // the provider has moved on: what it made under other rules is no longer its answer
             if (Version is not null && Version != version)
             {
-                var stale = context.Analyses.Where(a => a.Version != version).Select(a => a.Id).ToList();
-
-                if (stale.Count > 0)
+                foreach (var transferId in DropOtherVersions(context, version))
                 {
-                    var orphaned = context.DownloadAnalyses.Where(d => stale.Contains(d.AnalysisId)).Select(d => d.TransferId).ToList();
-
-                    context.DownloadAnalyses.Where(d => stale.Contains(d.AnalysisId)).ExecuteDelete();
-                    context.Analyses.Where(a => stale.Contains(a.Id)).ExecuteDelete();
-
-                    foreach (var transferId in orphaned)
-                    {
-                        verdicts.Remove(transferId);
-                    }
-
-                    Log.Information("The analysis provider is now {Version}, was {Previous}; dropped {Count} analyses made before", version, Version, stale.Count);
+                    verdicts.Remove(transferId);
                 }
             }
 
@@ -376,6 +379,25 @@ public class AnalysisCache
         }
     }
 
+    // drops every analysis not made under `version`, and the downloads' links to them; returns those downloads
+    private List<Guid> DropOtherVersions(TransfersDbContext context, string version)
+    {
+        var stale = context.Analyses.Where(a => a.Version != version).Select(a => a.Id).ToList();
+
+        if (stale.Count == 0)
+        {
+            return [];
+        }
+
+        var orphaned = context.DownloadAnalyses.Where(d => stale.Contains(d.AnalysisId)).Select(d => d.TransferId).ToList();
+
+        context.DownloadAnalyses.Where(d => stale.Contains(d.AnalysisId)).ExecuteDelete();
+        context.Analyses.Where(a => stale.Contains(a.Id)).ExecuteDelete();
+
+        Log.Information("Analyses are now made by {Version}; dropped {Count} made by another", version, stale.Count);
+        return orphaned;
+    }
+
     private static string StringAt(JsonElement element, params string[] path)
     {
         foreach (var name in path)
@@ -404,6 +426,14 @@ public class AnalysisCache
         }
 
         using var context = ContextFactory.CreateDbContext();
+
+        // slskd's own analyser has a version slskd knows, so what any other made -- an older version of it, or
+        // another source -- is dropped now, rather than when the first new answer happens to arrive
+        if (Expected is { } expected)
+        {
+            DropOtherVersions(context, expected);
+            Version = expected;
+        }
 
         Verdicts = context.DownloadAnalyses
             .Join(context.Analyses, d => d.AnalysisId, a => a.Id, (d, a) => new { d.TransferId, a.Level, a.Headline })

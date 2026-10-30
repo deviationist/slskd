@@ -3,6 +3,7 @@ namespace slskd.Tests.Unit.Player
     using System;
     using System.Collections.Generic;
     using System.IO;
+    using System.Linq;
     using System.Net;
     using System.Net.Http;
     using System.Text;
@@ -167,6 +168,60 @@ namespace slskd.Tests.Unit.Player
             Assert.Equal(0, kept);
         }
 
+        [Fact]
+        public async Task Analysis_is_off_until_a_source_is_chosen()
+        {
+            // a provider set up but not chosen: opt-in means nothing is asked until source says so
+            var options = new slskd.Options.PlayerOptions.PlayerAnalysisOptions
+            {
+                Provider = new slskd.Options.PlayerOptions.PlayerAnalysisProviderOptions { Url = "http://provider.invalid/contract", Token = "t" },
+            };
+
+            Assert.Equal("off", options.Source);
+            Assert.False(options.Enabled);
+            Assert.Equal(AnalysisState.Off, (await Provider(source: "off").GetAsync(Track)).State);
+            Assert.Empty(Requests);
+        }
+
+        [Fact]
+        public async Task The_builtin_analyser_answers_without_asking_anyone_and_wherever_the_file_is()
+        {
+            // outside every root: the roots name folders to a provider elsewhere, and slskd's own analyser needs none
+            var outside = new FileInfo(Path.Combine(Temp, "elsewhere.flac"));
+            File.WriteAllBytes(outside.FullName, new byte[] { 1 });
+            var tool = new FakeMediaTool
+            {
+                Probe = """{ "streams": [ { "codec_name": "flac", "sample_rate": "44100", "channels": 1, "bits_per_raw_sample": "16" } ], "format": { "duration": "1" } }""",
+                DecodedPcm = Enumerable.Range(0, 44100).SelectMany(n => BitConverter.GetBytes((short)(8000 * Math.Sin(n / 7.0)))).ToArray(),
+            };
+
+            var answer = await Provider(source: "builtin", builtin: new slskd.Player.Builtin.BuiltinAnalyser(tool)).GetAsync(outside);
+
+            Assert.Equal(AnalysisState.Ready, answer.State);
+            Assert.Equal("slskd", answer.Analysis.Value.GetProperty("provider").GetProperty("name").GetString());
+            Assert.Empty(Requests);
+        }
+
+        [Fact]
+        public async Task A_file_the_builtin_analyser_cannot_decode_has_nothing_to_show()
+        {
+            var answer = await Provider(source: "builtin", builtin: new slskd.Player.Builtin.BuiltinAnalyser(new FakeMediaTool { Probe = "{}" })).GetAsync(Track);
+
+            Assert.Equal(AnalysisState.Unavailable, answer.State);
+        }
+
+        [Theory]
+        [InlineData("off", true)]
+        [InlineData("builtin", true)]
+        [InlineData("provider", false)]
+        [InlineData("both", false)]
+        public void A_source_is_one_of_three_and_provider_needs_a_url(string source, bool valid)
+        {
+            var options = new slskd.Options.PlayerOptions.PlayerAnalysisOptions { Source = source };
+
+            Assert.Equal(valid, !options.Validate(new System.ComponentModel.DataAnnotations.ValidationContext(options)).Any());
+        }
+
         [Theory]
         [InlineData(HttpStatusCode.Forbidden, AnalysisState.None)]
         [InlineData(HttpStatusCode.NotFound, AnalysisState.None)]
@@ -178,7 +233,7 @@ namespace slskd.Tests.Unit.Player
         private static HttpResponseMessage Json(HttpStatusCode status, string body)
             => new(status) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
 
-        private AnalysisProvider Provider(string url = "http://provider.invalid/contract", Task hold = null, Action<Guid, System.Text.Json.JsonElement> keep = null)
+        private AnalysisProvider Provider(string url = "http://provider.invalid/contract", Task hold = null, Action<Guid, System.Text.Json.JsonElement> keep = null, string source = null, slskd.Player.Builtin.BuiltinAnalyser builtin = null)
         {
             var handler = new Handler(async request =>
             {
@@ -201,6 +256,7 @@ namespace slskd.Tests.Unit.Player
                 {
                     Analysis = new slskd.Options.PlayerOptions.PlayerAnalysisOptions
                     {
+                        Source = source ?? (url is null ? "off" : "provider"),
                         Provider = new slskd.Options.PlayerOptions.PlayerAnalysisProviderOptions
                         {
                             Url = url,
@@ -209,7 +265,7 @@ namespace slskd.Tests.Unit.Player
                         },
                     },
                 },
-            }), keep is null ? null : new KeepingCache(keep));
+            }), keep is null ? null : new KeepingCache(keep), builtin);
         }
 
         // the cache, standing in for the database: what was kept, as it was handed over
