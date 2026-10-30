@@ -56,6 +56,11 @@ public enum NotificationEvent
     RoomMention,
 
     /// <summary>
+    ///     A room message that has gone unread.
+    /// </summary>
+    RoomMessage,
+
+    /// <summary>
     ///     New results for a search watch.
     /// </summary>
     WatchResults,

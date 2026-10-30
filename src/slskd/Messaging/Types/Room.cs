@@ -64,6 +64,12 @@ namespace slskd.Messaging
         public string Owner { get; set; }
 
         /// <summary>
+        ///     A value indicating whether the room exists only here, made by a simulated message (see the
+        ///     <c>room-simulation</c> flag): it is never joined on the server, and nothing said in it leaves slskd.
+        /// </summary>
+        public bool IsSimulated { get; set; }
+
+        /// <summary>
         ///     The list of users in the room.
         /// </summary>
         public IList<UserData> Users { get; set; } = new List<UserData>();

@@ -1,11 +1,13 @@
 import './Rooms.css';
 import RoomJoinModal from './RoomJoinModal';
+import { useRoomsUnread } from './RoomsUnreadContext';
 import React from 'react';
 import { Button, Icon, Menu } from 'semantic-ui-react';
 
 const RoomMenu = ({ active, joined, onRoomChange, ...rest }) => {
   const names = [...joined];
   const isActive = (name) => active === name;
+  const { countOf } = useRoomsUnread();
 
   return (
     <Menu
@@ -26,6 +28,14 @@ const RoomMenu = ({ active, joined, onRoomChange, ...rest }) => {
             size="tiny"
           />
           {name}
+          {!isActive(name) && countOf(name) > 0 && (
+            <span
+              className="room-menu-count"
+              title={`${countOf(name)} unread`}
+            >
+              {countOf(name)}
+            </span>
+          )}
         </Menu.Item>
       ))}
       <Menu.Menu position="right">

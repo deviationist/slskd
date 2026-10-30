@@ -1501,7 +1501,7 @@ integrations:
 ## Notifications
 
 Notifications tell the operator something on the channels they choose: a private message gone unread, new results for a search watch, a
-mention in a room, or a problem. Each event is switched on and routed on its own. Two channels exist:
+mention in a room or a message there, or a problem. Each event is switched on and routed on its own. Two channels exist:
 
 * **`mail`**, through the [mail](#mail) settings above. It is on whenever mail is.
 * **`ntfy`**, a push to a phone or desktop through an [ntfy](https://ntfy.sh) server: `ntfy.sh` or one of your own. It is on when it has a
@@ -1513,6 +1513,7 @@ An event's `channels` names the channels it goes to; an event that names none go
 | ----- | -------- | --------------- |
 | `private_message` | A private message still unread `delay` seconds after it arrived, at most once per conversation until it is read. Nothing is sent while you are in the conversation, since the Chat page reads it as it arrives. What was already unread when slskd started is not notified again when the server replays it | yes |
 | `room_mention` | A message in a joined room that names your username as a word of its own, at most once per room every 10 minutes | yes |
+| `room_message` | A message in a joined room still unread `delay` seconds after it arrived, at most once per room until the room is read, and only from the `rooms` named (none named: every room joined). Nothing is sent while you have the room open on the Rooms page in view. A message that mentions you is left to `room_mention` when that is on | yes |
 | `watch_results` | A search watch's new results: the full table by mail, as before, and a line on other channels | no, so existing watches keep mailing |
 | `connection_lost` | The Soulseek connection down for `after` minutes while slskd is trying to reconnect, and again when it is back. A disconnect you asked for is not notified | yes |
 | `share_scan_failed` | A share scan that failed | yes |
@@ -1540,6 +1541,11 @@ integrations:
       room_mention:
         enabled: true
         channels: [ntfy]
+      room_message:
+        enabled: true
+        channels: [ntfy]
+        delay: 60 # seconds a room must stay unread
+        rooms: [] # every room joined
       watch_results:
         enabled: true
         channels: [] # every enabled channel
@@ -1913,6 +1919,13 @@ Several additional feature flags are provided to change the application's runtim
 | `--volatile`                     | `SLSKD_VOLATILE`                     | Use volatile data storage (all data will be lost at shutdown)    |
 | `--case-sensitive-regex`         | `SLSKD_CASE_SENSITIVE_REGEX`         | User-defined regular expressions are case sensitive              |
 | `--legacy-windows-tcp-keepalive` | `SLSKD_LEGACY_WINDOWS_TCP_KEEPALIVE` | Use a legacy TCP keepalive strategy for older Windows versions   |
+| `--room-simulation`              | `SLSKD_ROOM_SIMULATION`              | Allow simulated room messages through the API (see below)        |
+
+With `room_simulation` on, `POST /api/v0/rooms/simulated` with `{ "roomName": "practice", "username": "alice", "message": "hello" }`
+takes in a room message as though the server had sent it: it is shown, counted unread and notified like a real one, so the Rooms badge and
+`room_message` notifications can be tried without joining a room or waiting for anyone to post. A room not joined is made and shown as a test
+room; it exists only in slskd, is never joined on the server, and what you send to it goes nowhere. Leave it as any other room. Without the
+flag the endpoint does not exist.
 
 #### **YAML**
 ```yaml
@@ -1931,6 +1944,7 @@ flags:
   volatile: false
   case_sensitive_reg_ex: false
   legacy_windows_tcp_keepalive: false
+  room_simulation: false
 ```
 
 # Commands

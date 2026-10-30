@@ -656,6 +656,7 @@ namespace slskd
                 // and for the notifiers, which subscribe to the events they notify when they are constructed
                 _ = app.Services.GetService<slskd.Integrations.Notifications.PrivateMessageNotifier>();
                 _ = app.Services.GetService<slskd.Integrations.Notifications.RoomMentionNotifier>();
+                _ = app.Services.GetService<slskd.Integrations.Notifications.RoomMessageNotifier>();
                 _ = app.Services.GetService<slskd.Integrations.Notifications.ProblemNotifier>();
                 _ = app.Services.GetService<VPNService>();
                 _ = app.Services.GetService<TelemetryService>();
@@ -796,6 +797,7 @@ namespace slskd
             services.AddSingleton<slskd.Integrations.Notifications.NotificationService>();
             services.AddSingleton<slskd.Integrations.Notifications.PrivateMessageNotifier>();
             services.AddSingleton<slskd.Integrations.Notifications.RoomMentionNotifier>();
+            services.AddSingleton<slskd.Integrations.Notifications.RoomMessageNotifier>();
             services.AddSingleton<slskd.Integrations.Notifications.ProblemNotifier>();
 
             services.AddSingleton<slskd.Search.Watches.WatchService>();

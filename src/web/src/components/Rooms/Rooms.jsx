@@ -5,6 +5,7 @@ import { browsePath, userPath } from '../../lib/users';
 import PlaceholderSegment from '../Shared/PlaceholderSegment';
 import Timestamp from '../Shared/Timestamp';
 import RoomMenu from './RoomMenu';
+import RoomsUnreadContext from './RoomsUnreadContext';
 import RoomUserList from './RoomUserList';
 import React, { Component, createRef } from 'react';
 import { withRouter } from 'react-router-dom';
@@ -35,6 +36,8 @@ const initialState = {
   },
   joined: [],
   loading: false,
+  // the open room exists only in slskd, made by a simulated message
+  simulated: false,
   message: '',
   room: {
     messages: [],
@@ -98,6 +101,23 @@ class Rooms extends Component {
     );
   }
 
+  // the open room is read the moment the server says it has anything unread,
+  // as Chat does with the open conversation -- but only while the page can be
+  // seen: a room left open in a tab in the background is not being read, and
+  // its messages should stay unread, and be notified. The page re-renders
+  // every second, so it is read as soon as it comes back into view
+  componentDidUpdate() {
+    const { active } = this.state;
+
+    if (
+      active &&
+      document.visibilityState === 'visible' &&
+      this.context.countOf(active) > 0
+    ) {
+      this.context.markRead(active);
+    }
+  }
+
   componentWillUnmount() {
     this.unregisterPullRefresh?.();
     const { messages: messagesInterval, rooms: roomsInterval } =
@@ -110,6 +130,10 @@ class Rooms extends Component {
 
     this.setState({ intervals: initialState.intervals });
   }
+
+  // what is unread comes from the server's pushed state, shared with the
+  // menu's badge
+  static contextType = RoomsUnreadContext;
 
   listRef = createRef();
 
@@ -161,6 +185,17 @@ class Rooms extends Component {
         const { active } = this.state;
 
         sessionStorage.setItem(activeRoomKey, active);
+
+        if (active) {
+          try {
+            const { isSimulated } = await rooms.get({ roomName: active });
+            if (this.state.active === active) {
+              this.setState({ simulated: Boolean(isSimulated) });
+            }
+          } catch {
+            this.setState({ simulated: false });
+          }
+        }
 
         await this.fetchActiveRoom();
         this.setState({ loading: false }, () => {
@@ -294,7 +329,7 @@ class Rooms extends Component {
   }
 
   render() {
-    const { active = [], joined = [], loading, room } = this.state;
+    const { active = [], joined = [], loading, room, simulated } = this.state;
 
     return (
       <div className="rooms">
@@ -328,10 +363,18 @@ class Rooms extends Component {
             <Card.Content onClick={() => this.focusInput()}>
               <Card.Header>
                 <Icon
-                  color="green"
+                  color={simulated ? 'grey' : 'green'}
                   name="circle"
                 />
                 {active}
+                {simulated && (
+                  <span
+                    className="room-simulated"
+                    title="Made by a simulated message: it exists only in slskd, and nothing said here leaves it"
+                  >
+                    test room
+                  </span>
+                )}
                 <Icon
                   className="close-button"
                   color="red"

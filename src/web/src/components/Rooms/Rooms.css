@@ -165,3 +165,31 @@
     height: calc(100dvh - var(--mobile-nav-bottom) - var(--top-bar-height) - 220px);
   }
 }
+
+/* what is unread in a room other than the open one, beside its name */
+.room-menu-count {
+  display: inline-block;
+  margin-left: 0.5em;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 0.75em;
+  font-weight: bold;
+  line-height: 18px;
+  text-align: center;
+  color: #fff;
+  background: #db2828;
+  border-radius: 9px;
+}
+
+/* a room made by a simulated message, which exists only in slskd */
+.room-simulated {
+  margin-left: 0.6em;
+  padding: 0 0.5em;
+  font-size: 0.6em;
+  font-weight: normal;
+  vertical-align: middle;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  opacity: 0.7;
+}
