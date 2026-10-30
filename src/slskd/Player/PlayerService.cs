@@ -78,6 +78,8 @@ public class PlayerService
     {
         OptionsMonitor = optionsMonitor;
         MediaTool = mediaTool;
+
+        Clock.EveryHour += (_, _) => Task.Run(ExpireNow);
     }
 
     /// <summary>
@@ -151,6 +153,80 @@ public class PlayerService
                 // logged by nobody: trimming is best effort
             }
         }
+    }
+
+    /// <summary>
+    ///     Drops the transcodes unused for longer than <paramref name="unused"/>, with their receipts.
+    /// </summary>
+    /// <remarks>
+    ///     Nearly all of the cache is transcodes, and they are the cheapest thing in it to make again: a few seconds
+    ///     on the next play. Every hit touches its entry, so the age is time since last use. A transcode of a file
+    ///     that has since gone -- moved by the pipeline, deleted by hand -- is reached by nothing, and this is what
+    ///     clears it. Waveforms are left to the capacity.
+    /// </remarks>
+    /// <param name="root">The cache directory.</param>
+    /// <param name="unused">How long a transcode may go unused.</param>
+    /// <param name="now">The time now.</param>
+    /// <returns>The number of transcodes dropped.</returns>
+    public static int Expire(string root, TimeSpan unused, DateTime now)
+    {
+        FileInfo[] entries;
+
+        try
+        {
+            entries = new DirectoryInfo(root).GetFiles();
+        }
+        catch (IOException)
+        {
+            return 0;
+        }
+
+        var dropped = 0;
+
+        foreach (var codec in Codecs.ByName.Values)
+        {
+            foreach (var entry in entries.Where(f => IsKeyed(f.Name, codec.Suffix) && now - f.LastWriteTimeUtc > unused))
+            {
+                var key = entry.Name[..^codec.Suffix.Length];
+                TryDelete(entry.FullName);
+                TryDelete(Path.Combine(root, $"{key}.audio.{codec.Name}.json"));
+                dropped++;
+            }
+        }
+
+        return dropped;
+    }
+
+    /// <summary>
+    ///     Drops everything cached for <paramref name="source"/>, before it is deleted: once it is gone, its identity
+    ///     -- path, size and modification time -- can no longer be worked out, and nothing could find these again.
+    /// </summary>
+    /// <param name="source">The file about to be deleted.</param>
+    /// <returns>The number of entries dropped.</returns>
+    public int Forget(FileInfo source)
+    {
+        if (!source.Exists)
+        {
+            return 0;
+        }
+
+        var key = Identity(source);
+        var dropped = 0;
+
+        try
+        {
+            foreach (var entry in new DirectoryInfo(CacheDirectory).GetFiles($"{key}.*"))
+            {
+                TryDelete(entry.FullName);
+                dropped++;
+            }
+        }
+        catch (IOException ex)
+        {
+            Log.Warning("Cannot drop the cached copies of {File}: {Message}", source.Name, ex.Message);
+        }
+
+        return dropped;
     }
 
     /// <summary>
@@ -269,6 +345,35 @@ public class PlayerService
 
             Evict(root, Capacity);
             return (destination, codec.ContentType);
+        }
+    }
+
+    // an entry named by an identity: 32 hex digits, then the suffix
+    private static bool IsKeyed(string name, string suffix)
+        => name.Length == 32 + suffix.Length && name.EndsWith(suffix, StringComparison.Ordinal)
+            && name[..32].All(Uri.IsHexDigit);
+
+    private void ExpireNow()
+    {
+        var days = OptionsMonitor.CurrentValue.Player.Cache.Ttl;
+
+        if (days <= 0 || !Directory.Exists(CacheDirectory))
+        {
+            return;
+        }
+
+        try
+        {
+            var dropped = Expire(CacheDirectory, TimeSpan.FromDays(days), DateTime.UtcNow);
+
+            if (dropped > 0)
+            {
+                Log.Information("Dropped {Count} transcodes unused for {Days} days", dropped, days);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning("Could not expire the player cache: {Message}", ex.Message);
         }
     }
 

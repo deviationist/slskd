@@ -229,8 +229,12 @@ player:
   ffprobe: ffprobe
   cache:
     directory: ~      # default: player-cache under the application's data directory
-    capacity: 2048    # megabytes
+    capacity: 2048    # megabytes; least recently used dropped first
+    ttl: 30           # days a transcode is kept unused; 0 keeps them to the capacity
 ```
+
+A track's waveform and transcodes are dropped with it when slskd deletes its file. Transcodes of files that went any other way -- moved, or deleted
+by hand -- are unused from then on, and go with the `ttl`.
 
 ### Analysis Provider
 

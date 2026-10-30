@@ -449,6 +449,13 @@ namespace slskd
                 /// </summary>
                 [Range(64, int.MaxValue)]
                 public int Capacity { get; init; } = 2048;
+
+                /// <summary>
+                ///     Gets the days a transcode is kept unused before it is dropped; 0 keeps them until the capacity is
+                ///     reached. Waveforms are a few KB each and are left to the capacity.
+                /// </summary>
+                [Range(0, 3650)]
+                public int Ttl { get; init; } = 30;
             }
 
             /// <summary>
