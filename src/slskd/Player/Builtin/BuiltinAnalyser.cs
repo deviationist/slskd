@@ -97,15 +97,28 @@ public partial class BuiltinAnalyser
 
         var measurer = new Measurer(facts, channels, full);
 
-        using (var sink = new PcmSink(measurer, format, channels))
+        // the checksum is a second read of the whole file, so it is taken while the decode runs rather than after it:
+        // a third of the time on a file where the read is the slow part. awaited either way, so a failure of one is
+        // never left unobserved behind the other
+        var checksum = MediaTool.HashAudioAsync(file.FullName, cancellationToken);
+
+        try
         {
-            await MediaTool.DecodeToAsync(file.FullName, facts.SampleRate, channels, format, sink, cancellationToken);
+            using (var sink = new PcmSink(measurer, format, channels))
+            {
+                await MediaTool.DecodeToAsync(file.FullName, facts.SampleRate, channels, format, sink, cancellationToken);
+            }
+        }
+        catch
+        {
+            await checksum.ContinueWith(_ => { }, TaskScheduler.Default);
+            throw;
         }
 
         var measurements = measurer.Finish();
-        var checksum = await MediaTool.HashAudioAsync(file.FullName, cancellationToken);
+        var id = $"{await checksum}-{Version}";
 
-        return Report.Document(measurements, $"{checksum}-{Version}");
+        return Report.Document(measurements, id);
     }
 
     /// <summary>
@@ -245,9 +258,9 @@ public partial class BuiltinAnalyser
         public PcmSink(Measurer measurer, string format, int channels)
         {
             Measurer = measurer;
-            Format = format;
             Channels = channels;
             Width = format == "s16le" ? 2 : 4;
+            Kind = format switch { "s16le" => 0, "s32le" => 1, _ => 2 };
             Full = format switch { "s32le" => (float)Math.Pow(2, 31), "s16le" => 32768f, _ => 1f };
             Carry = new byte[Width * channels];
         }
@@ -259,9 +272,11 @@ public partial class BuiltinAnalyser
         public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
 
         private Measurer Measurer { get; }
-        private string Format { get; }
         private int Channels { get; }
         private int Width { get; }
+
+        // the format as a number, so the per-sample switch is not a string comparison
+        private int Kind { get; }
         private float Full { get; }
         private byte[] Carry { get; }
         private int Carried { get; set; }
@@ -328,12 +343,12 @@ public partial class BuiltinAnalyser
 
         private (float Value, long Integer) Sample(ReadOnlySpan<byte> bytes)
         {
-            switch (Format)
+            switch (Kind)
             {
-                case "s16le":
+                case 0:
                     var s16 = BinaryPrimitives.ReadInt16LittleEndian(bytes);
                     return (s16 / Full, s16);
-                case "s32le":
+                case 1:
                     var s32 = BinaryPrimitives.ReadInt32LittleEndian(bytes);
                     return ((float)s32 / Full, s32);
                 default:
