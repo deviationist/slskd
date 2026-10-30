@@ -79,6 +79,13 @@ public enum Unplayable
 ///         downloads directory pointing out of it. Followed at every level of the path (<see cref="RealPath"/>), not
 ///         only the last: a link to a folder on the way leaves the path as written inside the directory.
 ///     </para>
+///     <para>
+///         The file is then opened by name again, by ffmpeg or the file server, so a folder swapped for a link between
+///         the check and the open is not caught here. That is deliberate: only something that can already write the
+///         downloads directory as this application's user can make the swap, and it would gain nothing it does not
+///         have -- the file is read as that same user. media-bridge, which reads these files as a different user on
+///         slskd's behalf, does close it, by opening once and handing ffmpeg the open file.
+///     </para>
 /// </remarks>
 public static class PlayableFile
 {

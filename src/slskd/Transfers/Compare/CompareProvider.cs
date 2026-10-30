@@ -125,6 +125,13 @@ public class CompareProvider
     /// </summary>
     public const string RefusedByProvider = "The compare provider will not compare these files; the server log says why";
 
+    /// <summary>
+    ///     The most comparisons waiting for, or being answered by, the provider at once. A new one past this is told
+    ///     to try again rather than queued: each can be a dozen decodes, and a queue would only hold work for callers
+    ///     who have stopped waiting.
+    /// </summary>
+    public const int MaximumInFlight = 3;
+
     // how soon a caller that did not wait is told to ask again
     private const int PollAfter = 3;
 
@@ -165,6 +172,10 @@ public class CompareProvider
         {
             HttpStatusCode.OK => (CompareState.Ready, TimeSpan.FromDays(1)),
             HttpStatusCode.Accepted => (CompareState.Pending, null),
+
+            // the provider is busy with other comparisons: the same as still working on this one, from where the
+            // browser stands -- ask again after the time it gives, and keep nothing
+            HttpStatusCode.TooManyRequests => (CompareState.Pending, null),
 
             // the request itself is wrong for this provider -- too many files, too few -- so the same one will be
             // refused again; not kept, because a change of the provider's limit should be seen at once
@@ -238,6 +249,11 @@ public class CompareProvider
         if (Answers.TryGetValue(key, out CompareAnswer cached))
         {
             return cached;
+        }
+
+        if (!InFlight.ContainsKey(key) && InFlight.Count >= MaximumInFlight)
+        {
+            return new CompareAnswer(CompareState.Unavailable, Reason: $"slskd is already comparing {MaximumInFlight} sets of files; try again shortly");
         }
 
         var lazy = InFlight.GetOrAdd(key, _ => new Lazy<Task<CompareAnswer>>(() => AskAndKeepAsync(key, located, files)));

@@ -217,10 +217,61 @@ namespace slskd.Tests.Unit.Transfers.Compare
             Assert.Single(Requests);
         }
 
+        [Fact]
+        public async Task A_busy_provider_is_waited_for_as_pending_and_nothing_is_kept()
+        {
+            var busy = Json(HttpStatusCode.TooManyRequests, "{\"error\":\"2 comparisons are already running\"}");
+            busy.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(TimeSpan.FromSeconds(15));
+            Responses.Enqueue(busy);
+            Responses.Enqueue(Json(HttpStatusCode.OK, Document));
+            var provider = Provider();
+
+            var first = await provider.GetAsync([A, B]);
+            var second = await provider.GetAsync([A, B]);
+
+            Assert.Equal((CompareState.Pending, 15), (first.State, first.RetryAfter));
+            Assert.Equal(CompareState.Ready, second.State);
+            Assert.Equal(2, Requests.Count);
+        }
+
+        [Fact]
+        public async Task Past_the_limit_a_new_comparison_is_turned_away_and_never_sent()
+        {
+            var gate = new TaskCompletionSource();
+            var provider = Provider(hold: gate.Task);
+            var sets = Enumerable.Range(0, CompareProvider.MaximumInFlight + 1)
+                .Select(i => new[] { A, Write(Path.Combine(Downloads, $"other-{i}.flac"), 2) })
+                .ToList();
+
+            for (var i = 0; i < CompareProvider.MaximumInFlight; i++)
+            {
+                Responses.Enqueue(Json(HttpStatusCode.OK, Document));
+                Assert.Equal(CompareState.Pending, (await provider.GetAsync(sets[i], wait: false)).State);
+            }
+
+            var turnedAway = await provider.GetAsync(sets[^1], wait: false);
+            var joined = await provider.GetAsync(sets[0], wait: false);
+
+            Assert.Equal(CompareState.Unavailable, turnedAway.State);
+            Assert.Contains("already comparing", turnedAway.Reason);
+            Assert.Equal(CompareState.Pending, joined.State);
+
+            // one goes to the provider at a time; the limit is on those waiting as well as the one being answered
+            gate.SetResult();
+
+            foreach (var set in sets.Take(CompareProvider.MaximumInFlight))
+            {
+                Assert.Equal(CompareState.Ready, (await provider.GetAsync(set)).State);
+            }
+
+            Assert.Equal(CompareProvider.MaximumInFlight, Requests.Count);
+        }
+
         [Theory]
         [InlineData(HttpStatusCode.OK, CompareState.Ready)]
         [InlineData(HttpStatusCode.Accepted, CompareState.Pending)]
         [InlineData(HttpStatusCode.BadRequest, CompareState.Refused)]
+        [InlineData(HttpStatusCode.TooManyRequests, CompareState.Pending)]
         [InlineData(HttpStatusCode.ServiceUnavailable, CompareState.Unavailable)]
         [InlineData(HttpStatusCode.BadGateway, CompareState.Unavailable)]
         public void Each_status_means_what_the_contract_says(HttpStatusCode status, CompareState state)
