@@ -1595,6 +1595,7 @@ and each is switched on by itself.
 | `url` | OneTagger's address, as a browser reaches it. Needed by either of the others |
 | `downloads` | slskd's downloads directory as OneTagger sees it, when it sees it under another path: in another container, or on another host (a Windows path such as `D:\Music\slskd` works). Unset, OneTagger is taken to see it where slskd does |
 | `menu` | A OneTagger item in the menu, opening it in a new tab. Works with `enabled` off |
+| `menu_opens` | Where that item goes: `downloads` (the default), the Tag Editor on the downloads directory, to browse what has been downloaded; or `home`, OneTagger as it opens by itself |
 
 The download is opened by address: `<url>/#/tageditor?path=<folder>&file=<file>`, the folder and file in OneTagger's terms. Reading that address is
 not in OneTagger itself but in a fork of it, [deviationist/onetagger](https://github.com/deviationist/onetagger); an upstream OneTagger
@@ -1609,6 +1610,7 @@ integrations:
     url: https://onetagger.example
     downloads: /downloads # where OneTagger's container mounts slskd's downloads
     menu: true
+    menu_opens: downloads # or home
 ```
 
 ## User-Defined

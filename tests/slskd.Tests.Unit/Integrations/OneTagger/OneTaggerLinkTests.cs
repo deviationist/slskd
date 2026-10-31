@@ -72,4 +72,16 @@ public class OneTaggerLinkTests
 
         Assert.Equal(valid, !options.Validate(new ValidationContext(options)).Any());
     }
+
+    [Theory]
+    [InlineData("downloads", true)]
+    [InlineData("home", true)]
+    [InlineData("Downloads", false)]
+    [InlineData("library", false)]
+    public void The_menu_opens_the_downloads_or_home(string opens, bool valid)
+    {
+        var options = new OneTaggerOptions { Menu = true, Url = "https://ot.example", MenuOpens = opens };
+
+        Assert.Equal(valid, !options.Validate(new ValidationContext(options)).Any());
+    }
 }

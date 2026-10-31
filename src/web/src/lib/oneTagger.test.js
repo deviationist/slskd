@@ -1,6 +1,7 @@
 import { isEnabled, isOpenable, menuUrl } from './oneTagger';
 
 const on = (settings) => ({ integrations: { oneTagger: settings } });
+const home = (settings) => on({ menuOpens: 'home', ...settings });
 
 describe('isEnabled', () => {
   it('wants OneTagger enabled and an address', () => {
@@ -14,15 +15,37 @@ describe('isEnabled', () => {
 
 describe('menuUrl', () => {
   it('is OneTagger itself where the menu is to carry it, and nothing otherwise', () => {
-    expect(menuUrl(on({ menu: true, url: 'https://ot/' }))).toBe('https://ot');
-    // the menu link stands on its own: it needs no download integration
-    expect(menuUrl(on({ enabled: false, menu: true, url: 'https://ot' }))).toBe(
+    expect(menuUrl(home({ menu: true, url: 'https://ot/' }))).toBe(
       'https://ot',
     );
+    // the menu link stands on its own: it needs no download integration
+    expect(
+      menuUrl(home({ enabled: false, menu: true, url: 'https://ot' })),
+    ).toBe('https://ot');
     expect(
       menuUrl(on({ enabled: true, menu: false, url: 'https://ot' })),
     ).toBeNull();
     expect(menuUrl(undefined)).toBeNull();
+  });
+
+  it('opens the Tag Editor on the downloads, as OneTagger sees them, by default', () => {
+    expect(
+      menuUrl(
+        on({ menu: true, url: 'https://ot/', downloads: '/music/slskd/' }),
+      ),
+    ).toBe('https://ot/#/tageditor?path=%2Fmusic%2Fslskd');
+    expect(
+      menuUrl(on({ menu: true, url: 'https://ot', downloads: 'D:\\Music\\' })),
+    ).toBe('https://ot/#/tageditor?path=D%3A%5CMusic');
+  });
+
+  it("takes slskd's own downloads directory when OneTagger sees it there too", () => {
+    expect(
+      menuUrl({
+        directories: { downloads: '/app/downloads/complete' },
+        integrations: { oneTagger: { menu: true, url: 'https://ot' } },
+      }),
+    ).toBe('https://ot/#/tageditor?path=%2Fapp%2Fdownloads%2Fcomplete');
   });
 });
 
