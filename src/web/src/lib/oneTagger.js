@@ -17,12 +17,28 @@ export const isEnabled = (options) =>
   settings(options)?.enabled === true && Boolean(settings(options)?.url);
 
 /**
- * OneTagger's address for the menu, or null when the menu leaves it out.
+ * Where the menu link goes, or null when the menu leaves it out: the Tag
+ * Editor on slskd's downloads directory, as OneTagger sees it, unless the menu
+ * is to open OneTagger as it opens by itself (menuOpens: home).
  */
-export const menuUrl = (options) =>
-  settings(options)?.menu === true && settings(options)?.url
-    ? settings(options).url.replace(/\/+$/u, '')
-    : null;
+export const menuUrl = (options) => {
+  const { menu, menuOpens, url } = settings(options) ?? {};
+
+  if (menu !== true || !url) {
+    return null;
+  }
+
+  const home = url.replace(/\/+$/u, '');
+  const downloads = (
+    settings(options).downloads ??
+    options?.directories?.downloads ??
+    ''
+  ).replace(/(?<=.)[/\\]+$/u, '');
+
+  return menuOpens === 'home' || !downloads
+    ? home
+    : `${home}/#/tageditor?path=${encodeURIComponent(downloads)}`;
+};
 
 /**
  * Whether a download can be opened: finished, its file recorded and not known

@@ -3113,11 +3113,22 @@ namespace slskd
                 /// </summary>
                 public bool Menu { get; init; } = false;
 
+                /// <summary>
+                ///     Gets where the menu link opens: <c>downloads</c>, the Tag Editor on slskd's downloads directory, or
+                ///     <c>home</c>, OneTagger as it opens by itself.
+                /// </summary>
+                public string MenuOpens { get; init; } = "downloads";
+
                 public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
                 {
                     if (!Enabled && !Menu)
                     {
                         yield break;
+                    }
+
+                    if (MenuOpens is not ("downloads" or "home"))
+                    {
+                        yield return new ValidationResult($"The {nameof(MenuOpens)} field must be downloads or home");
                     }
 
                     if (!Uri.TryCreate(Url, UriKind.Absolute, out var url) || (url.Scheme != Uri.UriSchemeHttp && url.Scheme != Uri.UriSchemeHttps))
