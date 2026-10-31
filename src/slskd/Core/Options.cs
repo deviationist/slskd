@@ -3081,6 +3081,60 @@ namespace slskd
             public NotificationsOptions Notifications { get; init; } = new NotificationsOptions();
 
             /// <summary>
+            ///     Gets OneTagger options.
+            /// </summary>
+            [Validate]
+            public OneTaggerOptions OneTagger { get; init; } = new OneTaggerOptions();
+
+            /// <summary>
+            ///     OneTagger, running as a service of its own: a finished download can be opened in its Tag Editor, and
+            ///     the menu can carry a link to it. Off by default.
+            /// </summary>
+            public class OneTaggerOptions : IValidatableObject
+            {
+                /// <summary>
+                ///     Gets a value indicating whether downloads can be opened in OneTagger.
+                /// </summary>
+                public bool Enabled { get; init; } = false;
+
+                /// <summary>
+                ///     Gets OneTagger's address, as a browser reaches it, e.g. https://onetagger.example.
+                /// </summary>
+                public string Url { get; init; } = null;
+
+                /// <summary>
+                ///     Gets slskd's downloads directory as OneTagger sees it, when it sees it under another path -- in
+                ///     another container, or on another host. Unset, OneTagger is taken to see it where slskd does.
+                /// </summary>
+                public string Downloads { get; init; } = null;
+
+                /// <summary>
+                ///     Gets a value indicating whether the menu carries a link to OneTagger.
+                /// </summary>
+                public bool Menu { get; init; } = false;
+
+                public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+                {
+                    if (!Enabled && !Menu)
+                    {
+                        yield break;
+                    }
+
+                    if (!Uri.TryCreate(Url, UriKind.Absolute, out var url) || (url.Scheme != Uri.UriSchemeHttp && url.Scheme != Uri.UriSchemeHttps))
+                    {
+                        yield return new ValidationResult($"The {nameof(Url)} field must contain a fully qualified URL, including protocol (e.g. https://)");
+                    }
+
+                    // OneTagger may run on another system than slskd's, so a path in its terms is absolute in either
+                    // form rather than in this system's alone
+                    if (Downloads is not null && !Downloads.StartsWith('/') && !System.Text.RegularExpressions.Regex.IsMatch(Downloads, @"^[A-Za-z]:[\\/]"))
+                    {
+                        yield return new ValidationResult($"The {nameof(Downloads)} field must be an absolute path, as OneTagger sees it");
+                    }
+                }
+            }
+
+            /// <summary>
             ///     VPN options.
             /// </summary>
             public class VpnOptions : IValidatableObject

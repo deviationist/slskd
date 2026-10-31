@@ -1583,6 +1583,32 @@ integrations:
         enabled: true
 ```
 
+## OneTagger
+
+[OneTagger](https://onetagger.github.io) tags music files from Beatport, Discogs and other sources. When it runs as a service of its own,
+a finished download can be opened in its Tag Editor from the Downloads page, and the menu can carry a link to it. Both are off by default,
+and each is switched on by itself.
+
+| Setting | Means |
+| ------- | ----- |
+| `enabled` | A OneTagger button beside each finished audio download, opening it in the Tag Editor in a new tab |
+| `url` | OneTagger's address, as a browser reaches it. Needed by either of the others |
+| `downloads` | slskd's downloads directory as OneTagger sees it, when it sees it under another path: in another container, or on another host (a Windows path such as `D:\Music\slskd` works). Unset, OneTagger is taken to see it where slskd does |
+| `menu` | A OneTagger item in the menu, opening it in a new tab. Works with `enabled` off |
+
+The download is opened by address: `<url>/#/tageditor?path=<folder>&file=<file>`, the folder and file in OneTagger's terms. A OneTagger that
+does not read the address opens on its Tag Editor as it last was. OneTagger has to be able to read the downloads, and to write them to
+save tags.
+
+```yaml
+integrations:
+  onetagger:
+    enabled: true
+    url: https://onetagger.example
+    downloads: /downloads # where OneTagger's container mounts slskd's downloads
+    menu: true
+```
+
 ## User-Defined
 
 User-defined integrations allow users to configure external applications to receive data from slskd as things happen internally.  slskd uses an internal [event bus](https://www.akamai.com/glossary/what-is-an-event-bus) over which event data is sent from application logic to whatever destination(s) users choose.

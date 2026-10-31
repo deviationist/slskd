@@ -1,6 +1,7 @@
 import * as shareLinks from '../../lib/shareLinks';
 import * as transfers from '../../lib/transfers';
 import { formatBytes, formatBytesAsUnit, getFileName } from '../../lib/util';
+import { OneTaggerRowButton } from '../OneTagger/OneTagger';
 import { RowBadge, RowPlay } from '../Player/Parts';
 import TransferDetails from './TransferDetails';
 import React, { Component, useEffect } from 'react';
@@ -318,6 +319,7 @@ class TransferList extends Component {
       files,
       onSelectionChange,
       onShareRequested,
+      oneTaggerEnabled,
       retrievalEnabled,
     } = this.props;
     const { confirming, isFolded, removing, retrieving, unavailable } =
@@ -368,6 +370,9 @@ class TransferList extends Component {
                     </Table.HeaderCell>
                     {onShareRequested && (
                       <Table.HeaderCell className="transferlist-share" />
+                    )}
+                    {oneTaggerEnabled && (
+                      <Table.HeaderCell className="transferlist-onetagger" />
                     )}
                     {retrievalEnabled && (
                       <Table.HeaderCell className="transferlist-retrieve" />
@@ -475,6 +480,11 @@ class TransferList extends Component {
                                 }
                               />
                             )}
+                          </Table.Cell>
+                        )}
+                        {oneTaggerEnabled && (
+                          <Table.Cell className="transferlist-onetagger">
+                            <OneTaggerRowButton file={f} />
                           </Table.Cell>
                         )}
                         {retrievalEnabled && (

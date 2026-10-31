@@ -82,6 +82,7 @@
 }
 
 .transferlist-share,
+.transferlist-onetagger,
 .transferlist-retrieve {
   width: 5px;
   min-width: 5px;
@@ -310,10 +311,10 @@
     column-gap: 0.75em;
     display: grid !important;
     grid-template-areas:
-      'sel name name name name name'
-      'sel prog prog prog prog prog'
-      'sel size shr retr rem det';
-    grid-template-columns: auto 1fr auto auto auto auto;
+      'sel name name name name name name'
+      'sel prog prog prog prog prog prog'
+      'sel size shr ot retr rem det';
+    grid-template-columns: auto 1fr auto auto auto auto auto;
     padding: 0.6em 0.75em !important;
     row-gap: 0.4em;
   }
@@ -344,6 +345,10 @@
 
   .transfer-card .transferlist-share {
     grid-area: shr;
+  }
+
+  .transfer-card .transferlist-onetagger {
+    grid-area: ot;
   }
 
   .transfer-card .transferlist-retrieve {
@@ -490,4 +495,28 @@
         border-radius: 0.28571429rem !important;
         white-space: nowrap;
     }
+}
+
+/* OneTagger's mark as a row's action, sized and coloured like the grey icons
+   beside it (a small Semantic icon is 0.857em of the text). */
+.onetagger-row {
+  color: #767676;
+  margin: 0 0.25rem 0 0;
+  cursor: pointer;
+  display: inline-block;
+  height: 0.857em;
+  opacity: 0.9;
+  vertical-align: middle;
+  width: 0.857em;
+}
+
+.onetagger-row:hover,
+.onetagger-row:focus {
+  opacity: 1;
+}
+
+.onetagger-row > svg {
+  display: block;
+  height: 100%;
+  width: 100%;
 }
